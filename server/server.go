@@ -1380,44 +1380,57 @@ func (server *BgpServer) Api2PathList(resource api.Resource, name string, ApiPat
 	return paths, nil
 }
 
-func (server *BgpServer) handleModPathRequest(grpcReq *GrpcRequest) []*table.Path {
+func (server *BgpServer) handleAddPathRequest(grpcReq *GrpcRequest) []*table.Path {
 	var err error
 	var uuidBytes []byte
 	paths := make([]*table.Path, 0, 1)
-	arg, ok := grpcReq.Data.(*api.ModPathArguments)
+	arg, ok := grpcReq.Data.(*api.AddPathRequest)
 	if !ok {
 		err = fmt.Errorf("type assertion failed")
+	} else {
+		paths, err = server.Api2PathList(arg.Resource, arg.VrfId, []*api.Path{arg.Path})
+		if err == nil {
+			u := uuid.NewV4()
+			uuidBytes = u.Bytes()
+			paths[0].SetUUID(uuidBytes)
+		}
 	}
+	grpcReq.ResponseCh <- &GrpcResponse{
+		ResponseErr: err,
+		Data: &api.AddPathResponse{
+			Uuid: uuidBytes,
+		},
+	}
+	close(grpcReq.ResponseCh)
+	return paths
+}
 
-	if err == nil {
-		switch arg.Operation {
-		case api.Operation_DEL:
-			if len(arg.Uuid) > 0 {
-				path := func() *table.Path {
-					for _, path := range server.globalRib.GetPathList(table.GLOBAL_RIB_NAME, server.globalRib.GetRFlist()) {
-						if len(path.UUID()) > 0 && bytes.Equal(path.UUID(), arg.Uuid) {
-							return path
-						}
+func (server *BgpServer) handleDeletePathRequest(grpcReq *GrpcRequest) []*table.Path {
+	var err error
+	paths := make([]*table.Path, 0, 1)
+	arg, ok := grpcReq.Data.(*api.DeletePathRequest)
+	if !ok {
+		err = fmt.Errorf("type assertion failed")
+	} else {
+		if len(arg.Uuid) > 0 {
+			path := func() *table.Path {
+				for _, path := range server.globalRib.GetPathList(table.GLOBAL_RIB_NAME, server.globalRib.GetRFlist()) {
+					if len(path.UUID()) > 0 && bytes.Equal(path.UUID(), arg.Uuid) {
+						return path
 					}
-					return nil
-				}()
-				if path != nil {
-					paths = append(paths, path.Clone(true))
-				} else {
-					err = fmt.Errorf("Can't find a specified path")
 				}
-				break
+				return nil
+			}()
+			if path != nil {
+				paths = append(paths, path.Clone(true))
+			} else {
+				err = fmt.Errorf("Can't find a specified path")
 			}
+		} else if arg.Path != nil {
 			arg.Path.IsWithdraw = true
-			fallthrough
-		case api.Operation_ADD:
-			paths, err = server.Api2PathList(arg.Resource, arg.Name, []*api.Path{arg.Path})
-			if err == nil {
-				u := uuid.NewV4()
-				uuidBytes = u.Bytes()
-				paths[0].SetUUID(uuidBytes)
-			}
-		case api.Operation_DEL_ALL:
+			paths, err = server.Api2PathList(arg.Resource, arg.VrfId, []*api.Path{arg.Path})
+		} else {
+			// delete all paths
 			families := server.globalRib.GetRFlist()
 			if arg.Family != 0 {
 				families = []bgp.RouteFamily{bgp.RouteFamily(arg.Family)}
@@ -1427,13 +1440,10 @@ func (server *BgpServer) handleModPathRequest(grpcReq *GrpcRequest) []*table.Pat
 			}
 		}
 	}
-	result := &GrpcResponse{
+	grpcReq.ResponseCh <- &GrpcResponse{
 		ResponseErr: err,
-		Data: &api.ModPathResponse{
-			Uuid: uuidBytes,
-		},
+		Data:        &api.DeletePathResponse{},
 	}
-	grpcReq.ResponseCh <- result
 	close(grpcReq.ResponseCh)
 	return paths
 }
@@ -1849,8 +1859,13 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 			Data: bmpmsgs,
 		}
 		close(grpcReq.ResponseCh)
-	case REQ_MOD_PATH:
-		pathList := server.handleModPathRequest(grpcReq)
+	case REQ_ADD_PATH:
+		pathList := server.handleAddPathRequest(grpcReq)
+		if len(pathList) > 0 {
+			msgs, _ = server.propagateUpdate(nil, pathList)
+		}
+	case REQ_DELETE_PATH:
+		pathList := server.handleDeletePathRequest(grpcReq)
 		if len(pathList) > 0 {
 			msgs, _ = server.propagateUpdate(nil, pathList)
 		}
