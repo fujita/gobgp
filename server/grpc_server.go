@@ -43,9 +43,11 @@ const (
 	REQ_NEIGHBOR_SOFT_RESET_OUT
 	REQ_NEIGHBOR_ENABLE
 	REQ_NEIGHBOR_DISABLE
-	REQ_MOD_NEIGHBOR
 	REQ_ADD_NEIGHBOR
 	REQ_DEL_NEIGHBOR
+	// FIXME: we should merge
+	REQ_GRPC_ADD_NEIGHBOR
+	REQ_GRPC_DELETE_NEIGHBOR
 	REQ_UPDATE_NEIGHBOR
 	REQ_GLOBAL_RIB
 	REQ_MONITOR_GLOBAL_BEST_CHANGED
@@ -364,8 +366,14 @@ func (s *Server) ModVrf(ctx context.Context, arg *api.ModVrfArguments) (*api.Err
 	return s.mod(REQ_VRF_MOD, arg)
 }
 
-func (s *Server) ModNeighbor(ctx context.Context, arg *api.ModNeighborArguments) (*api.Error, error) {
-	return s.mod(REQ_MOD_NEIGHBOR, arg)
+func (s *Server) AddNeighbor(ctx context.Context, arg *api.AddNeighborRequest) (*api.AddNeighborResponse, error) {
+	d, err := s.get(REQ_GRPC_ADD_NEIGHBOR, arg)
+	return d.(*api.AddNeighborResponse), err
+}
+
+func (s *Server) DeleteNeighbor(ctx context.Context, arg *api.DeleteNeighborRequest) (*api.DeleteNeighborResponse, error) {
+	d, err := s.get(REQ_GRPC_DELETE_NEIGHBOR, arg)
+	return d.(*api.DeleteNeighborResponse), err
 }
 
 func (s *Server) GetDefinedSet(ctx context.Context, arg *api.DefinedSet) (*api.DefinedSet, error) {
