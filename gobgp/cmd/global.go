@@ -790,18 +790,21 @@ usage: %s rib %s match <MATCH_EXPR> then <THEN_EXPR> -a %%s
 		return err
 	}
 
-	arg := &api.ModPathArguments{
-		Operation: api.Operation_ADD,
-		Resource:  resource,
-		Name:      name,
-		Path:      path,
+	if modtype == CMD_ADD {
+		arg := &api.AddPathRequest{
+			Resource: resource,
+			VrfId:    name,
+			Path:     path,
+		}
+		_, err = client.AddPath(context.Background(), arg)
+	} else {
+		arg := &api.DeletePathRequest{
+			Resource: resource,
+			VrfId:    name,
+			Path:     path,
+		}
+		_, err = client.DeletePath(context.Background(), arg)
 	}
-
-	if modtype == CMD_DEL {
-		arg.Operation = api.Operation_DEL
-	}
-
-	_, err = client.ModPath(context.Background(), arg)
 	return err
 }
 
@@ -920,12 +923,11 @@ func NewGlobalCmd() *cobra.Command {
 					if err != nil {
 						exitWithError(err)
 					}
-					arg := &api.ModPathArguments{
-						Operation: api.Operation_DEL_ALL,
-						Resource:  api.Resource_GLOBAL,
-						Family:    uint32(family),
+					arg := &api.DeletePathRequest{
+						Resource: api.Resource_GLOBAL,
+						Family:   uint32(family),
 					}
-					_, err = client.ModPath(context.Background(), arg)
+					_, err = client.DeletePath(context.Background(), arg)
 					if err != nil {
 						exitWithError(err)
 					}

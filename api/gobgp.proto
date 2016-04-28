@@ -33,8 +33,9 @@ service GobgpApi {
   rpc Shutdown(Arguments) returns (Error) {}
   rpc Enable(Arguments) returns (Error) {}
   rpc Disable(Arguments) returns (Error) {}
-  rpc ModPath(ModPathArguments) returns (ModPathResponse) {}
   rpc ModPaths(stream ModPathsArguments) returns (Error) {}
+  rpc AddPath(AddPathRequest) returns (AddPathResponse);
+  rpc DeletePath(DeletePathRequest) returns (DeletePathResponse);
   rpc MonitorRib(Table) returns (stream Destination) {}
   rpc MonitorBestChanged(Arguments) returns (stream Destination) {}
   rpc MonitorPeerState(Arguments) returns (stream Peer) {}
@@ -74,25 +75,31 @@ message Arguments {
     string name = 3;
 }
 
-message ModPathArguments {
-    Operation operation = 1;
-    Resource resource = 2;
-    string name = 3;
-    Path path = 4;
-    // uuid field can be only used when operation is DEL
-    bytes uuid = 5;
-    // family field is only used when operation is DEL_ALL
-    uint32 family = 6;
-}
-
-message ModPathResponse {
-    bytes uuid = 1;
-}
-
 message ModPathsArguments {
     Resource resource = 1;
     string name = 2;
     repeated Path paths = 3;
+}
+
+message AddPathRequest {
+    Resource resource = 1;
+    string vrf_id = 2;
+    Path path = 3;
+}
+
+message AddPathResponse {
+    bytes uuid = 1;
+}
+
+message DeletePathRequest {
+    Resource resource = 1;
+    string vrf_id = 2;
+    uint32 family = 3;
+    Path path = 4;
+    bytes uuid = 5;
+}
+
+message DeletePathResponse {
 }
 
 message ModNeighborArguments {
