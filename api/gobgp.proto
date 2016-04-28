@@ -22,9 +22,10 @@ package gobgpapi;
 service GobgpApi {
   rpc GetGlobalConfig(Arguments) returns (Global) {}
   rpc ModGlobalConfig(ModGlobalConfigArguments) returns (Error) {}
+  rpc AddNeighbor(AddNeighborRequest) returns (AddNeighborResponse) {}
+  rpc DeleteNeighbor(DeleteNeighborRequest) returns (DeleteNeighborResponse) {}
   rpc GetNeighbors(Arguments) returns (stream Peer) {}
   rpc GetNeighbor(Arguments) returns (Peer) {}
-  rpc ModNeighbor(ModNeighborArguments) returns(Error) {}
   rpc GetRib(Table) returns (Table) {}
   rpc Reset(Arguments) returns (Error) {}
   rpc SoftReset(Arguments) returns (Error) {}
@@ -96,9 +97,18 @@ message DeletePathRequest {
 message DeletePathResponse {
 }
 
-message ModNeighborArguments {
-    Operation operation = 1;
-    Peer peer = 2;
+message AddNeighborRequest {
+    Peer peer = 1;
+}
+
+message AddNeighborResponse {
+}
+
+message DeleteNeighborRequest {
+    Peer peer = 1;
+}
+
+message DeleteNeighborResponse {
 }
 
 message MrtArguments {
