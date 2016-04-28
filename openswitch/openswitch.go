@@ -390,21 +390,17 @@ func (m *OpsManager) handleRouteUpdate(update ovsdb.TableUpdate) []*server.GrpcR
 				return nil
 			}
 			if isWithdraw {
-				reqs = append(reqs, server.NewGrpcRequest(server.REQ_MOD_PATH, "del", bgp.RouteFamily(0), &api.ModPathArguments{
-					Operation: api.Operation_DEL,
-					Resource:  api.Resource_GLOBAL,
-					Name:      "",
-					Path:      path,
+				reqs = append(reqs, server.NewGrpcRequest(server.REQ_DELETE_PATH, "", bgp.RouteFamily(0), &api.AddPathRequest{
+					Resource: api.Resource_GLOBAL,
+					Path:     path,
 				}))
 			} else {
 				if isFromGobgp {
 					return nil
 				}
-				reqs = append(reqs, server.NewGrpcRequest(server.REQ_MOD_PATH, "add", bgp.RouteFamily(0), &api.ModPathArguments{
-					Operation: api.Operation_ADD,
-					Resource:  api.Resource_GLOBAL,
-					Name:      "",
-					Path:      path,
+				reqs = append(reqs, server.NewGrpcRequest(server.REQ_ADD_PATH, "", bgp.RouteFamily(0), &api.AddPathRequest{
+					Resource: api.Resource_GLOBAL,
+					Path:     path,
 				}))
 			}
 		}

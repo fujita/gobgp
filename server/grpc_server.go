@@ -61,7 +61,8 @@ const (
 	REQ_VRF
 	REQ_VRFS
 	REQ_VRF_MOD
-	REQ_MOD_PATH
+	REQ_ADD_PATH
+	REQ_DELETE_PATH
 	REQ_MOD_PATHS
 	REQ_DEFINED_SET
 	REQ_MOD_DEFINED_SET
@@ -246,12 +247,14 @@ func (s *Server) Disable(ctx context.Context, arg *api.Arguments) (*api.Error, e
 	return s.neighbor(REQ_NEIGHBOR_DISABLE, arg)
 }
 
-func (s *Server) ModPath(ctx context.Context, arg *api.ModPathArguments) (*api.ModPathResponse, error) {
-	d, err := s.get(REQ_MOD_PATH, arg)
-	if err != nil {
-		return nil, err
-	}
-	return d.(*api.ModPathResponse), nil
+func (s *Server) AddPath(ctx context.Context, arg *api.AddPathRequest) (*api.AddPathResponse, error) {
+	d, err := s.get(REQ_ADD_PATH, arg)
+	return d.(*api.AddPathResponse), err
+}
+
+func (s *Server) DeletePath(ctx context.Context, arg *api.DeletePathRequest) (*api.DeletePathResponse, error) {
+	d, err := s.get(REQ_DELETE_PATH, arg)
+	return d.(*api.DeletePathResponse), err
 }
 
 func (s *Server) ModPaths(stream api.GobgpApi_ModPathsServer) error {
