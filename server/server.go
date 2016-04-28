@@ -1448,15 +1448,15 @@ func (server *BgpServer) handleDeletePathRequest(grpcReq *GrpcRequest) []*table.
 	return paths
 }
 
-func (server *BgpServer) handleModPathsRequest(grpcReq *GrpcRequest) []*table.Path {
+func (server *BgpServer) handleInjectMrtRequest(grpcReq *GrpcRequest) []*table.Path {
 	var err error
 	var paths []*table.Path
-	arg, ok := grpcReq.Data.(*api.ModPathsArguments)
+	arg, ok := grpcReq.Data.(*api.InjectMrtRequest)
 	if !ok {
 		err = fmt.Errorf("type assertion failed")
 	}
 	if err == nil {
-		paths, err = server.Api2PathList(arg.Resource, arg.Name, arg.Paths)
+		paths, err = server.Api2PathList(arg.Resource, arg.VrfId, arg.Paths)
 		if err == nil {
 			return paths
 		}
@@ -1869,13 +1869,6 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 		if len(pathList) > 0 {
 			msgs, _ = server.propagateUpdate(nil, pathList)
 		}
-	case REQ_MOD_PATHS:
-		pathList := server.handleModPathsRequest(grpcReq)
-		if len(pathList) > 0 {
-			msgs, _ = server.propagateUpdate(nil, pathList)
-			grpcReq.ResponseCh <- &GrpcResponse{}
-			close(grpcReq.ResponseCh)
-		}
 	case REQ_NEIGHBORS:
 		results := make([]*GrpcResponse, len(server.neighborMap))
 		i := 0
@@ -2271,6 +2264,13 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 		server.handleMrt(grpcReq)
 	case REQ_MOD_MRT:
 		server.handleModMrt(grpcReq)
+	case REQ_INJECT_MRT:
+		pathList := server.handleInjectMrtRequest(grpcReq)
+		if len(pathList) > 0 {
+			msgs, _ = server.propagateUpdate(nil, pathList)
+			grpcReq.ResponseCh <- &GrpcResponse{}
+			close(grpcReq.ResponseCh)
+		}
 	case REQ_MOD_BMP:
 		server.handleModBmp(grpcReq)
 	case REQ_MOD_RPKI:
