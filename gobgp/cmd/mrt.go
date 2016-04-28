@@ -200,7 +200,7 @@ func injectMrt(r string, filename string, count int, skip int) error {
 
 	idx := 0
 
-	ch := make(chan *api.ModPathsArguments, 1<<20)
+	ch := make(chan *api.InjectMrtRequest, 1<<20)
 
 	go func() {
 
@@ -288,7 +288,7 @@ func injectMrt(r string, filename string, count int, skip int) error {
 				}
 
 				if idx >= skip {
-					ch <- &api.ModPathsArguments{
+					ch <- &api.InjectMrtRequest{
 						Resource: resource,
 						Paths:    paths,
 					}
@@ -304,7 +304,7 @@ func injectMrt(r string, filename string, count int, skip int) error {
 		close(ch)
 	}()
 
-	stream, err := client.ModPaths(context.Background())
+	stream, err := client.InjectMrt(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to modpath: %s", err)
 	}
@@ -316,12 +316,9 @@ func injectMrt(r string, filename string, count int, skip int) error {
 		}
 	}
 
-	res, err := stream.CloseAndRecv()
+	_, err = stream.CloseAndRecv()
 	if err != nil {
 		return fmt.Errorf("failed to send: %s", err)
-	}
-	if res.Code != api.Error_SUCCESS {
-		return fmt.Errorf("error: code: %d, msg: %s", res.Code, res.Msg)
 	}
 	return nil
 }

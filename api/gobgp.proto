@@ -33,7 +33,6 @@ service GobgpApi {
   rpc Shutdown(Arguments) returns (Error) {}
   rpc Enable(Arguments) returns (Error) {}
   rpc Disable(Arguments) returns (Error) {}
-  rpc ModPaths(stream ModPathsArguments) returns (Error) {}
   rpc AddPath(AddPathRequest) returns (AddPathResponse);
   rpc DeletePath(DeletePathRequest) returns (DeletePathResponse);
   rpc MonitorRib(Table) returns (stream Destination) {}
@@ -41,6 +40,7 @@ service GobgpApi {
   rpc MonitorPeerState(Arguments) returns (stream Peer) {}
   rpc GetMrt(MrtArguments) returns (stream MrtMessage) {}
   rpc ModMrt(ModMrtArguments) returns (Error) {}
+  rpc InjectMrt(stream InjectMrtRequest) returns (InjectMrtResponse);
   rpc ModBmp(ModBmpArguments) returns (Error) {}
   rpc GetRPKI(Arguments) returns (stream RPKI) {}
   rpc ModRPKI(ModRpkiArguments) returns (Error) {}
@@ -73,12 +73,6 @@ message Arguments {
     Resource resource = 1;
     uint32 family = 2;
     string name = 3;
-}
-
-message ModPathsArguments {
-    Resource resource = 1;
-    string name = 2;
-    repeated Path paths = 3;
 }
 
 message AddPathRequest {
@@ -119,6 +113,15 @@ message ModMrtArguments {
     int32 dump_type = 2;
     string filename = 3;
     uint64 interval = 4;
+}
+
+message InjectMrtRequest {
+    Resource resource = 1;
+    string vrf_id = 2;
+    repeated Path paths = 3;
+}
+
+message InjectMrtResponse {
 }
 
 message ModBmpArguments {

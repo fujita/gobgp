@@ -53,6 +53,7 @@ const (
 	REQ_MONITOR_NEIGHBOR_PEER_STATE
 	REQ_MRT_GLOBAL_RIB
 	REQ_MRT_LOCAL_RIB
+	REQ_INJECT_MRT
 	REQ_MOD_MRT
 	REQ_MOD_BMP
 	REQ_RPKI
@@ -63,7 +64,6 @@ const (
 	REQ_VRF_MOD
 	REQ_ADD_PATH
 	REQ_DELETE_PATH
-	REQ_MOD_PATHS
 	REQ_DEFINED_SET
 	REQ_MOD_DEFINED_SET
 	REQ_STATEMENT
@@ -257,7 +257,7 @@ func (s *Server) DeletePath(ctx context.Context, arg *api.DeletePathRequest) (*a
 	return d.(*api.DeletePathResponse), err
 }
 
-func (s *Server) ModPaths(stream api.GobgpApi_ModPathsServer) error {
+func (s *Server) InjectMrt(stream api.GobgpApi_InjectMrtServer) error {
 	for {
 		arg, err := stream.Recv()
 
@@ -271,7 +271,7 @@ func (s *Server) ModPaths(stream api.GobgpApi_ModPathsServer) error {
 			return fmt.Errorf("unsupported resource: %s", arg.Resource)
 		}
 
-		req := NewGrpcRequest(REQ_MOD_PATHS, arg.Name, bgp.RouteFamily(0), arg)
+		req := NewGrpcRequest(REQ_INJECT_MRT, "", bgp.RouteFamily(0), arg)
 		s.bgpServerCh <- req
 
 		res := <-req.ResponseCh
@@ -280,11 +280,7 @@ func (s *Server) ModPaths(stream api.GobgpApi_ModPathsServer) error {
 			return err
 		}
 	}
-	err := stream.SendAndClose(&api.Error{
-		Code: api.Error_SUCCESS,
-	})
-
-	return err
+	return stream.SendAndClose(&api.InjectMrtResponse{})
 }
 
 func (s *Server) GetMrt(arg *api.MrtArguments, stream api.GobgpApi_GetMrtServer) error {
