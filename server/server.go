@@ -1661,9 +1661,8 @@ func (server *BgpServer) handleModConfig(grpcReq *GrpcRequest) error {
 		table.SelectionOptions = c.RouteSelectionOptions.Config
 	case api.Operation_DEL_ALL:
 		for k, _ := range server.neighborMap {
-			_, err := server.handleGrpcModNeighbor(&GrpcRequest{
-				Data: &api.ModNeighborArguments{
-					Operation: api.Operation_DEL,
+			_, err := server.handleDeleteNeighborRequest(&GrpcRequest{
+				Data: &api.DeleteNeighborRequest{
 					Peer: &api.Peer{
 						Conf: &api.PeerConf{
 							NeighborAddress: k,
@@ -2164,8 +2163,14 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 		result.Data = err
 		grpcReq.ResponseCh <- result
 		close(grpcReq.ResponseCh)
-	case REQ_MOD_NEIGHBOR:
-		m, err := server.handleGrpcModNeighbor(grpcReq)
+	case REQ_GRPC_ADD_NEIGHBOR:
+		_, err := server.handleAddNeighborRequest(grpcReq)
+		grpcReq.ResponseCh <- &GrpcResponse{
+			ResponseErr: err,
+		}
+		close(grpcReq.ResponseCh)
+	case REQ_GRPC_DELETE_NEIGHBOR:
+		m, err := server.handleDeleteNeighborRequest(grpcReq)
 		grpcReq.ResponseCh <- &GrpcResponse{
 			ResponseErr: err,
 		}
@@ -2454,10 +2459,11 @@ func (server *BgpServer) handleUpdateNeighbor(c *config.Neighbor) ([]*SenderMsg,
 	return msgs, policyUpdated, nil
 }
 
-func (server *BgpServer) handleGrpcModNeighbor(grpcReq *GrpcRequest) ([]*SenderMsg, error) {
-	arg := grpcReq.Data.(*api.ModNeighborArguments)
-	switch arg.Operation {
-	case api.Operation_ADD:
+func (server *BgpServer) handleAddNeighborRequest(grpcReq *GrpcRequest) ([]*SenderMsg, error) {
+	arg, ok := grpcReq.Data.(*api.AddNeighborRequest)
+	if !ok {
+		return []*SenderMsg{}, fmt.Errorf("AddNeighborRequest type assertion failed")
+	} else {
 		apitoConfig := func(a *api.Peer) (*config.Neighbor, error) {
 			pconf := &config.Neighbor{}
 			if a.Conf != nil {
@@ -2567,15 +2573,16 @@ func (server *BgpServer) handleGrpcModNeighbor(grpcReq *GrpcRequest) ([]*SenderM
 			return nil, err
 		}
 		return server.handleAddNeighbor(c)
-	case api.Operation_DEL:
-		return server.handleDelNeighbor(&config.Neighbor{
-			Config: config.NeighborConfig{
-				NeighborAddress: arg.Peer.Conf.NeighborAddress,
-			},
-		}, bgp.BGP_ERROR_CEASE, bgp.BGP_ERROR_SUB_PEER_DECONFIGURED)
-	default:
-		return nil, fmt.Errorf("unsupported operation %s", arg.Operation)
 	}
+}
+
+func (server *BgpServer) handleDeleteNeighborRequest(grpcReq *GrpcRequest) ([]*SenderMsg, error) {
+	arg := grpcReq.Data.(*api.DeleteNeighborRequest)
+	return server.handleDelNeighbor(&config.Neighbor{
+		Config: config.NeighborConfig{
+			NeighborAddress: arg.Peer.Conf.NeighborAddress,
+		},
+	}, bgp.BGP_ERROR_CEASE, bgp.BGP_ERROR_SUB_PEER_DECONFIGURED)
 }
 
 func (server *BgpServer) handleGrpcModDefinedSet(grpcReq *GrpcRequest) error {
