@@ -862,8 +862,7 @@ func modGlobalConfig(args []string) error {
 			return err
 		}
 	}
-	_, err = client.ModGlobalConfig(context.Background(), &api.ModGlobalConfigArguments{
-		Operation: api.Operation_ADD,
+	_, err = client.StartServer(context.Background(), &api.StartServerRequest{
 		Global: &api.Global{
 			As:              uint32(asn),
 			RouterId:        id.String(),
@@ -984,9 +983,7 @@ func NewGlobalCmd() *cobra.Command {
 	allCmd := &cobra.Command{
 		Use: CMD_ALL,
 		Run: func(cmd *cobra.Command, args []string) {
-			_, err := client.ModGlobalConfig(context.Background(), &api.ModGlobalConfigArguments{
-				Operation: api.Operation_DEL_ALL,
-			})
+			_, err := client.StopServer(context.Background(), &api.StopServerRequest{})
 			if err != nil {
 				exitWithError(err)
 			}
