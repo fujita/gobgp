@@ -62,9 +62,10 @@ const (
 	REQ_RPKI
 	REQ_MOD_RPKI
 	REQ_ROA
+	REQ_ADD_VRF
+	REQ_DELETE_VRF
 	REQ_VRF
 	REQ_VRFS
-	REQ_VRF_MOD
 	REQ_ADD_PATH
 	REQ_DELETE_PATH
 	REQ_DEFINED_SET
@@ -369,8 +370,14 @@ func (s *Server) mod(typ int, d interface{}) (*api.Error, error) {
 	return none, nil
 }
 
-func (s *Server) ModVrf(ctx context.Context, arg *api.ModVrfArguments) (*api.Error, error) {
-	return s.mod(REQ_VRF_MOD, arg)
+func (s *Server) AddVrf(ctx context.Context, arg *api.AddVrfRequest) (*api.AddVrfResponse, error) {
+	d, err := s.get(REQ_ADD_VRF, arg)
+	return d.(*api.AddVrfResponse), err
+}
+
+func (s *Server) DeleteVrf(ctx context.Context, arg *api.DeleteVrfRequest) (*api.DeleteVrfResponse, error) {
+	d, err := s.get(REQ_DELETE_VRF, arg)
+	return d.(*api.DeleteVrfResponse), err
 }
 
 func (s *Server) AddNeighbor(ctx context.Context, arg *api.AddNeighborRequest) (*api.AddNeighborResponse, error) {
