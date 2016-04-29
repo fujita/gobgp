@@ -984,7 +984,7 @@ func (server *BgpServer) handleFSMMessage(peer *Peer, e *FsmMsg) []*SenderMsg {
 func (server *BgpServer) SetGlobalType(g config.Global) error {
 	ch := make(chan *GrpcResponse)
 	server.GrpcReqCh <- &GrpcRequest{
-		RequestType: REQ_MOD_GLOBAL_CONFIG,
+		RequestType: REQ_START_SERVER,
 		Data:        &g,
 		ResponseCh:  ch,
 	}
@@ -1576,83 +1576,48 @@ END:
 }
 
 func (server *BgpServer) handleModConfig(grpcReq *GrpcRequest) error {
-	var op api.Operation
 	var c *config.Global
 	switch arg := grpcReq.Data.(type) {
-	case *api.ModGlobalConfigArguments:
-		op = arg.Operation
-		if op == api.Operation_ADD {
-			g := arg.Global
-			if net.ParseIP(g.RouterId) == nil {
-				return fmt.Errorf("invalid router-id format: %s", g.RouterId)
-			}
-			families := make([]config.AfiSafi, 0, len(g.Families))
-			for _, f := range g.Families {
-				name := config.AfiSafiType(bgp.RouteFamily(f).String())
-				families = append(families, config.AfiSafi{
-					Config: config.AfiSafiConfig{
-						AfiSafiName: name,
-						Enabled:     true,
-					},
-					State: config.AfiSafiState{
-						AfiSafiName: name,
-					},
-				})
-			}
-			b := &config.BgpConfigSet{
-				Global: config.Global{
-					Config: config.GlobalConfig{
-						As:               g.As,
-						RouterId:         g.RouterId,
-						Port:             g.ListenPort,
-						LocalAddressList: g.ListenAddresses,
-					},
-					MplsLabelRange: config.MplsLabelRange{
-						MinLabel: g.MplsLabelMin,
-						MaxLabel: g.MplsLabelMax,
-					},
-					AfiSafis: families,
+	case *api.StartServerRequest:
+		g := arg.Global
+		if net.ParseIP(g.RouterId) == nil {
+			return fmt.Errorf("invalid router-id format: %s", g.RouterId)
+		}
+		families := make([]config.AfiSafi, 0, len(g.Families))
+		for _, f := range g.Families {
+			name := config.AfiSafiType(bgp.RouteFamily(f).String())
+			families = append(families, config.AfiSafi{
+				Config: config.AfiSafiConfig{
+					AfiSafiName: name,
+					Enabled:     true,
 				},
-			}
-			if err := config.SetDefaultConfigValues(nil, b); err != nil {
-				return err
-			}
-			c = &b.Global
+				State: config.AfiSafiState{
+					AfiSafiName: name,
+				},
+			})
 		}
-	case *config.Global:
-		op = api.Operation_ADD
-		c = arg
-	}
-
-	switch op {
-	case api.Operation_ADD:
-		if server.bgpConfig.Global.Config.As != 0 {
-			return fmt.Errorf("gobgp is already started")
+		b := &config.BgpConfigSet{
+			Global: config.Global{
+				Config: config.GlobalConfig{
+					As:               g.As,
+					RouterId:         g.RouterId,
+					Port:             g.ListenPort,
+					LocalAddressList: g.ListenAddresses,
+				},
+				MplsLabelRange: config.MplsLabelRange{
+					MinLabel: g.MplsLabelMin,
+					MaxLabel: g.MplsLabelMax,
+				},
+				AfiSafis: families,
+			},
 		}
-
-		if c.Config.Port > 0 {
-			acceptCh := make(chan *net.TCPConn, 4096)
-			for _, addr := range c.Config.LocalAddressList {
-				l, err := NewTCPListener(addr, uint32(c.Config.Port), acceptCh)
-				if err != nil {
-					return err
-				}
-				server.listeners = append(server.listeners, l)
-			}
-			server.acceptCh = acceptCh
-		}
-
-		rfs, _ := config.AfiSafis(c.AfiSafis).ToRfList()
-		server.globalRib = table.NewTableManager(rfs, c.MplsLabelRange.MinLabel, c.MplsLabelRange.MaxLabel)
-
-		p := config.RoutingPolicy{}
-		if err := server.SetRoutingPolicy(p); err != nil {
+		if err := config.SetDefaultConfigValues(nil, b); err != nil {
 			return err
 		}
-		server.bgpConfig.Global = *c
-		// update route selection options
-		table.SelectionOptions = c.RouteSelectionOptions.Config
-	case api.Operation_DEL_ALL:
+		c = &b.Global
+	case *config.Global:
+		c = arg
+	case *api.StopServerRequest:
 		for k, _ := range server.neighborMap {
 			_, err := server.handleDeleteNeighborRequest(&GrpcRequest{
 				Data: &api.DeleteNeighborRequest{
@@ -1671,7 +1636,35 @@ func (server *BgpServer) handleModConfig(grpcReq *GrpcRequest) error {
 			l.Close()
 		}
 		server.bgpConfig.Global = config.Global{}
+		return nil
 	}
+
+	if server.bgpConfig.Global.Config.As != 0 {
+		return fmt.Errorf("gobgp is already started")
+	}
+
+	if c.Config.Port > 0 {
+		acceptCh := make(chan *net.TCPConn, 4096)
+		for _, addr := range c.Config.LocalAddressList {
+			l, err := NewTCPListener(addr, uint32(c.Config.Port), acceptCh)
+			if err != nil {
+				return err
+			}
+			server.listeners = append(server.listeners, l)
+		}
+		server.acceptCh = acceptCh
+	}
+
+	rfs, _ := config.AfiSafis(c.AfiSafis).ToRfList()
+	server.globalRib = table.NewTableManager(rfs, c.MplsLabelRange.MinLabel, c.MplsLabelRange.MaxLabel)
+
+	p := config.RoutingPolicy{}
+	if err := server.SetRoutingPolicy(p); err != nil {
+		return err
+	}
+	server.bgpConfig.Global = *c
+	// update route selection options
+	table.SelectionOptions = c.RouteSelectionOptions.Config
 	return nil
 }
 
@@ -1725,7 +1718,7 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 		return results
 	}
 
-	if server.bgpConfig.Global.Config.As == 0 && grpcReq.RequestType != REQ_MOD_GLOBAL_CONFIG {
+	if server.bgpConfig.Global.Config.As == 0 && grpcReq.RequestType != REQ_START_SERVER {
 		grpcReq.ResponseCh <- &GrpcResponse{
 			ResponseErr: fmt.Errorf("bgpd main loop is not started yet"),
 		}
@@ -1750,7 +1743,7 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 		}
 		grpcReq.ResponseCh <- result
 		close(grpcReq.ResponseCh)
-	case REQ_MOD_GLOBAL_CONFIG:
+	case REQ_START_SERVER, REQ_STOP_SERVER:
 		err := server.handleModConfig(grpcReq)
 		grpcReq.ResponseCh <- &GrpcResponse{
 			ResponseErr: err,

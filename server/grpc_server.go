@@ -30,7 +30,8 @@ import (
 const (
 	_ = iota
 	REQ_GLOBAL_CONFIG
-	REQ_MOD_GLOBAL_CONFIG
+	REQ_START_SERVER
+	REQ_STOP_SERVER
 	REQ_NEIGHBOR
 	REQ_NEIGHBORS
 	REQ_ADJ_RIB_IN
@@ -470,8 +471,14 @@ func (s *Server) GetGlobalConfig(ctx context.Context, arg *api.Arguments) (*api.
 	return d.(*api.Global), nil
 }
 
-func (s *Server) ModGlobalConfig(ctx context.Context, arg *api.ModGlobalConfigArguments) (*api.Error, error) {
-	return s.mod(REQ_MOD_GLOBAL_CONFIG, arg)
+func (s *Server) StartServer(ctx context.Context, arg *api.StartServerRequest) (*api.StartServerResponse, error) {
+	d, err := s.get(REQ_START_SERVER, arg)
+	return d.(*api.StartServerResponse), err
+}
+
+func (s *Server) StopServer(ctx context.Context, arg *api.StopServerRequest) (*api.StopServerResponse, error) {
+	d, err := s.get(REQ_STOP_SERVER, arg)
+	return d.(*api.StopServerResponse), err
 }
 
 type GrpcRequest struct {

@@ -276,9 +276,7 @@ func (m *OpsManager) handleVrfUpdate(update ovsdb.TableUpdate) *server.GrpcReque
 		} else if _, ok := v.Old.Fields["bgp_routers"]; ok {
 			_, _, err := m.getBGPRouterUUID()
 			if err != nil {
-				return server.NewGrpcRequest(server.REQ_MOD_GLOBAL_CONFIG, "del", bgp.RouteFamily(0), &api.ModGlobalConfigArguments{
-					Operation: api.Operation_DEL,
-				})
+				return server.NewGrpcRequest(server.REQ_STOP_SERVER, "", bgp.RouteFamily(0), &api.StopServerRequest{})
 			}
 		}
 	}
@@ -309,8 +307,7 @@ func (m *OpsManager) handleBgpRouterUpdate(update ovsdb.TableUpdate) []*server.G
 					}).Debug("router-id is not configured yet")
 					return nil
 				}
-				reqs = append(reqs, server.NewGrpcRequest(server.REQ_MOD_GLOBAL_CONFIG, "add", bgp.RouteFamily(0), &api.ModGlobalConfigArguments{
-					Operation: api.Operation_ADD,
+				reqs = append(reqs, server.NewGrpcRequest(server.REQ_START_SERVER, "", bgp.RouteFamily(0), &api.StartServerRequest{
 					Global: &api.Global{
 						As:       asn,
 						RouterId: r,
@@ -638,11 +635,11 @@ func (m *OpsManager) GobgpServe() error {
 			}).Error("grpc operation failed")
 		} else {
 			if monitorReady {
-				if grpcReq.RequestType == server.REQ_MOD_GLOBAL_CONFIG && grpcReq.Name == "del" {
+				if grpcReq.RequestType == server.REQ_STOP_SERVER {
 					monitorReady = false
 				}
 			} else {
-				if grpcReq.RequestType == server.REQ_MOD_GLOBAL_CONFIG && grpcReq.Name == "add" {
+				if grpcReq.RequestType == server.REQ_START_SERVER {
 					monitorReady = true
 					go m.GobgpMonitor(&monitorReady)
 				}
