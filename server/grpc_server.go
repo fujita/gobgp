@@ -55,8 +55,9 @@ const (
 	REQ_MONITOR_NEIGHBOR_PEER_STATE
 	REQ_MRT_GLOBAL_RIB
 	REQ_MRT_LOCAL_RIB
+	REQ_ENABLE_MRT
+	REQ_DISABLE_MRT
 	REQ_INJECT_MRT
-	REQ_MOD_MRT
 	REQ_MOD_BMP
 	REQ_RPKI
 	REQ_MOD_RPKI
@@ -259,6 +260,16 @@ func (s *Server) DeletePath(ctx context.Context, arg *api.DeletePathRequest) (*a
 	return d.(*api.DeletePathResponse), err
 }
 
+func (s *Server) EnableMrt(ctx context.Context, arg *api.EnableMrtRequest) (*api.EnableMrtResponse, error) {
+	d, err := s.get(REQ_ENABLE_MRT, arg)
+	return d.(*api.EnableMrtResponse), err
+}
+
+func (s *Server) DisableMrt(ctx context.Context, arg *api.DisableMrtRequest) (*api.DisableMrtResponse, error) {
+	d, err := s.get(REQ_DISABLE_MRT, arg)
+	return d.(*api.DisableMrtResponse), err
+}
+
 func (s *Server) InjectMrt(stream api.GobgpApi_InjectMrtServer) error {
 	for {
 		arg, err := stream.Recv()
@@ -300,10 +311,6 @@ func (s *Server) GetMrt(arg *api.MrtArguments, stream api.GobgpApi_GetMrtServer)
 	return handleMultipleResponses(req, func(res *GrpcResponse) error {
 		return stream.Send(res.Data.(*api.MrtMessage))
 	})
-}
-
-func (s *Server) ModMrt(ctx context.Context, arg *api.ModMrtArguments) (*api.Error, error) {
-	return s.mod(REQ_MOD_MRT, arg)
 }
 
 func (s *Server) ModBmp(ctx context.Context, arg *api.ModBmpArguments) (*api.Error, error) {

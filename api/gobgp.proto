@@ -39,8 +39,9 @@ service GobgpApi {
   rpc MonitorRib(Table) returns (stream Destination) {}
   rpc MonitorBestChanged(Arguments) returns (stream Destination) {}
   rpc MonitorPeerState(Arguments) returns (stream Peer) {}
+  rpc EnableMrt(EnableMrtRequest) returns (EnableMrtResponse);
+  rpc DisableMrt(DisableMrtRequest) returns (DisableMrtResponse);
   rpc GetMrt(MrtArguments) returns (stream MrtMessage) {}
-  rpc ModMrt(ModMrtArguments) returns (Error) {}
   rpc InjectMrt(stream InjectMrtRequest) returns (InjectMrtResponse);
   rpc ModBmp(ModBmpArguments) returns (Error) {}
   rpc GetRPKI(Arguments) returns (stream RPKI) {}
@@ -118,11 +119,19 @@ message MrtArguments {
     string neighbor_address = 4;
 }
 
-message ModMrtArguments {
-    Operation operation = 1;
-    int32 dump_type = 2;
-    string filename = 3;
-    uint64 interval = 4;
+message EnableMrtRequest {
+    int32 dump_type = 1;
+    string filename = 2;
+    uint64 interval = 3;
+}
+
+message EnableMrtResponse {
+}
+
+message DisableMrtRequest {
+}
+
+message DisableMrtResponse {
 }
 
 message InjectMrtRequest {
