@@ -1460,49 +1460,40 @@ func (server *BgpServer) handleInjectMrtRequest(grpcReq *GrpcRequest) []*table.P
 
 }
 
-func (server *BgpServer) handleVrfMod(arg *api.ModVrfArguments) ([]*table.Path, error) {
+func (server *BgpServer) handleAddVrfRequest(grpcReq *GrpcRequest) ([]*table.Path, error) {
+	arg, _ := grpcReq.Data.(*api.AddVrfRequest)
 	rib := server.globalRib
-	var msgs []*table.Path
-	switch arg.Operation {
-	case api.Operation_ADD:
-		rd := bgp.GetRouteDistinguisher(arg.Vrf.Rd)
-		f := func(bufs [][]byte) ([]bgp.ExtendedCommunityInterface, error) {
-			ret := make([]bgp.ExtendedCommunityInterface, 0, len(bufs))
-			for _, rt := range bufs {
-				r, err := bgp.ParseExtended(rt)
-				if err != nil {
-					return nil, err
-				}
-				ret = append(ret, r)
+	rd := bgp.GetRouteDistinguisher(arg.Vrf.Rd)
+	f := func(bufs [][]byte) ([]bgp.ExtendedCommunityInterface, error) {
+		ret := make([]bgp.ExtendedCommunityInterface, 0, len(bufs))
+		for _, rt := range bufs {
+			r, err := bgp.ParseExtended(rt)
+			if err != nil {
+				return nil, err
 			}
-			return ret, nil
+			ret = append(ret, r)
 		}
-		importRt, err := f(arg.Vrf.ImportRt)
-		if err != nil {
-			return nil, err
-		}
-		exportRt, err := f(arg.Vrf.ExportRt)
-		if err != nil {
-			return nil, err
-		}
-		pi := &table.PeerInfo{
-			AS:      server.bgpConfig.Global.Config.As,
-			LocalID: net.ParseIP(server.bgpConfig.Global.Config.RouterId).To4(),
-		}
-		msgs, err = rib.AddVrf(arg.Vrf.Name, rd, importRt, exportRt, pi)
-		if err != nil {
-			return nil, err
-		}
-	case api.Operation_DEL:
-		var err error
-		msgs, err = rib.DeleteVrf(arg.Vrf.Name)
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("unknown operation: %d", arg.Operation)
+		return ret, nil
 	}
-	return msgs, nil
+	importRt, err := f(arg.Vrf.ImportRt)
+	if err != nil {
+		return nil, err
+	}
+	exportRt, err := f(arg.Vrf.ExportRt)
+	if err != nil {
+		return nil, err
+	}
+	pi := &table.PeerInfo{
+		AS:      server.bgpConfig.Global.Config.As,
+		LocalID: net.ParseIP(server.bgpConfig.Global.Config.RouterId).To4(),
+	}
+	return rib.AddVrf(arg.Vrf.Name, rd, importRt, exportRt, pi)
+}
+
+func (server *BgpServer) handleDeleteVrfRequest(grpcReq *GrpcRequest) ([]*table.Path, error) {
+	arg, _ := grpcReq.Data.(*api.DeleteVrfRequest)
+	rib := server.globalRib
+	return rib.DeleteVrf(arg.Vrf.Name)
 }
 
 func (server *BgpServer) handleVrfRequest(req *GrpcRequest) []*table.Path {
@@ -1559,9 +1550,12 @@ func (server *BgpServer) handleVrfRequest(req *GrpcRequest) []*table.Path {
 			}
 		}
 		goto END
-	case REQ_VRF_MOD:
-		arg := req.Data.(*api.ModVrfArguments)
-		msgs, result.ResponseErr = server.handleVrfMod(arg)
+	case REQ_ADD_VRF:
+		msgs, result.ResponseErr = server.handleAddVrfRequest(req)
+		result.Data = &api.AddVrfResponse{}
+	case REQ_DELETE_VRF:
+		msgs, result.ResponseErr = server.handleDeleteVrfRequest(req)
+		result.Data = &api.DeleteVrfResponse{}
 	default:
 		result.ResponseErr = fmt.Errorf("unknown request type: %d", req.RequestType)
 	}
@@ -2274,7 +2268,7 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 		server.handleModRpki(grpcReq)
 	case REQ_ROA, REQ_RPKI:
 		server.roaManager.handleGRPC(grpcReq)
-	case REQ_VRF, REQ_VRFS, REQ_VRF_MOD:
+	case REQ_VRF, REQ_VRFS:
 		pathList := server.handleVrfRequest(grpcReq)
 		if len(pathList) > 0 {
 			msgs, _ = server.propagateUpdate(nil, pathList)
