@@ -47,8 +47,9 @@ service GobgpApi {
   rpc GetRPKI(Arguments) returns (stream RPKI) {}
   rpc ModRPKI(ModRpkiArguments) returns (Error) {}
   rpc GetROA(Arguments) returns (stream ROA) {}
+  rpc AddVrf(AddVrfRequest) returns (AddVrfResponse);
+  rpc DeleteVrf(DeleteVrfRequest) returns (DeleteVrfResponse);
   rpc GetVrfs(Arguments) returns (stream Vrf) {}
-  rpc ModVrf(ModVrfArguments) returns (Error) {}
   rpc GetDefinedSet(DefinedSet) returns (DefinedSet) {}
   rpc GetDefinedSets(DefinedSet) returns (stream DefinedSet) {}
   rpc ModDefinedSet(ModDefinedSetArguments) returns (Error) {}
@@ -164,9 +165,18 @@ message ModRpkiArguments {
     string prefix = 6;
 }
 
-message ModVrfArguments {
-    Operation operation = 1;
-    Vrf vrf = 2;
+message AddVrfRequest {
+    Vrf vrf = 1;
+}
+
+message AddVrfResponse {
+}
+
+message DeleteVrfRequest {
+    Vrf vrf = 1;
+}
+
+message DeleteVrfResponse {
 }
 
 message ModDefinedSetArguments {
