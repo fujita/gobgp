@@ -322,8 +322,7 @@ func (m *OpsManager) handleBgpRouterUpdate(update ovsdb.TableUpdate) []*server.G
 				newNeighMap := v.New.Fields["bgp_neighbors"].(ovsdb.OvsMap).GoMap
 				for k, _ := range oldNeighMap {
 					if _, ok := newNeighMap[k]; !ok {
-						reqs = append(reqs, server.NewGrpcRequest(server.REQ_MOD_NEIGHBOR, "del", bgp.RouteFamily(0), &api.ModNeighborArguments{
-							Operation: api.Operation_DEL,
+						reqs = append(reqs, server.NewGrpcRequest(server.REQ_GRPC_DELETE_NEIGHBOR, "", bgp.RouteFamily(0), &api.DeleteNeighborRequest{
 							Peer: &api.Peer{
 								Conf: &api.PeerConf{
 									NeighborAddress: k.(string),
@@ -355,8 +354,7 @@ func (m *OpsManager) handleNeighborUpdate(update ovsdb.TableUpdate) []*server.Gr
 					}).Debug("remote-as is not configured yet")
 					continue
 				}
-				reqs = append(reqs, server.NewGrpcRequest(server.REQ_MOD_NEIGHBOR, "add", bgp.RouteFamily(0), &api.ModNeighborArguments{
-					Operation: api.Operation_ADD,
+				reqs = append(reqs, server.NewGrpcRequest(server.REQ_GRPC_ADD_NEIGHBOR, "", bgp.RouteFamily(0), &api.AddNeighborRequest{
 					Peer: &api.Peer{
 						Conf: &api.PeerConf{
 							NeighborAddress: addrs[idx].String(),
