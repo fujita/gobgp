@@ -28,6 +28,7 @@ service GobgpApi {
   rpc GetNeighbors(Arguments) returns (stream Peer) {}
   rpc GetNeighbor(Arguments) returns (Peer) {}
   rpc GetRib(Table) returns (Table) {}
+  rpc ValidateRib(ValidateRibRequest) returns (ValidateRibResponse) {}
   rpc Reset(Arguments) returns (Error) {}
   rpc SoftReset(Arguments) returns (Error) {}
   rpc SoftResetIn(Arguments) returns (Error) {}
@@ -281,6 +282,15 @@ message Table {
     uint32 family = 3;
     repeated Destination destinations = 4;
     bool post_policy = 5;
+}
+
+message ValidateRibRequest {
+    Resource type = 1;
+    uint32 family = 2;
+    string prefix = 3;
+}
+
+message ValidateRibResponse {
 }
 
 message Peer {
