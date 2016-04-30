@@ -1,4 +1,4 @@
-// Copyright (C) 2015 Nippon Telegraph and Telephone Corporation.
+// Copyright (C) 2015,2016 Nippon Telegraph and Telephone Corporation.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,11 +20,13 @@ package gobgpapi;
 // Interface exported by the server.
 
 service GobgpApi {
+  rpc StartServer(StartServerRequest) returns (StartServerResponse) {}
+  rpc StopServer(StopServerRequest) returns (StopServerResponse) {}
   rpc GetGlobalConfig(Arguments) returns (Global) {}
-  rpc ModGlobalConfig(ModGlobalConfigArguments) returns (Error) {}
+  rpc AddNeighbor(AddNeighborRequest) returns (AddNeighborResponse) {}
+  rpc DeleteNeighbor(DeleteNeighborRequest) returns (DeleteNeighborResponse) {}
   rpc GetNeighbors(Arguments) returns (stream Peer) {}
   rpc GetNeighbor(Arguments) returns (Peer) {}
-  rpc ModNeighbor(ModNeighborArguments) returns(Error) {}
   rpc GetRib(Table) returns (Table) {}
   rpc Reset(Arguments) returns (Error) {}
   rpc SoftReset(Arguments) returns (Error) {}
@@ -33,19 +35,23 @@ service GobgpApi {
   rpc Shutdown(Arguments) returns (Error) {}
   rpc Enable(Arguments) returns (Error) {}
   rpc Disable(Arguments) returns (Error) {}
-  rpc ModPath(ModPathArguments) returns (ModPathResponse) {}
-  rpc ModPaths(stream ModPathsArguments) returns (Error) {}
+  rpc AddPath(AddPathRequest) returns (AddPathResponse) {}
+  rpc DeletePath(DeletePathRequest) returns (DeletePathResponse) {}
   rpc MonitorRib(Table) returns (stream Destination) {}
   rpc MonitorBestChanged(Arguments) returns (stream Destination) {}
   rpc MonitorPeerState(Arguments) returns (stream Peer) {}
+  rpc EnableMrt(EnableMrtRequest) returns (EnableMrtResponse) {}
+  rpc DisableMrt(DisableMrtRequest) returns (DisableMrtResponse) {}
   rpc GetMrt(MrtArguments) returns (stream MrtMessage) {}
-  rpc ModMrt(ModMrtArguments) returns (Error) {}
-  rpc ModBmp(ModBmpArguments) returns (Error) {}
+  rpc InjectMrt(stream InjectMrtRequest) returns (InjectMrtResponse) {}
+  rpc AddBmp(AddBmpRequest) returns (AddBmpResponse) {}
+  rpc DeleteBmp(DeleteBmpRequest) returns (DeleteBmpResponse) {}
   rpc GetRPKI(Arguments) returns (stream RPKI) {}
   rpc ModRPKI(ModRpkiArguments) returns (Error) {}
   rpc GetROA(Arguments) returns (stream ROA) {}
+  rpc AddVrf(AddVrfRequest) returns (AddVrfResponse) {}
+  rpc DeleteVrf(DeleteVrfRequest) returns (DeleteVrfResponse) {}
   rpc GetVrfs(Arguments) returns (stream Vrf) {}
-  rpc ModVrf(ModVrfArguments) returns (Error) {}
   rpc GetDefinedSet(DefinedSet) returns (DefinedSet) {}
   rpc GetDefinedSets(DefinedSet) returns (stream DefinedSet) {}
   rpc ModDefinedSet(ModDefinedSetArguments) returns (Error) {}
@@ -74,30 +80,39 @@ message Arguments {
     string name = 3;
 }
 
-message ModPathArguments {
-    Operation operation = 1;
-    Resource resource = 2;
-    string name = 3;
-    Path path = 4;
-    // uuid field can be only used when operation is DEL
-    bytes uuid = 5;
-    // family field is only used when operation is DEL_ALL
-    uint32 family = 6;
+message AddPathRequest {
+    Resource resource = 1;
+    string vrf_id = 2;
+    Path path = 3;
 }
 
-message ModPathResponse {
+message AddPathResponse {
     bytes uuid = 1;
 }
 
-message ModPathsArguments {
+message DeletePathRequest {
     Resource resource = 1;
-    string name = 2;
-    repeated Path paths = 3;
+    string vrf_id = 2;
+    uint32 family = 3;
+    Path path = 4;
+    bytes uuid = 5;
 }
 
-message ModNeighborArguments {
-    Operation operation = 1;
-    Peer peer = 2;
+message DeletePathResponse {
+}
+
+message AddNeighborRequest {
+    Peer peer = 1;
+}
+
+message AddNeighborResponse {
+}
+
+message DeleteNeighborRequest {
+    Peer peer = 1;
+}
+
+message DeleteNeighborResponse {
 }
 
 message MrtArguments {
@@ -107,23 +122,50 @@ message MrtArguments {
     string neighbor_address = 4;
 }
 
-message ModMrtArguments {
-    Operation operation = 1;
-    int32 dump_type = 2;
-    string filename = 3;
-    uint64 interval = 4;
+message EnableMrtRequest {
+    int32 dump_type = 1;
+    string filename = 2;
+    uint64 interval = 3;
 }
 
-message ModBmpArguments {
-    Operation operation = 1;
-    string address = 2;
-    uint32 port = 3;
+message EnableMrtResponse {
+}
+
+message DisableMrtRequest {
+}
+
+message DisableMrtResponse {
+}
+
+message InjectMrtRequest {
+    Resource resource = 1;
+    string vrf_id = 2;
+    repeated Path paths = 3;
+}
+
+message InjectMrtResponse {
+}
+
+message AddBmpRequest {
+    string address = 1;
+    uint32 port = 2;
     enum MonitoringPolicy {
         PRE = 0;
         POST = 1;
         BOTH = 2;
     }
-    MonitoringPolicy type = 4;
+    MonitoringPolicy type = 3;
+}
+
+message AddBmpResponse {
+}
+
+message DeleteBmpRequest {
+    string address = 1;
+    uint32 port = 2;
+}
+
+message DeleteBmpResponse {
 }
 
 message ModRpkiArguments {
@@ -135,9 +177,18 @@ message ModRpkiArguments {
     string prefix = 6;
 }
 
-message ModVrfArguments {
-    Operation operation = 1;
-    Vrf vrf = 2;
+message AddVrfRequest {
+    Vrf vrf = 1;
+}
+
+message AddVrfResponse {
+}
+
+message DeleteVrfRequest {
+    Vrf vrf = 1;
+}
+
+message DeleteVrfResponse {
 }
 
 message ModDefinedSetArguments {
@@ -168,9 +219,17 @@ message ModPolicyAssignmentArguments {
     PolicyAssignment assignment = 2;
 }
 
-message ModGlobalConfigArguments {
-    Operation operation = 1;
+message StartServerRequest {
     Global global = 2;
+}
+
+message StartServerResponse {
+}
+
+message StopServerRequest {
+}
+
+message StopServerResponse {
 }
 
 enum Resource {
