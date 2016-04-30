@@ -61,6 +61,7 @@ const (
 	REQ_INJECT_MRT
 	REQ_ADD_BMP
 	REQ_DELETE_BMP
+	REQ_VALIDATE_RIB
 	REQ_RPKI
 	REQ_MOD_RPKI
 	REQ_ROA
@@ -324,6 +325,11 @@ func (s *Server) AddBmp(ctx context.Context, arg *api.AddBmpRequest) (*api.AddBm
 func (s *Server) DeleteBmp(ctx context.Context, arg *api.DeleteBmpRequest) (*api.DeleteBmpResponse, error) {
 	d, err := s.get(REQ_DELETE_BMP, arg)
 	return d.(*api.DeleteBmpResponse), err
+}
+
+func (s *Server) ValidateRib(ctx context.Context, arg *api.ValidateRibRequest) (*api.ValidateRibResponse, error) {
+	d, err := s.get(REQ_VALIDATE_RIB, arg)
+	return d.(*api.ValidateRibResponse), err
 }
 
 func (s *Server) ModRPKI(ctx context.Context, arg *api.ModRpkiArguments) (*api.Error, error) {

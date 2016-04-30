@@ -2278,6 +2278,8 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 		server.handleAddBmp(grpcReq)
 	case REQ_DELETE_BMP:
 		server.handleDeleteBmp(grpcReq)
+	case REQ_VALIDATE_RIB:
+		server.handleValidateRib(grpcReq)
 	case REQ_MOD_RPKI:
 		server.handleModRpki(grpcReq)
 	case REQ_ROA, REQ_RPKI:
@@ -3007,6 +3009,29 @@ func (server *BgpServer) handleDeleteBmp(grpcReq *GrpcRequest) {
 	}
 }
 
+func (server *BgpServer) handleValidateRib(grpcReq *GrpcRequest) {
+	arg := grpcReq.Data.(*api.ValidateRibRequest)
+	for _, rf := range server.globalRib.GetRFlist() {
+		if t, ok := server.globalRib.Tables[rf]; ok {
+			dsts := t.GetDestinations()
+			if arg.Prefix != "" {
+				_, prefix, _ := net.ParseCIDR(arg.Prefix)
+				if dst := t.GetDestination(prefix.String()); dst != nil {
+					dsts = map[string]*table.Destination{prefix.String(): dst}
+				}
+			}
+			for _, dst := range dsts {
+				server.roaManager.validate(dst.GetAllKnownPathList())
+			}
+		}
+	}
+	result := &GrpcResponse{
+		Data: &api.ValidateRibResponse{},
+	}
+	grpcReq.ResponseCh <- result
+	close(grpcReq.ResponseCh)
+}
+
 func (server *BgpServer) handleModRpki(grpcReq *GrpcRequest) {
 	arg := grpcReq.Data.(*api.ModRpkiArguments)
 
@@ -3022,23 +3047,6 @@ func (server *BgpServer) handleModRpki(grpcReq *GrpcRequest) {
 		return
 	case api.Operation_ENABLE, api.Operation_DISABLE, api.Operation_RESET, api.Operation_SOFTRESET:
 		grpcDone(grpcReq, server.roaManager.operate(arg.Operation, arg.Address))
-		return
-	case api.Operation_REPLACE:
-		for _, rf := range server.globalRib.GetRFlist() {
-			if t, ok := server.globalRib.Tables[rf]; ok {
-				dsts := t.GetDestinations()
-				if arg.Prefix != "" {
-					_, prefix, _ := net.ParseCIDR(arg.Prefix)
-					if dst := t.GetDestination(prefix.String()); dst != nil {
-						dsts = map[string]*table.Destination{prefix.String(): dst}
-					}
-				}
-				for _, dst := range dsts {
-					server.roaManager.validate(dst.GetAllKnownPathList())
-				}
-			}
-		}
-		grpcDone(grpcReq, nil)
 		return
 	}
 	grpcDone(grpcReq, fmt.Errorf("not supported yet"))
