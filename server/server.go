@@ -1005,12 +1005,9 @@ func (server *BgpServer) SetGlobalType(g config.Global) error {
 func (server *BgpServer) SetRpkiConfig(c []config.RpkiServer) error {
 	ch := make(chan *GrpcResponse)
 	server.GrpcReqCh <- &GrpcRequest{
-		RequestType: REQ_MOD_RPKI,
-		Data: &api.ModRpkiArguments{
-			Operation: api.Operation_INITIALIZE,
-			Asn:       server.bgpConfig.Global.Config.As,
-		},
-		ResponseCh: ch,
+		RequestType: REQ_INITIALIZE_RPKI,
+		Data:        &server.bgpConfig.Global,
+		ResponseCh:  ch,
 	}
 	if err := (<-ch).Err(); err != nil {
 		return err
@@ -2280,6 +2277,9 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 		server.handleDeleteBmp(grpcReq)
 	case REQ_VALIDATE_RIB:
 		server.handleValidateRib(grpcReq)
+	case REQ_INITIALIZE_RPKI:
+		g := grpcReq.Data.(*config.Global)
+		grpcDone(grpcReq, server.roaManager.SetAS(g.Config.As))
 	case REQ_MOD_RPKI:
 		server.handleModRpki(grpcReq)
 	case REQ_ROA, REQ_RPKI:
@@ -3036,9 +3036,6 @@ func (server *BgpServer) handleModRpki(grpcReq *GrpcRequest) {
 	arg := grpcReq.Data.(*api.ModRpkiArguments)
 
 	switch arg.Operation {
-	case api.Operation_INITIALIZE:
-		grpcDone(grpcReq, server.roaManager.SetAS(arg.Asn))
-		return
 	case api.Operation_ADD:
 		grpcDone(grpcReq, server.roaManager.AddServer(net.JoinHostPort(arg.Address, strconv.Itoa(int(arg.Port))), arg.Lifetime))
 		return
