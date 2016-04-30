@@ -187,13 +187,11 @@ func NewRPKICmd() *cobra.Command {
 	validateCmd := &cobra.Command{
 		Use: "validate",
 		Run: func(cmd *cobra.Command, args []string) {
-			arg := &api.ModRpkiArguments{
-				Operation: api.Operation_REPLACE,
-			}
+			arg := &api.ValidateRibRequest{}
 			if len(args) == 1 {
 				arg.Prefix = args[0]
 			}
-			client.ModRPKI(context.Background(), arg)
+			client.ValidateRib(context.Background(), arg)
 		},
 	}
 	rpkiCmd.AddCommand(validateCmd)
