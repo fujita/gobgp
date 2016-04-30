@@ -59,7 +59,8 @@ const (
 	REQ_ENABLE_MRT
 	REQ_DISABLE_MRT
 	REQ_INJECT_MRT
-	REQ_MOD_BMP
+	REQ_ADD_BMP
+	REQ_DELETE_BMP
 	REQ_RPKI
 	REQ_MOD_RPKI
 	REQ_ROA
@@ -315,8 +316,14 @@ func (s *Server) GetMrt(arg *api.MrtArguments, stream api.GobgpApi_GetMrtServer)
 	})
 }
 
-func (s *Server) ModBmp(ctx context.Context, arg *api.ModBmpArguments) (*api.Error, error) {
-	return s.mod(REQ_MOD_BMP, arg)
+func (s *Server) AddBmp(ctx context.Context, arg *api.AddBmpRequest) (*api.AddBmpResponse, error) {
+	d, err := s.get(REQ_ADD_BMP, arg)
+	return d.(*api.AddBmpResponse), err
+}
+
+func (s *Server) DeleteBmp(ctx context.Context, arg *api.DeleteBmpRequest) (*api.DeleteBmpResponse, error) {
+	d, err := s.get(REQ_DELETE_BMP, arg)
+	return d.(*api.DeleteBmpResponse), err
 }
 
 func (s *Server) ModRPKI(ctx context.Context, arg *api.ModRpkiArguments) (*api.Error, error) {

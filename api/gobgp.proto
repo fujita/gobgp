@@ -44,7 +44,8 @@ service GobgpApi {
   rpc DisableMrt(DisableMrtRequest) returns (DisableMrtResponse);
   rpc GetMrt(MrtArguments) returns (stream MrtMessage) {}
   rpc InjectMrt(stream InjectMrtRequest) returns (InjectMrtResponse);
-  rpc ModBmp(ModBmpArguments) returns (Error) {}
+  rpc AddBmp(AddBmpRequest) returns (AddBmpResponse) {}
+  rpc DeleteBmp(DeleteBmpRequest) returns (DeleteBmpResponse) {}
   rpc GetRPKI(Arguments) returns (stream RPKI) {}
   rpc ModRPKI(ModRpkiArguments) returns (Error) {}
   rpc GetROA(Arguments) returns (stream ROA) {}
@@ -145,16 +146,26 @@ message InjectMrtRequest {
 message InjectMrtResponse {
 }
 
-message ModBmpArguments {
-    Operation operation = 1;
-    string address = 2;
-    uint32 port = 3;
+message AddBmpRequest {
+    string address = 1;
+    uint32 port = 2;
     enum MonitoringPolicy {
         PRE = 0;
         POST = 1;
         BOTH = 2;
     }
-    MonitoringPolicy type = 4;
+    MonitoringPolicy type = 3;
+}
+
+message AddBmpResponse {
+}
+
+message DeleteBmpRequest {
+    string address = 1;
+    uint32 port = 2;
+}
+
+message DeleteBmpResponse {
 }
 
 message ModRpkiArguments {
