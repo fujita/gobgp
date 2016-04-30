@@ -1030,7 +1030,7 @@ func (server *BgpServer) SetBmpConfig(c []config.BmpServer) error {
 	for _, s := range c {
 		ch := make(chan *GrpcResponse)
 		server.GrpcReqCh <- &GrpcRequest{
-			RequestType: REQ_MOD_BMP,
+			RequestType: REQ_ADD_BMP,
 			Data:        &s.Config,
 			ResponseCh:  ch,
 		}
@@ -2255,8 +2255,10 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 			grpcReq.ResponseCh <- &GrpcResponse{}
 			close(grpcReq.ResponseCh)
 		}
-	case REQ_MOD_BMP:
-		server.handleModBmp(grpcReq)
+	case REQ_ADD_BMP:
+		server.handleAddBmp(grpcReq)
+	case REQ_DELETE_BMP:
+		server.handleDeleteBmp(grpcReq)
 	case REQ_MOD_RPKI:
 		server.handleModRpki(grpcReq)
 	case REQ_ROA, REQ_RPKI:
@@ -2921,42 +2923,54 @@ func (server *BgpServer) handleDisableMrtRequest(grpcReq *GrpcRequest) {
 	close(grpcReq.ResponseCh)
 }
 
-func (server *BgpServer) handleModBmp(grpcReq *GrpcRequest) {
-	var op api.Operation
+func (server *BgpServer) handleAddBmp(grpcReq *GrpcRequest) {
 	var c *config.BmpServerConfig
 	switch arg := grpcReq.Data.(type) {
-	case *api.ModBmpArguments:
+	case *api.AddBmpRequest:
 		c = &config.BmpServerConfig{
 			Address: arg.Address,
 			Port:    arg.Port,
 			RouteMonitoringPolicy: config.BmpRouteMonitoringPolicyType(arg.Type),
 		}
-		op = arg.Operation
 	case *config.BmpServerConfig:
 		c = arg
-		op = api.Operation_ADD
 	}
 
 	w, y := server.watchers[WATCHER_BMP]
 	if !y {
-		if op == api.Operation_ADD {
-			w, _ = newBmpWatcher(server.GrpcReqCh)
-			server.watchers[WATCHER_BMP] = w
-		} else if op == api.Operation_DEL {
-			grpcDone(grpcReq, fmt.Errorf("not enabled yet"))
-			return
-		}
+		w, _ = newBmpWatcher(server.GrpcReqCh)
+		server.watchers[WATCHER_BMP] = w
 	}
 
-	switch op {
-	case api.Operation_ADD:
-		err := w.(*bmpWatcher).addServer(*c)
-		grpcDone(grpcReq, err)
-	case api.Operation_DEL:
+	err := w.(*bmpWatcher).addServer(*c)
+	grpcReq.ResponseCh <- &GrpcResponse{
+		ResponseErr: err,
+		Data:        &api.AddBmpResponse{},
+	}
+	close(grpcReq.ResponseCh)
+}
+
+func (server *BgpServer) handleDeleteBmp(grpcReq *GrpcRequest) {
+	var c *config.BmpServerConfig
+	switch arg := grpcReq.Data.(type) {
+	case *api.DeleteBmpRequest:
+		c = &config.BmpServerConfig{
+			Address: arg.Address,
+			Port:    arg.Port,
+		}
+	case *config.BmpServerConfig:
+		c = arg
+	}
+
+	if w, y := server.watchers[WATCHER_BMP]; y {
 		err := w.(*bmpWatcher).deleteServer(*c)
-		grpcDone(grpcReq, err)
-	default:
-		grpcDone(grpcReq, fmt.Errorf("unsupported operation: %s", op))
+		grpcReq.ResponseCh <- &GrpcResponse{
+			ResponseErr: err,
+			Data:        &api.DeleteBmpResponse{},
+		}
+		close(grpcReq.ResponseCh)
+	} else {
+		grpcDone(grpcReq, fmt.Errorf("bmp not configured"))
 	}
 }
 
