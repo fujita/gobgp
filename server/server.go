@@ -1743,10 +1743,18 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 		}
 		grpcReq.ResponseCh <- result
 		close(grpcReq.ResponseCh)
-	case REQ_START_SERVER, REQ_STOP_SERVER:
+	case REQ_START_SERVER:
 		err := server.handleModConfig(grpcReq)
 		grpcReq.ResponseCh <- &GrpcResponse{
 			ResponseErr: err,
+			Data:        &api.StartServerResponse{},
+		}
+		close(grpcReq.ResponseCh)
+	case REQ_STOP_SERVER:
+		err := server.handleModConfig(grpcReq)
+		grpcReq.ResponseCh <- &GrpcResponse{
+			ResponseErr: err,
+			Data:        &api.StopServerResponse{},
 		}
 		close(grpcReq.ResponseCh)
 	case REQ_GLOBAL_RIB, REQ_LOCAL_RIB:
@@ -2152,12 +2160,14 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 	case REQ_GRPC_ADD_NEIGHBOR:
 		_, err := server.handleAddNeighborRequest(grpcReq)
 		grpcReq.ResponseCh <- &GrpcResponse{
+			Data:        &api.AddNeighborResponse{},
 			ResponseErr: err,
 		}
 		close(grpcReq.ResponseCh)
 	case REQ_GRPC_DELETE_NEIGHBOR:
 		m, err := server.handleDeleteNeighborRequest(grpcReq)
 		grpcReq.ResponseCh <- &GrpcResponse{
+			Data:        &api.DeleteNeighborResponse{},
 			ResponseErr: err,
 		}
 		if len(m) > 0 {
@@ -2272,7 +2282,7 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 		server.handleModRpki(grpcReq)
 	case REQ_ROA, REQ_RPKI:
 		server.roaManager.handleGRPC(grpcReq)
-	case REQ_VRF, REQ_VRFS:
+	case REQ_VRF, REQ_VRFS, REQ_ADD_VRF, REQ_DELETE_VRF:
 		pathList := server.handleVrfRequest(grpcReq)
 		if len(pathList) > 0 {
 			msgs, _ = server.propagateUpdate(nil, pathList)
@@ -2925,7 +2935,8 @@ func (server *BgpServer) handleEnableMrtRequest(grpcReq *GrpcRequest) {
 		server.watchers[WATCHER_MRT] = w
 	}
 	grpcReq.ResponseCh <- &GrpcResponse{
-		Data: &api.EnableMrtResponse{},
+		ResponseErr: err,
+		Data:        &api.EnableMrtResponse{},
 	}
 	close(grpcReq.ResponseCh)
 }
