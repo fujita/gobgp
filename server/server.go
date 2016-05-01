@@ -1007,12 +1007,11 @@ func (server *BgpServer) SetRpkiConfig(c []config.RpkiServer) error {
 	for _, s := range c {
 		ch := make(chan *GrpcResponse)
 		server.GrpcReqCh <- &GrpcRequest{
-			RequestType: REQ_MOD_RPKI,
-			Data: &api.ModRpkiArguments{
-				Operation: api.Operation_ADD,
-				Address:   s.Config.Address,
-				Port:      s.Config.Port,
-				Lifetime:  s.Config.RecordLifetime,
+			RequestType: REQ_ADD_RPKI,
+			Data: &api.AddRpkiRequest{
+				Address:  s.Config.Address,
+				Port:     s.Config.Port,
+				Lifetime: s.Config.RecordLifetime,
 			},
 			ResponseCh: ch,
 		}
@@ -2271,7 +2270,7 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 	case REQ_INITIALIZE_RPKI:
 		g := grpcReq.Data.(*config.Global)
 		grpcDone(grpcReq, server.roaManager.SetAS(g.Config.As))
-	case REQ_MOD_RPKI:
+	case REQ_ADD_RPKI, REQ_DELETE_RPKI, REQ_ENABLE_RPKI, REQ_DISABLE_RPKI, REQ_RESET_RPKI, REQ_SOFT_RESET_RPKI:
 		server.handleModRpki(grpcReq)
 	case REQ_ROA, REQ_RPKI:
 		server.roaManager.handleGRPC(grpcReq)
@@ -3011,20 +3010,29 @@ func (server *BgpServer) handleValidateRib(grpcReq *GrpcRequest) {
 }
 
 func (server *BgpServer) handleModRpki(grpcReq *GrpcRequest) {
-	arg := grpcReq.Data.(*api.ModRpkiArguments)
-
-	switch arg.Operation {
-	case api.Operation_ADD:
-		grpcDone(grpcReq, server.roaManager.AddServer(net.JoinHostPort(arg.Address, strconv.Itoa(int(arg.Port))), arg.Lifetime))
-		return
-	case api.Operation_DEL:
-		grpcDone(grpcReq, server.roaManager.DeleteServer(arg.Address))
-		return
-	case api.Operation_ENABLE, api.Operation_DISABLE, api.Operation_RESET, api.Operation_SOFTRESET:
-		grpcDone(grpcReq, server.roaManager.operate(arg.Operation, arg.Address))
-		return
+	done := func(grpcReq *GrpcRequest, data interface{}, e error) {
+		result := &GrpcResponse{
+			ResponseErr: e,
+			Data:        data,
+		}
+		grpcReq.ResponseCh <- result
+		close(grpcReq.ResponseCh)
 	}
-	grpcDone(grpcReq, fmt.Errorf("not supported yet"))
+
+	switch arg := grpcReq.Data.(type) {
+	case *api.AddRpkiRequest:
+		done(grpcReq, &api.AddRpkiResponse{}, server.roaManager.AddServer(net.JoinHostPort(arg.Address, strconv.Itoa(int(arg.Port))), arg.Lifetime))
+	case *api.DeleteRpkiRequest:
+		done(grpcReq, &api.DeleteRpkiResponse{}, server.roaManager.DeleteServer(arg.Address))
+	case *api.EnableRpkiRequest:
+		done(grpcReq, &api.EnableRpkiResponse{}, server.roaManager.operate(api.Operation_ENABLE, arg.Address))
+	case *api.DisableRpkiRequest:
+		done(grpcReq, &api.DisableRpkiResponse{}, server.roaManager.operate(api.Operation_DISABLE, arg.Address))
+	case *api.ResetRpkiRequest:
+		done(grpcReq, &api.ResetRpkiResponse{}, server.roaManager.operate(api.Operation_RESET, arg.Address))
+	case *api.SoftResetRpkiRequest:
+		done(grpcReq, &api.SoftResetRpkiResponse{}, server.roaManager.operate(api.Operation_SOFTRESET, arg.Address))
+	}
 }
 
 func (server *BgpServer) handleMrt(grpcReq *GrpcRequest) {

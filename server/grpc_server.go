@@ -65,7 +65,12 @@ const (
 	// TODO: delete
 	REQ_INITIALIZE_RPKI
 	REQ_RPKI
-	REQ_MOD_RPKI
+	REQ_ADD_RPKI
+	REQ_DELETE_RPKI
+	REQ_ENABLE_RPKI
+	REQ_DISABLE_RPKI
+	REQ_RESET_RPKI
+	REQ_SOFT_RESET_RPKI
 	REQ_ROA
 	REQ_ADD_VRF
 	REQ_DELETE_VRF
@@ -334,8 +339,34 @@ func (s *Server) ValidateRib(ctx context.Context, arg *api.ValidateRibRequest) (
 	return d.(*api.ValidateRibResponse), err
 }
 
-func (s *Server) ModRPKI(ctx context.Context, arg *api.ModRpkiArguments) (*api.Error, error) {
-	return s.mod(REQ_MOD_RPKI, arg)
+func (s *Server) AddRpki(ctx context.Context, arg *api.AddRpkiRequest) (*api.AddRpkiResponse, error) {
+	d, err := s.get(REQ_ADD_RPKI, arg)
+	return d.(*api.AddRpkiResponse), err
+}
+
+func (s *Server) DeleteRpki(ctx context.Context, arg *api.DeleteRpkiRequest) (*api.DeleteRpkiResponse, error) {
+	d, err := s.get(REQ_DELETE_RPKI, arg)
+	return d.(*api.DeleteRpkiResponse), err
+}
+
+func (s *Server) EnableRpki(ctx context.Context, arg *api.EnableRpkiRequest) (*api.EnableRpkiResponse, error) {
+	d, err := s.get(REQ_ENABLE_RPKI, arg)
+	return d.(*api.EnableRpkiResponse), err
+}
+
+func (s *Server) DisableRpki(ctx context.Context, arg *api.DisableRpkiRequest) (*api.DisableRpkiResponse, error) {
+	d, err := s.get(REQ_DISABLE_RPKI, arg)
+	return d.(*api.DisableRpkiResponse), err
+}
+
+func (s *Server) ResetRpki(ctx context.Context, arg *api.ResetRpkiRequest) (*api.ResetRpkiResponse, error) {
+	d, err := s.get(REQ_RESET_RPKI, arg)
+	return d.(*api.ResetRpkiResponse), err
+}
+
+func (s *Server) SoftResetRpki(ctx context.Context, arg *api.SoftResetRpkiRequest) (*api.SoftResetRpkiResponse, error) {
+	d, err := s.get(REQ_SOFT_RESET_RPKI, arg)
+	return d.(*api.SoftResetRpkiResponse), err
 }
 
 func (s *Server) GetRPKI(arg *api.Arguments, stream api.GobgpApi_GetRPKIServer) error {
