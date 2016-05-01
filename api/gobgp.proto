@@ -48,7 +48,12 @@ service GobgpApi {
   rpc AddBmp(AddBmpRequest) returns (AddBmpResponse) {}
   rpc DeleteBmp(DeleteBmpRequest) returns (DeleteBmpResponse) {}
   rpc GetRPKI(Arguments) returns (stream RPKI) {}
-  rpc ModRPKI(ModRpkiArguments) returns (Error) {}
+  rpc AddRpki(AddRpkiRequest) returns (AddRpkiResponse) {}
+  rpc DeleteRpki(DeleteRpkiRequest) returns (DeleteRpkiResponse) {}
+  rpc EnableRpki(EnableRpkiRequest) returns (EnableRpkiResponse) {}
+  rpc DisableRpki(DisableRpkiRequest) returns (DisableRpkiResponse) {}
+  rpc ResetRpki(ResetRpkiRequest) returns (ResetRpkiResponse) {}
+  rpc SoftResetRpki(SoftResetRpkiRequest) returns (SoftResetRpkiResponse) {}
   rpc GetROA(Arguments) returns (stream ROA) {}
   rpc AddVrf(AddVrfRequest) returns (AddVrfResponse);
   rpc DeleteVrf(DeleteVrfRequest) returns (DeleteVrfResponse);
@@ -169,13 +174,49 @@ message DeleteBmpRequest {
 message DeleteBmpResponse {
 }
 
-message ModRpkiArguments {
-    Operation operation = 1;
-    uint32 asn = 2;
-    string address = 3;
-    uint32 port = 4;
-    int64 lifetime = 5;
-    string prefix = 6;
+message AddRpkiRequest {
+    string address = 1;
+    uint32 port = 2;
+    int64 lifetime = 3;
+}
+
+message AddRpkiResponse {
+}
+
+message DeleteRpkiRequest {
+    string address = 1;
+    uint32 port = 2;
+}
+
+message DeleteRpkiResponse {
+}
+
+message EnableRpkiRequest {
+    string address = 1;
+}
+
+message EnableRpkiResponse {
+}
+
+message DisableRpkiRequest {
+    string address = 1;
+}
+
+message DisableRpkiResponse {
+}
+
+message ResetRpkiRequest {
+    string address = 1;
+}
+
+message ResetRpkiResponse {
+}
+
+message SoftResetRpkiRequest {
+    string address = 1;
+}
+
+message SoftResetRpkiResponse {
 }
 
 message AddVrfRequest {

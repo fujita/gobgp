@@ -132,16 +132,6 @@ func NewRPKICmd() *cobra.Command {
 		Use: CMD_RPKI,
 	}
 
-	modRPKI := func(op api.Operation, address string) error {
-		arg := &api.ModRpkiArguments{
-			Operation: op,
-			Address:   address,
-			Port:      323,
-		}
-		_, err := client.ModRPKI(context.Background(), arg)
-		return err
-	}
-
 	serverCmd := &cobra.Command{
 		Use: CMD_RPKI_SERVER,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -155,20 +145,32 @@ func NewRPKICmd() *cobra.Command {
 			if addr == nil {
 				exitWithError(fmt.Errorf("invalid ip address: %s", args[0]))
 			}
-			var op api.Operation
+			var err error
 			switch args[1] {
 			case "add":
-				op = api.Operation_ADD
+				_, err = client.AddRpki(context.Background(), &api.AddRpkiRequest{
+					Address: addr.String(),
+					Port:    323,
+				})
 			case "reset":
-				op = api.Operation_RESET
+				_, err = client.ResetRpki(context.Background(), &api.ResetRpkiRequest{
+					Address: addr.String(),
+				})
 			case "softreset":
-				op = api.Operation_SOFTRESET
+				_, err = client.SoftResetRpki(context.Background(), &api.SoftResetRpkiRequest{
+					Address: addr.String(),
+				})
 			case "enable":
-				op = api.Operation_ENABLE
+				_, err = client.EnableRpki(context.Background(), &api.EnableRpkiRequest{
+					Address: addr.String(),
+				})
+			case "disable":
+				_, err = client.DisableRpki(context.Background(), &api.DisableRpkiRequest{
+					Address: addr.String(),
+				})
 			default:
 				exitWithError(fmt.Errorf("unknown operation: %s", args[1]))
 			}
-			err := modRPKI(op, addr.String())
 			if err != nil {
 				exitWithError(err)
 			}
