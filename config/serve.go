@@ -76,15 +76,8 @@ func ConfigSetToRoutingPolicy(c *BgpConfigSet) *RoutingPolicy {
 	}
 }
 
-func UpdateConfig(curC *BgpConfigSet, newC *BgpConfigSet) (*BgpConfigSet, []Neighbor, []Neighbor, []Neighbor, bool) {
-	bgpConfig := &BgpConfigSet{}
-	if curC == nil {
-		bgpConfig.Global = newC.Global
-		curC = bgpConfig
-	} else {
-		// can't update the global config
-		bgpConfig.Global = curC.Global
-	}
+func UpdateConfig(curC, newC *BgpConfigSet) ([]Neighbor, []Neighbor, []Neighbor, bool) {
+
 	added := []Neighbor{}
 	deleted := []Neighbor{}
 	updated := []Neighbor{}
@@ -93,6 +86,8 @@ func UpdateConfig(curC *BgpConfigSet, newC *BgpConfigSet) (*BgpConfigSet, []Neig
 		if idx := inSlice(n, curC.Neighbors); idx < 0 {
 			added = append(added, n)
 		} else if !n.Equal(&curC.Neighbors[idx]) {
+			log.Debug("current neighbor config:", curC.Neighbors[idx])
+			log.Debug("new neighbor config:", n)
 			updated = append(updated, n)
 		}
 	}
@@ -103,8 +98,7 @@ func UpdateConfig(curC *BgpConfigSet, newC *BgpConfigSet) (*BgpConfigSet, []Neig
 		}
 	}
 
-	bgpConfig.Neighbors = newC.Neighbors
-	return bgpConfig, added, deleted, updated, CheckPolicyDifference(ConfigSetToRoutingPolicy(curC), ConfigSetToRoutingPolicy(newC))
+	return added, deleted, updated, CheckPolicyDifference(ConfigSetToRoutingPolicy(curC), ConfigSetToRoutingPolicy(newC))
 }
 
 func CheckPolicyDifference(currentPolicy *RoutingPolicy, newPolicy *RoutingPolicy) bool {

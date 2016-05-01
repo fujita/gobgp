@@ -161,7 +161,7 @@ func (path *Path) UpdatePathAttrs(global *config.Global, peer *config.Neighbor) 
 		return
 	}
 
-	localAddress := net.ParseIP(peer.Transport.Config.LocalAddress)
+	localAddress := net.ParseIP(peer.Transport.State.LocalAddress)
 	isZero := func(ip net.IP) bool {
 		return ip.Equal(net.ParseIP("0.0.0.0")) || ip.Equal(net.ParseIP("::"))
 	}
@@ -506,6 +506,10 @@ func (path *Path) delPathAttr(typ bgp.BGPAttrType) {
 // return Path's string representation
 func (path *Path) String() string {
 	s := bytes.NewBuffer(make([]byte, 0, 64))
+	if path.IsEOR() {
+		s.WriteString(fmt.Sprintf("{ %s EOR | src: %s }", path.GetRouteFamily(), path.GetSource()))
+		return s.String()
+	}
 	s.WriteString(fmt.Sprintf("{ %s | ", path.getPrefix()))
 	s.WriteString(fmt.Sprintf("src: %s", path.GetSource()))
 	s.WriteString(fmt.Sprintf(", nh: %s", path.GetNexthop()))

@@ -40,9 +40,9 @@ type AfiSafis []AfiSafi
 func (c AfiSafis) ToRfList() ([]bgp.RouteFamily, error) {
 	rfs := make([]bgp.RouteFamily, 0, len(c))
 	for _, rf := range c {
-		k, err := bgp.GetRouteFamily(string(rf.AfiSafiName))
+		k, err := bgp.GetRouteFamily(string(rf.Config.AfiSafiName))
 		if err != nil {
-			return nil, fmt.Errorf("invalid address family: %s", rf.AfiSafiName)
+			return nil, fmt.Errorf("invalid address family: %s", rf.Config.AfiSafiName)
 		}
 		rfs = append(rfs, k)
 	}
@@ -56,4 +56,13 @@ func CreateRfMap(p *Neighbor) map[bgp.RouteFamily]bool {
 		rfMap[rf] = true
 	}
 	return rfMap
+}
+
+func GetAfiSafi(p *Neighbor, family bgp.RouteFamily) *AfiSafi {
+	for _, a := range p.AfiSafis {
+		if string(a.Config.AfiSafiName) == family.String() {
+			return &a
+		}
+	}
+	return nil
 }

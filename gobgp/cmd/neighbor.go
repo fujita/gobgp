@@ -164,7 +164,7 @@ func showNeighbor(args []string) error {
 		id = p.Conf.Id.String()
 	}
 	fmt.Printf("  BGP version 4, remote router ID %s\n", id)
-	fmt.Printf("  BGP state = %s, up for %s\n", p.Info.BgpState, formatTimedelta(int64(p.Timers.State.Uptime)))
+	fmt.Printf("  BGP state = %s, up for %s\n", p.Info.BgpState, formatTimedelta(int64(p.Timers.State.Uptime)-time.Now().Unix()))
 	fmt.Printf("  BGP OutQ = %d, Flops = %d\n", p.Info.OutQ, p.Info.Flops)
 	fmt.Printf("  Hold time is %d, keepalive interval is %d seconds\n", p.Timers.State.NegotiatedHoldTime, p.Timers.Config.KeepaliveInterval)
 	fmt.Printf("  Configured hold time is %d, keepalive interval is %d seconds\n", p.Timers.Config.HoldTime, p.Timers.Config.KeepaliveInterval)
@@ -755,7 +755,7 @@ func modNeighbor(cmdType string, args []string) error {
 	if len(m[""]) != 1 || net.ParseIP(m[""][0]) == nil {
 		return fmt.Errorf("%s", usage)
 	}
-	arg := &api.ModNeighborArguments{}
+	var err error
 	switch cmdType {
 	case CMD_ADD:
 		if len(m["as"]) != 1 {
@@ -765,22 +765,25 @@ func modNeighbor(cmdType string, args []string) error {
 		if err != nil {
 			return err
 		}
-		arg.Operation = api.Operation_ADD
-		arg.Peer = &api.Peer{
-			Conf: &api.PeerConf{
-				NeighborAddress: m[""][0],
-				PeerAs:          uint32(as),
+		arg := &api.AddNeighborRequest{
+			Peer: &api.Peer{
+				Conf: &api.PeerConf{
+					NeighborAddress: m[""][0],
+					PeerAs:          uint32(as),
+				},
 			},
 		}
+		_, err = client.AddNeighbor(context.Background(), arg)
 	case CMD_DEL:
-		arg.Operation = api.Operation_DEL
-		arg.Peer = &api.Peer{
-			Conf: &api.PeerConf{
-				NeighborAddress: m[""][0],
+		arg := &api.DeleteNeighborRequest{
+			Peer: &api.Peer{
+				Conf: &api.PeerConf{
+					NeighborAddress: m[""][0],
+				},
 			},
 		}
+		_, err = client.DeleteNeighbor(context.Background(), arg)
 	}
-	_, err := client.ModNeighbor(context.Background(), arg)
 	return err
 }
 

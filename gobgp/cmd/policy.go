@@ -119,6 +119,10 @@ func formatDefinedSet(head bool, typ string, indent int, list []*api.DefinedSet)
 			buff.WriteString(fmt.Sprintf(format, s.Name, ""))
 		}
 		for i, x := range s.List {
+			if typ == "COMMUNITY" || typ == "EXT-COMMUNITY" {
+				exp := regexp.MustCompile("\\^(\\S+)\\$")
+				x = exp.ReplaceAllString(x, "$1")
+			}
 			if i == 0 {
 				buff.WriteString(fmt.Sprintf(format, s.Name, x))
 			} else {
@@ -446,7 +450,8 @@ func printStatement(indent int, s *api.Statement) {
 	formatComAction := func(c *api.CommunityAction) string {
 		option := c.Type.String()
 		if len(c.Communities) != 0 {
-			communities := strings.Join(c.Communities, ",")
+			exp := regexp.MustCompile("[\\^\\$]")
+			communities := exp.ReplaceAllString(strings.Join(c.Communities, ","), "")
 			option = fmt.Sprintf("%s[%s]", c.Type, communities)
 		}
 		return option
@@ -469,6 +474,9 @@ func printStatement(indent int, s *api.Statement) {
 		}
 
 		fmt.Printf("%sAsPrepend:       %s   %d\n", sIndent(indent+4), asn, s.Actions.AsPrepend.Repeat)
+	}
+	if s.Actions.Nexthop != nil {
+		fmt.Printf("%sNexthop:             %s\n", sIndent(indent+4), s.Actions.Nexthop.Address)
 	}
 	fmt.Printf("%s%s\n", sIndent(indent+4), s.Actions.RouteAction)
 }
@@ -579,7 +587,7 @@ func modStatement(op string, args []string) error {
 	case CMD_ADD:
 		o = api.Operation_ADD
 	case CMD_DEL:
-		o = api.Operation_DEL
+		o = api.Operation_DEL_ALL
 	default:
 		return fmt.Errorf("invalid operation: %s", op)
 	}
@@ -779,7 +787,7 @@ func modAction(name, op string, args []string) error {
 	}
 	usage := fmt.Sprintf("usage: gobgp policy statement %s %s action", name, op)
 	if len(args) < 1 {
-		return fmt.Errorf("%s { reject | accept | community | ext-community | med | as-prepend }", usage)
+		return fmt.Errorf("%s { reject | accept | community | ext-community | med | as-prepend | next-hop }", usage)
 	}
 	typ := args[0]
 	args = args[1:]
@@ -863,6 +871,13 @@ func modAction(name, op string, args []string) error {
 			Asn:         uint32(asn),
 			Repeat:      uint32(repeat),
 			UseLeftMost: last,
+		}
+	case "next-hop":
+		if len(args) != 1 {
+			return fmt.Errorf("%s next-hop <value>", usage)
+		}
+		stmt.Actions.Nexthop = &api.NexthopAction{
+			Address: args[0],
 		}
 	}
 	_, err := client.ModStatement(context.Background(), arg)

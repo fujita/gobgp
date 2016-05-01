@@ -911,6 +911,18 @@ func TestAsPathCondition(t *testing.T) {
 		makeTest(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{1000, 7521, 100}, false),
 	}
 
+	tests["^65001( |_.*_)65535$"] = []astest{
+		makeTest(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65001, 65535}, true),
+		makeTest(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65001, 65001, 65535}, true),
+		makeTest(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65001, 65002, 65003, 65535}, true),
+		makeTest(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65001, 65534}, false),
+		makeTest(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65002, 65535}, false),
+		makeTest(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65002, 65001, 65535}, false),
+		makeTest(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65001, 65535, 65002}, false),
+		makeTest(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{650019, 65535}, false),
+		makeTest(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65001, 165535}, false),
+	}
+
 	for k, v := range tests {
 		s, _ := NewAsPathSet(config.AsPathSet{
 			AsPathSetName: k,
@@ -2645,6 +2657,13 @@ func TestPolicyAs4PathPrependLastAs(t *testing.T) {
 		createAs4Value("65001.1"),
 		createAs4Value("65000.1"),
 	}, newPath.GetAsSeqList())
+}
+
+func TestParseCommunityRegexp(t *testing.T) {
+	exp, err := ParseCommunityRegexp("65000:1")
+	assert.Equal(t, nil, err)
+	assert.Equal(t, true, exp.MatchString("65000:1"))
+	assert.Equal(t, false, exp.MatchString("65000:100"))
 }
 
 func createStatement(name, psname, nsname string, accept bool) config.Statement {

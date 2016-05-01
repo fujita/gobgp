@@ -229,7 +229,8 @@ const (
 	AFI_SAFI_TYPE_IPV4_MULTICAST        AfiSafiType = "ipv4-multicast"
 	AFI_SAFI_TYPE_IPV6_MULTICAST        AfiSafiType = "ipv6-multicast"
 	AFI_SAFI_TYPE_RTC                   AfiSafiType = "rtc"
-	AFI_SAFI_TYPE_ENCAP                 AfiSafiType = "encap"
+	AFI_SAFI_TYPE_IPV4_ENCAP            AfiSafiType = "ipv4-encap"
+	AFI_SAFI_TYPE_IPV6_ENCAP            AfiSafiType = "ipv6-encap"
 	AFI_SAFI_TYPE_IPV4_FLOWSPEC         AfiSafiType = "ipv4-flowspec"
 	AFI_SAFI_TYPE_L3VPN_IPV4_FLOWSPEC   AfiSafiType = "l3vpn-ipv4-flowspec"
 	AFI_SAFI_TYPE_IPV6_FLOWSPEC         AfiSafiType = "ipv6-flowspec"
@@ -252,13 +253,14 @@ var AfiSafiTypeToIntMap = map[AfiSafiType]int{
 	AFI_SAFI_TYPE_IPV4_MULTICAST:        10,
 	AFI_SAFI_TYPE_IPV6_MULTICAST:        11,
 	AFI_SAFI_TYPE_RTC:                   12,
-	AFI_SAFI_TYPE_ENCAP:                 13,
-	AFI_SAFI_TYPE_IPV4_FLOWSPEC:         14,
-	AFI_SAFI_TYPE_L3VPN_IPV4_FLOWSPEC:   15,
-	AFI_SAFI_TYPE_IPV6_FLOWSPEC:         16,
-	AFI_SAFI_TYPE_L3VPN_IPV6_FLOWSPEC:   17,
-	AFI_SAFI_TYPE_L2VPN_FLOWSPEC:        18,
-	AFI_SAFI_TYPE_OPAQUE:                19,
+	AFI_SAFI_TYPE_IPV4_ENCAP:            13,
+	AFI_SAFI_TYPE_IPV6_ENCAP:            14,
+	AFI_SAFI_TYPE_IPV4_FLOWSPEC:         15,
+	AFI_SAFI_TYPE_L3VPN_IPV4_FLOWSPEC:   16,
+	AFI_SAFI_TYPE_IPV6_FLOWSPEC:         17,
+	AFI_SAFI_TYPE_L3VPN_IPV6_FLOWSPEC:   18,
+	AFI_SAFI_TYPE_L2VPN_FLOWSPEC:        19,
+	AFI_SAFI_TYPE_OPAQUE:                20,
 }
 
 func (v AfiSafiType) ToInt() int {
@@ -283,13 +285,14 @@ var IntToAfiSafiTypeMap = map[int]AfiSafiType{
 	10: AFI_SAFI_TYPE_IPV4_MULTICAST,
 	11: AFI_SAFI_TYPE_IPV6_MULTICAST,
 	12: AFI_SAFI_TYPE_RTC,
-	13: AFI_SAFI_TYPE_ENCAP,
-	14: AFI_SAFI_TYPE_IPV4_FLOWSPEC,
-	15: AFI_SAFI_TYPE_L3VPN_IPV4_FLOWSPEC,
-	16: AFI_SAFI_TYPE_IPV6_FLOWSPEC,
-	17: AFI_SAFI_TYPE_L3VPN_IPV6_FLOWSPEC,
-	18: AFI_SAFI_TYPE_L2VPN_FLOWSPEC,
-	19: AFI_SAFI_TYPE_OPAQUE,
+	13: AFI_SAFI_TYPE_IPV4_ENCAP,
+	14: AFI_SAFI_TYPE_IPV6_ENCAP,
+	15: AFI_SAFI_TYPE_IPV4_FLOWSPEC,
+	16: AFI_SAFI_TYPE_L3VPN_IPV4_FLOWSPEC,
+	17: AFI_SAFI_TYPE_IPV6_FLOWSPEC,
+	18: AFI_SAFI_TYPE_L3VPN_IPV6_FLOWSPEC,
+	19: AFI_SAFI_TYPE_L2VPN_FLOWSPEC,
+	20: AFI_SAFI_TYPE_OPAQUE,
 }
 
 func (v AfiSafiType) Validate() error {
@@ -934,8 +937,6 @@ func (lhs *BmpServerConfig) Equal(rhs *BmpServerConfig) bool {
 //struct for container gobgp:bmp-server
 type BmpServer struct {
 	// original -> gobgp:address
-	//gobgp:address's original type is inet:ip-address
-	Address string `mapstructure:"address"`
 	// original -> gobgp:bmp-server-config
 	Config BmpServerConfig `mapstructure:"config"`
 	// original -> gobgp:bmp-server-state
@@ -946,13 +947,7 @@ func (lhs *BmpServer) Equal(rhs *BmpServer) bool {
 	if lhs == nil || rhs == nil {
 		return false
 	}
-	if lhs.Address != rhs.Address {
-		return false
-	}
 	if !lhs.Config.Equal(&(rhs.Config)) {
-		return false
-	}
-	if !lhs.State.Equal(&(rhs.State)) {
 		return false
 	}
 	return true
@@ -1127,8 +1122,6 @@ func (lhs *RpkiServerConfig) Equal(rhs *RpkiServerConfig) bool {
 //struct for container gobgp:rpki-server
 type RpkiServer struct {
 	// original -> gobgp:address
-	//gobgp:address's original type is inet:ip-address
-	Address string `mapstructure:"address"`
 	// original -> gobgp:rpki-server-config
 	Config RpkiServerConfig `mapstructure:"config"`
 	// original -> gobgp:rpki-server-state
@@ -1139,13 +1132,7 @@ func (lhs *RpkiServer) Equal(rhs *RpkiServer) bool {
 	if lhs == nil || rhs == nil {
 		return false
 	}
-	if lhs.Address != rhs.Address {
-		return false
-	}
 	if !lhs.Config.Equal(&(rhs.Config)) {
-		return false
-	}
-	if !lhs.State.Equal(&(rhs.State)) {
 		return false
 	}
 	return true
@@ -1282,7 +1269,6 @@ func (lhs *PeerGroupConfig) Equal(rhs *PeerGroupConfig) bool {
 //struct for container bgp:peer-group
 type PeerGroup struct {
 	// original -> bgp:peer-group-name
-	PeerGroupName string `mapstructure:"peer-group-name"`
 	// original -> bgp:peer-group-config
 	Config PeerGroupConfig `mapstructure:"config"`
 	// original -> bgp:peer-group-state
@@ -1319,13 +1305,7 @@ func (lhs *PeerGroup) Equal(rhs *PeerGroup) bool {
 	if lhs == nil || rhs == nil {
 		return false
 	}
-	if lhs.PeerGroupName != rhs.PeerGroupName {
-		return false
-	}
 	if !lhs.Config.Equal(&(rhs.Config)) {
-		return false
-	}
-	if !lhs.State.Equal(&(rhs.State)) {
 		return false
 	}
 	if !lhs.Timers.Equal(&(rhs.Timers)) {
@@ -1358,10 +1338,10 @@ func (lhs *PeerGroup) Equal(rhs *PeerGroup) bool {
 	{
 		lmap := make(map[string]*AfiSafi)
 		for _, l := range lhs.AfiSafis {
-			lmap[string(l.AfiSafiName)] = &l
+			lmap[string(l.Config.AfiSafiName)] = &l
 		}
 		for _, r := range rhs.AfiSafis {
-			if l, y := lmap[string(r.AfiSafiName)]; !y {
+			if l, y := lmap[string(r.Config.AfiSafiName)]; !y {
 				return false
 			} else if !r.Equal(l) {
 				return false
@@ -1430,9 +1410,6 @@ func (lhs *RouteServer) Equal(rhs *RouteServer) bool {
 		return false
 	}
 	if !lhs.Config.Equal(&(rhs.Config)) {
-		return false
-	}
-	if !lhs.State.Equal(&(rhs.State)) {
 		return false
 	}
 	return true
@@ -1523,9 +1500,6 @@ func (lhs *AddPaths) Equal(rhs *AddPaths) bool {
 	if !lhs.Config.Equal(&(rhs.Config)) {
 		return false
 	}
-	if !lhs.State.Equal(&(rhs.State)) {
-		return false
-	}
 	return true
 }
 
@@ -1586,9 +1560,6 @@ func (lhs *AsPathOptions) Equal(rhs *AsPathOptions) bool {
 		return false
 	}
 	if !lhs.Config.Equal(&(rhs.Config)) {
-		return false
-	}
-	if !lhs.State.Equal(&(rhs.State)) {
 		return false
 	}
 	return true
@@ -1653,9 +1624,6 @@ func (lhs *RouteReflector) Equal(rhs *RouteReflector) bool {
 	if !lhs.Config.Equal(&(rhs.Config)) {
 		return false
 	}
-	if !lhs.State.Equal(&(rhs.State)) {
-		return false
-	}
 	return true
 }
 
@@ -1718,9 +1686,6 @@ func (lhs *EbgpMultihop) Equal(rhs *EbgpMultihop) bool {
 	if !lhs.Config.Equal(&(rhs.Config)) {
 		return false
 	}
-	if !lhs.State.Equal(&(rhs.State)) {
-		return false
-	}
 	return true
 }
 
@@ -1771,9 +1736,6 @@ func (lhs *LoggingOptions) Equal(rhs *LoggingOptions) bool {
 		return false
 	}
 	if !lhs.Config.Equal(&(rhs.Config)) {
-		return false
-	}
-	if !lhs.State.Equal(&(rhs.State)) {
 		return false
 	}
 	return true
@@ -1831,9 +1793,6 @@ func (lhs *ErrorHandling) Equal(rhs *ErrorHandling) bool {
 		return false
 	}
 	if !lhs.Config.Equal(&(rhs.Config)) {
-		return false
-	}
-	if !lhs.State.Equal(&(rhs.State)) {
 		return false
 	}
 	return true
@@ -1904,6 +1863,9 @@ type TransportConfig struct {
 	// original -> bgp:local-address
 	//bgp:local-address's original type is union
 	LocalAddress string `mapstructure:"local-address"`
+	// original -> gobgp:remote-port
+	//gobgp:remote-port's original type is inet:port-number
+	RemotePort uint16 `mapstructure:"remote-port"`
 }
 
 func (lhs *TransportConfig) Equal(rhs *TransportConfig) bool {
@@ -1922,6 +1884,9 @@ func (lhs *TransportConfig) Equal(rhs *TransportConfig) bool {
 	if lhs.LocalAddress != rhs.LocalAddress {
 		return false
 	}
+	if lhs.RemotePort != rhs.RemotePort {
+		return false
+	}
 	return true
 }
 
@@ -1938,9 +1903,6 @@ func (lhs *Transport) Equal(rhs *Transport) bool {
 		return false
 	}
 	if !lhs.Config.Equal(&(rhs.Config)) {
-		return false
-	}
-	if !lhs.State.Equal(&(rhs.State)) {
 		return false
 	}
 	return true
@@ -2064,9 +2026,6 @@ func (lhs *Timers) Equal(rhs *Timers) bool {
 		return false
 	}
 	if !lhs.Config.Equal(&(rhs.Config)) {
-		return false
-	}
-	if !lhs.State.Equal(&(rhs.State)) {
 		return false
 	}
 	return true
@@ -2348,9 +2307,9 @@ type NeighborConfig struct {
 	// original -> bgp:neighbor-address
 	//bgp:neighbor-address's original type is inet:ip-address
 	NeighborAddress string `mapstructure:"neighbor-address"`
-	// original -> gobgp:neighbor-port-number
-	//gobgp:neighbor-port-number's original type is inet:port-number
-	NeighborPortNumber uint16 `mapstructure:"neighbor-port-number"`
+	// original -> gobgp:admin-down
+	//gobgp:admin-down's original type is boolean
+	AdminDown bool `mapstructure:"admin-down"`
 }
 
 func (lhs *NeighborConfig) Equal(rhs *NeighborConfig) bool {
@@ -2387,7 +2346,7 @@ func (lhs *NeighborConfig) Equal(rhs *NeighborConfig) bool {
 	if lhs.NeighborAddress != rhs.NeighborAddress {
 		return false
 	}
-	if lhs.NeighborPortNumber != rhs.NeighborPortNumber {
+	if lhs.AdminDown != rhs.AdminDown {
 		return false
 	}
 	return true
@@ -2396,8 +2355,6 @@ func (lhs *NeighborConfig) Equal(rhs *NeighborConfig) bool {
 //struct for container bgp:neighbor
 type Neighbor struct {
 	// original -> bgp:neighbor-address
-	//bgp:neighbor-address's original type is inet:ip-address
-	NeighborAddress string `mapstructure:"neighbor-address"`
 	// original -> bgp:neighbor-config
 	Config NeighborConfig `mapstructure:"config"`
 	// original -> bgp:neighbor-state
@@ -2434,13 +2391,7 @@ func (lhs *Neighbor) Equal(rhs *Neighbor) bool {
 	if lhs == nil || rhs == nil {
 		return false
 	}
-	if lhs.NeighborAddress != rhs.NeighborAddress {
-		return false
-	}
 	if !lhs.Config.Equal(&(rhs.Config)) {
-		return false
-	}
-	if !lhs.State.Equal(&(rhs.State)) {
 		return false
 	}
 	if !lhs.Timers.Equal(&(rhs.Timers)) {
@@ -2473,10 +2424,10 @@ func (lhs *Neighbor) Equal(rhs *Neighbor) bool {
 	{
 		lmap := make(map[string]*AfiSafi)
 		for _, l := range lhs.AfiSafis {
-			lmap[string(l.AfiSafiName)] = &l
+			lmap[string(l.Config.AfiSafiName)] = &l
 		}
 		for _, r := range rhs.AfiSafis {
-			if l, y := lmap[string(r.AfiSafiName)]; !y {
+			if l, y := lmap[string(r.Config.AfiSafiName)]; !y {
 				return false
 			} else if !r.Equal(l) {
 				return false
@@ -2494,32 +2445,6 @@ func (lhs *Neighbor) Equal(rhs *Neighbor) bool {
 	}
 	if !lhs.RouteServer.Equal(&(rhs.RouteServer)) {
 		return false
-	}
-	return true
-}
-
-//struct for container gobgp:listen-config
-type ListenConfig struct {
-	// original -> gobgp:port
-	Port int32 `mapstructure:"port"`
-	// original -> gobgp:local-address
-	LocalAddressList []string `mapstructure:"local-address-list"`
-}
-
-func (lhs *ListenConfig) Equal(rhs *ListenConfig) bool {
-	if lhs == nil || rhs == nil {
-		return false
-	}
-	if lhs.Port != rhs.Port {
-		return false
-	}
-	if len(lhs.LocalAddressList) != len(rhs.LocalAddressList) {
-		return false
-	}
-	for idx, l := range lhs.LocalAddressList {
-		if l != rhs.LocalAddressList[idx] {
-			return false
-		}
 	}
 	return true
 }
@@ -2577,18 +2502,51 @@ func (lhs *Zebra) Equal(rhs *Zebra) bool {
 	return true
 }
 
-//struct for container gobgp:collector
-type Collector struct {
-	// original -> gobgp:enabled
-	//gobgp:enabled's original type is boolean
-	Enabled bool `mapstructure:"enabled"`
+//struct for container gobgp:state
+type RouteTargetMembershipState struct {
+	// original -> gobgp:deferral-time
+	DeferralTime uint16 `mapstructure:"deferral-time"`
 }
 
-func (lhs *Collector) Equal(rhs *Collector) bool {
+func (lhs *RouteTargetMembershipState) Equal(rhs *RouteTargetMembershipState) bool {
 	if lhs == nil || rhs == nil {
 		return false
 	}
-	if lhs.Enabled != rhs.Enabled {
+	if lhs.DeferralTime != rhs.DeferralTime {
+		return false
+	}
+	return true
+}
+
+//struct for container gobgp:config
+type RouteTargetMembershipConfig struct {
+	// original -> gobgp:deferral-time
+	DeferralTime uint16 `mapstructure:"deferral-time"`
+}
+
+func (lhs *RouteTargetMembershipConfig) Equal(rhs *RouteTargetMembershipConfig) bool {
+	if lhs == nil || rhs == nil {
+		return false
+	}
+	if lhs.DeferralTime != rhs.DeferralTime {
+		return false
+	}
+	return true
+}
+
+//struct for container gobgp:route-target-membership
+type RouteTargetMembership struct {
+	// original -> gobgp:route-target-membership-config
+	Config RouteTargetMembershipConfig `mapstructure:"config"`
+	// original -> gobgp:route-target-membership-state
+	State RouteTargetMembershipState `mapstructure:"state"`
+}
+
+func (lhs *RouteTargetMembership) Equal(rhs *RouteTargetMembership) bool {
+	if lhs == nil || rhs == nil {
+		return false
+	}
+	if !lhs.Config.Equal(&(rhs.Config)) {
 		return false
 	}
 	return true
@@ -2776,9 +2734,6 @@ func (lhs *Ipv6Unicast) Equal(rhs *Ipv6Unicast) bool {
 	if !lhs.Config.Equal(&(rhs.Config)) {
 		return false
 	}
-	if !lhs.State.Equal(&(rhs.State)) {
-		return false
-	}
 	return true
 }
 
@@ -2885,9 +2840,6 @@ func (lhs *PrefixLimit) Equal(rhs *PrefixLimit) bool {
 	if !lhs.Config.Equal(&(rhs.Config)) {
 		return false
 	}
-	if !lhs.State.Equal(&(rhs.State)) {
-		return false
-	}
 	return true
 }
 
@@ -2909,9 +2861,6 @@ func (lhs *Ipv4Unicast) Equal(rhs *Ipv4Unicast) bool {
 		return false
 	}
 	if !lhs.Config.Equal(&(rhs.Config)) {
-		return false
-	}
-	if !lhs.State.Equal(&(rhs.State)) {
 		return false
 	}
 	return true
@@ -3044,9 +2993,6 @@ func (lhs *ApplyPolicy) Equal(rhs *ApplyPolicy) bool {
 	if !lhs.Config.Equal(&(rhs.Config)) {
 		return false
 	}
-	if !lhs.State.Equal(&(rhs.State)) {
-		return false
-	}
 	return true
 }
 
@@ -3177,16 +3123,12 @@ func (lhs *MpGracefulRestart) Equal(rhs *MpGracefulRestart) bool {
 	if !lhs.Config.Equal(&(rhs.Config)) {
 		return false
 	}
-	if !lhs.State.Equal(&(rhs.State)) {
-		return false
-	}
 	return true
 }
 
 //struct for container bgp-mp:afi-safi
 type AfiSafi struct {
 	// original -> bgp-mp:afi-safi-name
-	AfiSafiName AfiSafiType `mapstructure:"afi-safi-name"`
 	// original -> bgp-mp:mp-graceful-restart
 	MpGracefulRestart MpGracefulRestart `mapstructure:"mp-graceful-restart"`
 	// original -> bgp-mp:afi-safi-config
@@ -3221,22 +3163,18 @@ type AfiSafi struct {
 	UseMultiplePaths UseMultiplePaths `mapstructure:"use-multiple-paths"`
 	// original -> bgp-mp:prefix-limit
 	PrefixLimit PrefixLimit `mapstructure:"prefix-limit"`
+	// original -> gobgp:route-target-membership
+	RouteTargetMembership RouteTargetMembership `mapstructure:"route-target-membership"`
 }
 
 func (lhs *AfiSafi) Equal(rhs *AfiSafi) bool {
 	if lhs == nil || rhs == nil {
 		return false
 	}
-	if lhs.AfiSafiName != rhs.AfiSafiName {
-		return false
-	}
 	if !lhs.MpGracefulRestart.Equal(&(rhs.MpGracefulRestart)) {
 		return false
 	}
 	if !lhs.Config.Equal(&(rhs.Config)) {
-		return false
-	}
-	if !lhs.State.Equal(&(rhs.State)) {
 		return false
 	}
 	if !lhs.ApplyPolicy.Equal(&(rhs.ApplyPolicy)) {
@@ -3279,6 +3217,9 @@ func (lhs *AfiSafi) Equal(rhs *AfiSafi) bool {
 		return false
 	}
 	if !lhs.PrefixLimit.Equal(&(rhs.PrefixLimit)) {
+		return false
+	}
+	if !lhs.RouteTargetMembership.Equal(&(rhs.RouteTargetMembership)) {
 		return false
 	}
 	return true
@@ -3399,9 +3340,6 @@ func (lhs *GracefulRestart) Equal(rhs *GracefulRestart) bool {
 	if !lhs.Config.Equal(&(rhs.Config)) {
 		return false
 	}
-	if !lhs.State.Equal(&(rhs.State)) {
-		return false
-	}
 	return true
 }
 
@@ -3450,9 +3388,6 @@ func (lhs *Ibgp) Equal(rhs *Ibgp) bool {
 		return false
 	}
 	if !lhs.Config.Equal(&(rhs.Config)) {
-		return false
-	}
-	if !lhs.State.Equal(&(rhs.State)) {
 		return false
 	}
 	return true
@@ -3517,9 +3452,6 @@ func (lhs *Ebgp) Equal(rhs *Ebgp) bool {
 	if !lhs.Config.Equal(&(rhs.Config)) {
 		return false
 	}
-	if !lhs.State.Equal(&(rhs.State)) {
-		return false
-	}
 	return true
 }
 
@@ -3574,9 +3506,6 @@ func (lhs *UseMultiplePaths) Equal(rhs *UseMultiplePaths) bool {
 		return false
 	}
 	if !lhs.Config.Equal(&(rhs.Config)) {
-		return false
-	}
-	if !lhs.State.Equal(&(rhs.State)) {
 		return false
 	}
 	if !lhs.Ebgp.Equal(&(rhs.Ebgp)) {
@@ -3671,9 +3600,6 @@ func (lhs *Confederation) Equal(rhs *Confederation) bool {
 	if !lhs.Config.Equal(&(rhs.Config)) {
 		return false
 	}
-	if !lhs.State.Equal(&(rhs.State)) {
-		return false
-	}
 	return true
 }
 
@@ -3732,9 +3658,6 @@ func (lhs *DefaultRouteDistance) Equal(rhs *DefaultRouteDistance) bool {
 		return false
 	}
 	if !lhs.Config.Equal(&(rhs.Config)) {
-		return false
-	}
-	if !lhs.State.Equal(&(rhs.State)) {
 		return false
 	}
 	return true
@@ -3849,9 +3772,6 @@ func (lhs *RouteSelectionOptions) Equal(rhs *RouteSelectionOptions) bool {
 	if !lhs.Config.Equal(&(rhs.Config)) {
 		return false
 	}
-	if !lhs.State.Equal(&(rhs.State)) {
-		return false
-	}
 	return true
 }
 
@@ -3867,6 +3787,10 @@ type GlobalState struct {
 	TotalPaths uint32 `mapstructure:"total-paths"`
 	// original -> bgp-op:total-prefixes
 	TotalPrefixes uint32 `mapstructure:"total-prefixes"`
+	// original -> gobgp:port
+	Port int32 `mapstructure:"port"`
+	// original -> gobgp:local-address
+	LocalAddressList []string `mapstructure:"local-address-list"`
 }
 
 func (lhs *GlobalState) Equal(rhs *GlobalState) bool {
@@ -3885,6 +3809,17 @@ func (lhs *GlobalState) Equal(rhs *GlobalState) bool {
 	if lhs.TotalPrefixes != rhs.TotalPrefixes {
 		return false
 	}
+	if lhs.Port != rhs.Port {
+		return false
+	}
+	if len(lhs.LocalAddressList) != len(rhs.LocalAddressList) {
+		return false
+	}
+	for idx, l := range lhs.LocalAddressList {
+		if l != rhs.LocalAddressList[idx] {
+			return false
+		}
+	}
 	return true
 }
 
@@ -3896,6 +3831,10 @@ type GlobalConfig struct {
 	// original -> bgp:router-id
 	//bgp:router-id's original type is inet:ipv4-address
 	RouterId string `mapstructure:"router-id"`
+	// original -> gobgp:port
+	Port int32 `mapstructure:"port"`
+	// original -> gobgp:local-address
+	LocalAddressList []string `mapstructure:"local-address-list"`
 }
 
 func (lhs *GlobalConfig) Equal(rhs *GlobalConfig) bool {
@@ -3907,6 +3846,17 @@ func (lhs *GlobalConfig) Equal(rhs *GlobalConfig) bool {
 	}
 	if lhs.RouterId != rhs.RouterId {
 		return false
+	}
+	if lhs.Port != rhs.Port {
+		return false
+	}
+	if len(lhs.LocalAddressList) != len(rhs.LocalAddressList) {
+		return false
+	}
+	for idx, l := range lhs.LocalAddressList {
+		if l != rhs.LocalAddressList[idx] {
+			return false
+		}
 	}
 	return true
 }
@@ -3931,14 +3881,10 @@ type Global struct {
 	AfiSafis []AfiSafi `mapstructure:"afi-safis"`
 	// original -> rpol:apply-policy
 	ApplyPolicy ApplyPolicy `mapstructure:"apply-policy"`
-	// original -> gobgp:collector
-	Collector Collector `mapstructure:"collector"`
 	// original -> gobgp:zebra
 	Zebra Zebra `mapstructure:"zebra"`
 	// original -> gobgp:mpls-label-range
 	MplsLabelRange MplsLabelRange `mapstructure:"mpls-label-range"`
-	// original -> gobgp:listen-config
-	ListenConfig ListenConfig `mapstructure:"listen-config"`
 }
 
 func (lhs *Global) Equal(rhs *Global) bool {
@@ -3946,9 +3892,6 @@ func (lhs *Global) Equal(rhs *Global) bool {
 		return false
 	}
 	if !lhs.Config.Equal(&(rhs.Config)) {
-		return false
-	}
-	if !lhs.State.Equal(&(rhs.State)) {
 		return false
 	}
 	if !lhs.RouteSelectionOptions.Equal(&(rhs.RouteSelectionOptions)) {
@@ -3972,10 +3915,10 @@ func (lhs *Global) Equal(rhs *Global) bool {
 	{
 		lmap := make(map[string]*AfiSafi)
 		for _, l := range lhs.AfiSafis {
-			lmap[string(l.AfiSafiName)] = &l
+			lmap[string(l.Config.AfiSafiName)] = &l
 		}
 		for _, r := range rhs.AfiSafis {
-			if l, y := lmap[string(r.AfiSafiName)]; !y {
+			if l, y := lmap[string(r.Config.AfiSafiName)]; !y {
 				return false
 			} else if !r.Equal(l) {
 				return false
@@ -3985,16 +3928,10 @@ func (lhs *Global) Equal(rhs *Global) bool {
 	if !lhs.ApplyPolicy.Equal(&(rhs.ApplyPolicy)) {
 		return false
 	}
-	if !lhs.Collector.Equal(&(rhs.Collector)) {
-		return false
-	}
 	if !lhs.Zebra.Equal(&(rhs.Zebra)) {
 		return false
 	}
 	if !lhs.MplsLabelRange.Equal(&(rhs.MplsLabelRange)) {
-		return false
-	}
-	if !lhs.ListenConfig.Equal(&(rhs.ListenConfig)) {
 		return false
 	}
 	return true
@@ -4029,10 +3966,10 @@ func (lhs *Bgp) Equal(rhs *Bgp) bool {
 	{
 		lmap := make(map[string]*Neighbor)
 		for _, l := range lhs.Neighbors {
-			lmap[string(l.NeighborAddress)] = &l
+			lmap[string(l.Config.NeighborAddress)] = &l
 		}
 		for _, r := range rhs.Neighbors {
-			if l, y := lmap[string(r.NeighborAddress)]; !y {
+			if l, y := lmap[string(r.Config.NeighborAddress)]; !y {
 				return false
 			} else if !r.Equal(l) {
 				return false
@@ -4045,10 +3982,10 @@ func (lhs *Bgp) Equal(rhs *Bgp) bool {
 	{
 		lmap := make(map[string]*PeerGroup)
 		for _, l := range lhs.PeerGroups {
-			lmap[string(l.PeerGroupName)] = &l
+			lmap[string(l.Config.PeerGroupName)] = &l
 		}
 		for _, r := range rhs.PeerGroups {
-			if l, y := lmap[string(r.PeerGroupName)]; !y {
+			if l, y := lmap[string(r.Config.PeerGroupName)]; !y {
 				return false
 			} else if !r.Equal(l) {
 				return false
@@ -4061,10 +3998,10 @@ func (lhs *Bgp) Equal(rhs *Bgp) bool {
 	{
 		lmap := make(map[string]*RpkiServer)
 		for _, l := range lhs.RpkiServers {
-			lmap[string(l.Address)] = &l
+			lmap[string(l.Config.Address)] = &l
 		}
 		for _, r := range rhs.RpkiServers {
-			if l, y := lmap[string(r.Address)]; !y {
+			if l, y := lmap[string(r.Config.Address)]; !y {
 				return false
 			} else if !r.Equal(l) {
 				return false
@@ -4077,10 +4014,10 @@ func (lhs *Bgp) Equal(rhs *Bgp) bool {
 	{
 		lmap := make(map[string]*BmpServer)
 		for _, l := range lhs.BmpServers {
-			lmap[string(l.Address)] = &l
+			lmap[string(l.Config.Address)] = &l
 		}
 		for _, r := range rhs.BmpServers {
-			if l, y := lmap[string(r.Address)]; !y {
+			if l, y := lmap[string(r.Config.Address)]; !y {
 				return false
 			} else if !r.Equal(l) {
 				return false
