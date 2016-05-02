@@ -79,7 +79,9 @@ const (
 	REQ_ADD_PATH
 	REQ_DELETE_PATH
 	REQ_DEFINED_SET
-	REQ_MOD_DEFINED_SET
+	REQ_ADD_DEFINED_SET
+	REQ_DELETE_DEFINED_SET
+	REQ_REPLACE_DEFINED_SET
 	REQ_STATEMENT
 	REQ_MOD_STATEMENT
 	REQ_POLICY
@@ -453,8 +455,19 @@ func (s *Server) GetDefinedSets(arg *api.DefinedSet, stream api.GobgpApi_GetDefi
 	})
 }
 
-func (s *Server) ModDefinedSet(ctx context.Context, arg *api.ModDefinedSetArguments) (*api.Error, error) {
-	return s.mod(REQ_MOD_DEFINED_SET, arg)
+func (s *Server) AddDefinedSet(ctx context.Context, arg *api.AddDefinedSetRequest) (*api.AddDefinedSetResponse, error) {
+	d, err := s.get(REQ_ADD_DEFINED_SET, arg)
+	return d.(*api.AddDefinedSetResponse), err
+}
+
+func (s *Server) DeleteDefinedSet(ctx context.Context, arg *api.DeleteDefinedSetRequest) (*api.DeleteDefinedSetResponse, error) {
+	d, err := s.get(REQ_DELETE_DEFINED_SET, arg)
+	return d.(*api.DeleteDefinedSetResponse), err
+}
+
+func (s *Server) ReplaceDefinedSet(ctx context.Context, arg *api.ReplaceDefinedSetRequest) (*api.ReplaceDefinedSetResponse, error) {
+	d, err := s.get(REQ_REPLACE_DEFINED_SET, arg)
+	return d.(*api.ReplaceDefinedSetResponse), err
 }
 
 func (s *Server) GetStatement(ctx context.Context, arg *api.Statement) (*api.Statement, error) {

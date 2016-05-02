@@ -60,7 +60,9 @@ service GobgpApi {
   rpc GetVrfs(Arguments) returns (stream Vrf) {}
   rpc GetDefinedSet(DefinedSet) returns (DefinedSet) {}
   rpc GetDefinedSets(DefinedSet) returns (stream DefinedSet) {}
-  rpc ModDefinedSet(ModDefinedSetArguments) returns (Error) {}
+  rpc AddDefinedSet(AddDefinedSetRequest) returns (AddDefinedSetResponse) {}
+  rpc DeleteDefinedSet(DeleteDefinedSetRequest) returns (DeleteDefinedSetResponse) {}
+  rpc ReplaceDefinedSet(ReplaceDefinedSetRequest) returns (ReplaceDefinedSetResponse) {}
   rpc GetStatement(Statement) returns (Statement) {}
   rpc GetStatements(Statement) returns (stream Statement) {}
   rpc ModStatement(ModStatementArguments) returns (Error) {}
@@ -233,9 +235,26 @@ message DeleteVrfRequest {
 message DeleteVrfResponse {
 }
 
-message ModDefinedSetArguments {
-    Operation operation = 1;
-    DefinedSet set = 2;
+message AddDefinedSetRequest {
+    DefinedSet set = 1;
+}
+
+message AddDefinedSetResponse {
+}
+
+message DeleteDefinedSetRequest {
+    DefinedSet set = 1;
+    bool all = 2;
+}
+
+message DeleteDefinedSetResponse {
+}
+
+message ReplaceDefinedSetRequest {
+    DefinedSet set = 1;
+}
+
+message ReplaceDefinedSetResponse {
 }
 
 message ModStatementArguments {
