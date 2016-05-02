@@ -2193,10 +2193,25 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 			}
 		}
 		close(grpcReq.ResponseCh)
-	case REQ_MOD_DEFINED_SET:
-		err := server.handleGrpcModDefinedSet(grpcReq)
+	case REQ_ADD_DEFINED_SET:
+		rsp, err := server.handleGrpcAddDefinedSet(grpcReq)
 		grpcReq.ResponseCh <- &GrpcResponse{
 			ResponseErr: err,
+			Data:        rsp,
+		}
+		close(grpcReq.ResponseCh)
+	case REQ_DELETE_DEFINED_SET:
+		rsp, err := server.handleGrpcDeleteDefinedSet(grpcReq)
+		grpcReq.ResponseCh <- &GrpcResponse{
+			ResponseErr: err,
+			Data:        rsp,
+		}
+		close(grpcReq.ResponseCh)
+	case REQ_REPLACE_DEFINED_SET:
+		rsp, err := server.handleGrpcReplaceDefinedSet(grpcReq)
+		grpcReq.ResponseCh <- &GrpcResponse{
+			ResponseErr: err,
+			Data:        rsp,
 		}
 		close(grpcReq.ResponseCh)
 	case REQ_STATEMENT:
@@ -2564,42 +2579,77 @@ func (server *BgpServer) handleDeleteNeighborRequest(grpcReq *GrpcRequest) ([]*S
 	}
 }
 
-func (server *BgpServer) handleGrpcModDefinedSet(grpcReq *GrpcRequest) error {
-	arg := grpcReq.Data.(*api.ModDefinedSetArguments)
+func (server *BgpServer) handleGrpcAddDefinedSet(grpcReq *GrpcRequest) (*api.AddDefinedSetResponse, error) {
+	arg := grpcReq.Data.(*api.AddDefinedSetRequest)
 	set := arg.Set
 	typ := table.DefinedType(set.Type)
 	name := set.Name
 	var err error
 	m, ok := server.policy.DefinedSetMap[typ]
 	if !ok {
-		return fmt.Errorf("invalid defined-set type: %d", typ)
+		return nil, fmt.Errorf("invalid defined-set type: %d", typ)
 	}
 	d, ok := m[name]
-	if arg.Operation != api.Operation_ADD && !ok {
-		return fmt.Errorf("not found defined-set: %s", name)
+	s, err := table.NewDefinedSetFromApiStruct(set)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		err = d.Append(s)
+	} else {
+		m[name] = s
+	}
+	return &api.AddDefinedSetResponse{}, err
+}
+
+func (server *BgpServer) handleGrpcDeleteDefinedSet(grpcReq *GrpcRequest) (*api.DeleteDefinedSetResponse, error) {
+	arg := grpcReq.Data.(*api.DeleteDefinedSetRequest)
+	set := arg.Set
+	typ := table.DefinedType(set.Type)
+	name := set.Name
+	var err error
+	m, ok := server.policy.DefinedSetMap[typ]
+	if !ok {
+		return nil, fmt.Errorf("invalid defined-set type: %d", typ)
+	}
+	d, ok := m[name]
+	if !ok {
+		return nil, fmt.Errorf("not found defined-set: %s", name)
 	}
 	s, err := table.NewDefinedSetFromApiStruct(set)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	switch arg.Operation {
-	case api.Operation_ADD:
-		if ok {
-			err = d.Append(s)
-		} else {
-			m[name] = s
-		}
-	case api.Operation_DEL:
-		err = d.Remove(s)
-	case api.Operation_DEL_ALL:
+	if arg.All {
 		if server.policy.InUse(d) {
-			return fmt.Errorf("can't delete. defined-set %s is in use", name)
+			return nil, fmt.Errorf("can't delete. defined-set %s is in use", name)
 		}
 		delete(m, name)
-	case api.Operation_REPLACE:
-		err = d.Replace(s)
+	} else {
+		err = d.Remove(s)
 	}
-	return err
+	return &api.DeleteDefinedSetResponse{}, err
+}
+
+func (server *BgpServer) handleGrpcReplaceDefinedSet(grpcReq *GrpcRequest) (*api.ReplaceDefinedSetResponse, error) {
+	arg := grpcReq.Data.(*api.ReplaceDefinedSetRequest)
+	set := arg.Set
+	typ := table.DefinedType(set.Type)
+	name := set.Name
+	var err error
+	m, ok := server.policy.DefinedSetMap[typ]
+	if !ok {
+		return nil, fmt.Errorf("invalid defined-set type: %d", typ)
+	}
+	d, ok := m[name]
+	if !ok {
+		return nil, fmt.Errorf("not found defined-set: %s", name)
+	}
+	s, err := table.NewDefinedSetFromApiStruct(set)
+	if err != nil {
+		return nil, err
+	}
+	return &api.ReplaceDefinedSetResponse{}, d.Replace(s)
 }
 
 func (server *BgpServer) handleGrpcGetStatement(grpcReq *GrpcRequest) error {

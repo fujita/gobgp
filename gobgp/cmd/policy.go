@@ -383,23 +383,25 @@ func modDefinedSet(settype string, modtype string, args []string) error {
 	if d, err = parseDefinedSet(settype, args); err != nil {
 		return err
 	}
-	var op api.Operation
 	switch modtype {
 	case CMD_ADD:
-		op = api.Operation_ADD
+		_, err = client.AddDefinedSet(context.Background(), &api.AddDefinedSetRequest{
+			Set: d,
+		})
 	case CMD_DEL:
+		all := false
 		if len(args) < 2 {
-			op = api.Operation_DEL_ALL
-		} else {
-			op = api.Operation_DEL
+			all = true
 		}
+		_, err = client.DeleteDefinedSet(context.Background(), &api.DeleteDefinedSetRequest{
+			Set: d,
+			All: all,
+		})
 	case CMD_SET:
-		op = api.Operation_REPLACE
+		_, err = client.ReplaceDefinedSet(context.Background(), &api.ReplaceDefinedSetRequest{
+			Set: d,
+		})
 	}
-	_, err = client.ModDefinedSet(context.Background(), &api.ModDefinedSetArguments{
-		Operation: op,
-		Set:       d,
-	})
 	return err
 }
 
