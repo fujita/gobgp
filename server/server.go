@@ -2230,10 +2230,25 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 			}
 		}
 		close(grpcReq.ResponseCh)
-	case REQ_MOD_STATEMENT:
-		err := server.handleGrpcModStatement(grpcReq)
+	case REQ_ADD_STATEMENT:
+		data, err := server.handleGrpcAddStatement(grpcReq)
 		grpcReq.ResponseCh <- &GrpcResponse{
 			ResponseErr: err,
+			Data:        data,
+		}
+		close(grpcReq.ResponseCh)
+	case REQ_DELETE_STATEMENT:
+		data, err := server.handleGrpcDeleteStatement(grpcReq)
+		grpcReq.ResponseCh <- &GrpcResponse{
+			ResponseErr: err,
+			Data:        data,
+		}
+		close(grpcReq.ResponseCh)
+	case REQ_REPLACE_STATEMENT:
+		data, err := server.handleGrpcReplaceStatement(grpcReq)
+		grpcReq.ResponseCh <- &GrpcResponse{
+			ResponseErr: err,
+			Data:        data,
 		}
 		close(grpcReq.ResponseCh)
 	case REQ_POLICY:
@@ -2696,37 +2711,63 @@ func (server *BgpServer) handleGrpcGetStatement(grpcReq *GrpcRequest) error {
 	return nil
 }
 
-func (server *BgpServer) handleGrpcModStatement(grpcReq *GrpcRequest) error {
-	arg := grpcReq.Data.(*api.ModStatementArguments)
+func (server *BgpServer) handleGrpcAddStatement(grpcReq *GrpcRequest) (*api.AddStatementResponse, error) {
+	var err error
+	arg := grpcReq.Data.(*api.AddStatementRequest)
 	s, err := table.NewStatementFromApiStruct(arg.Statement, server.policy.DefinedSetMap)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	m := server.policy.StatementMap
 	name := s.Name
-	d, ok := m[name]
-	if arg.Operation != api.Operation_ADD && !ok {
-		return fmt.Errorf("not found statement: %s", name)
+	if d, ok := m[name]; ok {
+		err = d.Add(s)
+	} else {
+		m[name] = s
 	}
-	switch arg.Operation {
-	case api.Operation_ADD:
-		if ok {
-			err = d.Add(s)
-		} else {
-			m[name] = s
-		}
-	case api.Operation_DEL:
-		err = d.Remove(s)
-	case api.Operation_DEL_ALL:
-		if server.policy.StatementInUse(d) {
-			return fmt.Errorf("can't delete. statement %s is in use", name)
-		}
-		delete(m, name)
-	case api.Operation_REPLACE:
-		err = d.Replace(s)
-	}
-	return err
+	return &api.AddStatementResponse{}, err
+}
 
+func (server *BgpServer) handleGrpcDeleteStatement(grpcReq *GrpcRequest) (*api.DeleteStatementResponse, error) {
+	var err error
+	arg := grpcReq.Data.(*api.DeleteStatementRequest)
+	s, err := table.NewStatementFromApiStruct(arg.Statement, server.policy.DefinedSetMap)
+	if err != nil {
+		return nil, err
+	}
+	m := server.policy.StatementMap
+	name := s.Name
+	if d, ok := m[name]; ok {
+		if arg.All {
+			if server.policy.StatementInUse(d) {
+				err = fmt.Errorf("can't delete. statement %s is in use", name)
+			} else {
+				delete(m, name)
+			}
+		} else {
+			err = d.Remove(s)
+		}
+	} else {
+		err = fmt.Errorf("not found statement: %s", name)
+	}
+	return &api.DeleteStatementResponse{}, err
+}
+
+func (server *BgpServer) handleGrpcReplaceStatement(grpcReq *GrpcRequest) (*api.ReplaceStatementResponse, error) {
+	var err error
+	arg := grpcReq.Data.(*api.ReplaceStatementRequest)
+	s, err := table.NewStatementFromApiStruct(arg.Statement, server.policy.DefinedSetMap)
+	if err != nil {
+		return nil, err
+	}
+	m := server.policy.StatementMap
+	name := s.Name
+	if d, ok := m[name]; ok {
+		err = d.Replace(s)
+	} else {
+		err = fmt.Errorf("not found statement: %s", name)
+	}
+	return &api.ReplaceStatementResponse{}, err
 }
 
 func (server *BgpServer) handleGrpcGetPolicy(grpcReq *GrpcRequest) error {
