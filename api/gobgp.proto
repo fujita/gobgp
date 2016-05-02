@@ -65,7 +65,9 @@ service GobgpApi {
   rpc ReplaceDefinedSet(ReplaceDefinedSetRequest) returns (ReplaceDefinedSetResponse) {}
   rpc GetStatement(Statement) returns (Statement) {}
   rpc GetStatements(Statement) returns (stream Statement) {}
-  rpc ModStatement(ModStatementArguments) returns (Error) {}
+  rpc AddStatement(AddStatementRequest) returns (AddStatementResponse) {}
+  rpc DeleteStatement(DeleteStatementRequest) returns (DeleteStatementResponse) {}
+  rpc ReplaceStatement(ReplaceStatementRequest) returns (ReplaceStatementResponse) {}
   rpc GetPolicy(Policy) returns (Policy) {}
   rpc GetPolicies(Policy) returns (stream Policy) {}
   rpc ModPolicy(ModPolicyArguments) returns (Error) {}
@@ -257,9 +259,26 @@ message ReplaceDefinedSetRequest {
 message ReplaceDefinedSetResponse {
 }
 
-message ModStatementArguments {
-    Operation operation = 1;
-    Statement statement = 2;
+message AddStatementRequest {
+    Statement statement = 1;
+}
+
+message AddStatementResponse {
+}
+
+message DeleteStatementRequest {
+    Statement statement = 1;
+    bool all = 2;
+}
+
+message DeleteStatementResponse {
+}
+
+message ReplaceStatementRequest {
+    Statement statement = 1;
+}
+
+message ReplaceStatementResponse {
 }
 
 message ModPolicyArguments {
