@@ -83,7 +83,9 @@ const (
 	REQ_DELETE_DEFINED_SET
 	REQ_REPLACE_DEFINED_SET
 	REQ_STATEMENT
-	REQ_MOD_STATEMENT
+	REQ_ADD_STATEMENT
+	REQ_DELETE_STATEMENT
+	REQ_REPLACE_STATEMENT
 	REQ_POLICY
 	REQ_MOD_POLICY
 	REQ_POLICY_ASSIGNMENT
@@ -486,8 +488,19 @@ func (s *Server) GetStatements(arg *api.Statement, stream api.GobgpApi_GetStatem
 	})
 }
 
-func (s *Server) ModStatement(ctx context.Context, arg *api.ModStatementArguments) (*api.Error, error) {
-	return s.mod(REQ_MOD_STATEMENT, arg)
+func (s *Server) AddStatement(ctx context.Context, arg *api.AddStatementRequest) (*api.AddStatementResponse, error) {
+	d, err := s.get(REQ_ADD_STATEMENT, arg)
+	return d.(*api.AddStatementResponse), err
+}
+
+func (s *Server) DeleteStatement(ctx context.Context, arg *api.DeleteStatementRequest) (*api.DeleteStatementResponse, error) {
+	d, err := s.get(REQ_DELETE_STATEMENT, arg)
+	return d.(*api.DeleteStatementResponse), err
+}
+
+func (s *Server) ReplaceStatement(ctx context.Context, arg *api.ReplaceStatementRequest) (*api.ReplaceStatementResponse, error) {
+	d, err := s.get(REQ_REPLACE_STATEMENT, arg)
+	return d.(*api.ReplaceStatementResponse), err
 }
 
 func (s *Server) GetPolicy(ctx context.Context, arg *api.Policy) (*api.Policy, error) {
