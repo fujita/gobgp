@@ -30,7 +30,8 @@ import (
 const (
 	_ = iota
 	REQ_GLOBAL_CONFIG
-	REQ_MOD_GLOBAL_CONFIG
+	REQ_START_SERVER
+	REQ_STOP_SERVER
 	REQ_NEIGHBOR
 	REQ_NEIGHBORS
 	REQ_ADJ_RIB_IN
@@ -43,9 +44,11 @@ const (
 	REQ_NEIGHBOR_SOFT_RESET_OUT
 	REQ_NEIGHBOR_ENABLE
 	REQ_NEIGHBOR_DISABLE
-	REQ_MOD_NEIGHBOR
 	REQ_ADD_NEIGHBOR
 	REQ_DEL_NEIGHBOR
+	// FIXME: we should merge
+	REQ_GRPC_ADD_NEIGHBOR
+	REQ_GRPC_DELETE_NEIGHBOR
 	REQ_UPDATE_NEIGHBOR
 	REQ_GLOBAL_RIB
 	REQ_MONITOR_GLOBAL_BEST_CHANGED
@@ -53,20 +56,36 @@ const (
 	REQ_MONITOR_NEIGHBOR_PEER_STATE
 	REQ_MRT_GLOBAL_RIB
 	REQ_MRT_LOCAL_RIB
-	REQ_MOD_MRT
-	REQ_MOD_BMP
+	REQ_ENABLE_MRT
+	REQ_DISABLE_MRT
+	REQ_INJECT_MRT
+	REQ_ADD_BMP
+	REQ_DELETE_BMP
+	REQ_VALIDATE_RIB
+	// TODO: delete
+	REQ_INITIALIZE_RPKI
 	REQ_RPKI
-	REQ_MOD_RPKI
+	REQ_ADD_RPKI
+	REQ_DELETE_RPKI
+	REQ_ENABLE_RPKI
+	REQ_DISABLE_RPKI
+	REQ_RESET_RPKI
+	REQ_SOFT_RESET_RPKI
 	REQ_ROA
+	REQ_ADD_VRF
+	REQ_DELETE_VRF
 	REQ_VRF
 	REQ_VRFS
-	REQ_VRF_MOD
-	REQ_MOD_PATH
-	REQ_MOD_PATHS
+	REQ_ADD_PATH
+	REQ_DELETE_PATH
 	REQ_DEFINED_SET
-	REQ_MOD_DEFINED_SET
+	REQ_ADD_DEFINED_SET
+	REQ_DELETE_DEFINED_SET
+	REQ_REPLACE_DEFINED_SET
 	REQ_STATEMENT
-	REQ_MOD_STATEMENT
+	REQ_ADD_STATEMENT
+	REQ_DELETE_STATEMENT
+	REQ_REPLACE_STATEMENT
 	REQ_POLICY
 	REQ_MOD_POLICY
 	REQ_POLICY_ASSIGNMENT
@@ -246,15 +265,27 @@ func (s *Server) Disable(ctx context.Context, arg *api.Arguments) (*api.Error, e
 	return s.neighbor(REQ_NEIGHBOR_DISABLE, arg)
 }
 
-func (s *Server) ModPath(ctx context.Context, arg *api.ModPathArguments) (*api.ModPathResponse, error) {
-	d, err := s.get(REQ_MOD_PATH, arg)
-	if err != nil {
-		return nil, err
-	}
-	return d.(*api.ModPathResponse), nil
+func (s *Server) AddPath(ctx context.Context, arg *api.AddPathRequest) (*api.AddPathResponse, error) {
+	d, err := s.get(REQ_ADD_PATH, arg)
+	return d.(*api.AddPathResponse), err
 }
 
-func (s *Server) ModPaths(stream api.GobgpApi_ModPathsServer) error {
+func (s *Server) DeletePath(ctx context.Context, arg *api.DeletePathRequest) (*api.DeletePathResponse, error) {
+	d, err := s.get(REQ_DELETE_PATH, arg)
+	return d.(*api.DeletePathResponse), err
+}
+
+func (s *Server) EnableMrt(ctx context.Context, arg *api.EnableMrtRequest) (*api.EnableMrtResponse, error) {
+	d, err := s.get(REQ_ENABLE_MRT, arg)
+	return d.(*api.EnableMrtResponse), err
+}
+
+func (s *Server) DisableMrt(ctx context.Context, arg *api.DisableMrtRequest) (*api.DisableMrtResponse, error) {
+	d, err := s.get(REQ_DISABLE_MRT, arg)
+	return d.(*api.DisableMrtResponse), err
+}
+
+func (s *Server) InjectMrt(stream api.GobgpApi_InjectMrtServer) error {
 	for {
 		arg, err := stream.Recv()
 
@@ -268,7 +299,7 @@ func (s *Server) ModPaths(stream api.GobgpApi_ModPathsServer) error {
 			return fmt.Errorf("unsupported resource: %s", arg.Resource)
 		}
 
-		req := NewGrpcRequest(REQ_MOD_PATHS, arg.Name, bgp.RouteFamily(0), arg)
+		req := NewGrpcRequest(REQ_INJECT_MRT, "", bgp.RouteFamily(0), arg)
 		s.bgpServerCh <- req
 
 		res := <-req.ResponseCh
@@ -277,11 +308,7 @@ func (s *Server) ModPaths(stream api.GobgpApi_ModPathsServer) error {
 			return err
 		}
 	}
-	err := stream.SendAndClose(&api.Error{
-		Code: api.Error_SUCCESS,
-	})
-
-	return err
+	return stream.SendAndClose(&api.InjectMrtResponse{})
 }
 
 func (s *Server) GetMrt(arg *api.MrtArguments, stream api.GobgpApi_GetMrtServer) error {
@@ -301,16 +328,49 @@ func (s *Server) GetMrt(arg *api.MrtArguments, stream api.GobgpApi_GetMrtServer)
 	})
 }
 
-func (s *Server) ModMrt(ctx context.Context, arg *api.ModMrtArguments) (*api.Error, error) {
-	return s.mod(REQ_MOD_MRT, arg)
+func (s *Server) AddBmp(ctx context.Context, arg *api.AddBmpRequest) (*api.AddBmpResponse, error) {
+	d, err := s.get(REQ_ADD_BMP, arg)
+	return d.(*api.AddBmpResponse), err
 }
 
-func (s *Server) ModBmp(ctx context.Context, arg *api.ModBmpArguments) (*api.Error, error) {
-	return s.mod(REQ_MOD_BMP, arg)
+func (s *Server) DeleteBmp(ctx context.Context, arg *api.DeleteBmpRequest) (*api.DeleteBmpResponse, error) {
+	d, err := s.get(REQ_DELETE_BMP, arg)
+	return d.(*api.DeleteBmpResponse), err
 }
 
-func (s *Server) ModRPKI(ctx context.Context, arg *api.ModRpkiArguments) (*api.Error, error) {
-	return s.mod(REQ_MOD_RPKI, arg)
+func (s *Server) ValidateRib(ctx context.Context, arg *api.ValidateRibRequest) (*api.ValidateRibResponse, error) {
+	d, err := s.get(REQ_VALIDATE_RIB, arg)
+	return d.(*api.ValidateRibResponse), err
+}
+
+func (s *Server) AddRpki(ctx context.Context, arg *api.AddRpkiRequest) (*api.AddRpkiResponse, error) {
+	d, err := s.get(REQ_ADD_RPKI, arg)
+	return d.(*api.AddRpkiResponse), err
+}
+
+func (s *Server) DeleteRpki(ctx context.Context, arg *api.DeleteRpkiRequest) (*api.DeleteRpkiResponse, error) {
+	d, err := s.get(REQ_DELETE_RPKI, arg)
+	return d.(*api.DeleteRpkiResponse), err
+}
+
+func (s *Server) EnableRpki(ctx context.Context, arg *api.EnableRpkiRequest) (*api.EnableRpkiResponse, error) {
+	d, err := s.get(REQ_ENABLE_RPKI, arg)
+	return d.(*api.EnableRpkiResponse), err
+}
+
+func (s *Server) DisableRpki(ctx context.Context, arg *api.DisableRpkiRequest) (*api.DisableRpkiResponse, error) {
+	d, err := s.get(REQ_DISABLE_RPKI, arg)
+	return d.(*api.DisableRpkiResponse), err
+}
+
+func (s *Server) ResetRpki(ctx context.Context, arg *api.ResetRpkiRequest) (*api.ResetRpkiResponse, error) {
+	d, err := s.get(REQ_RESET_RPKI, arg)
+	return d.(*api.ResetRpkiResponse), err
+}
+
+func (s *Server) SoftResetRpki(ctx context.Context, arg *api.SoftResetRpkiRequest) (*api.SoftResetRpkiResponse, error) {
+	d, err := s.get(REQ_SOFT_RESET_RPKI, arg)
+	return d.(*api.SoftResetRpkiResponse), err
 }
 
 func (s *Server) GetRPKI(arg *api.Arguments, stream api.GobgpApi_GetRPKIServer) error {
@@ -361,12 +421,24 @@ func (s *Server) mod(typ int, d interface{}) (*api.Error, error) {
 	return none, nil
 }
 
-func (s *Server) ModVrf(ctx context.Context, arg *api.ModVrfArguments) (*api.Error, error) {
-	return s.mod(REQ_VRF_MOD, arg)
+func (s *Server) AddVrf(ctx context.Context, arg *api.AddVrfRequest) (*api.AddVrfResponse, error) {
+	d, err := s.get(REQ_ADD_VRF, arg)
+	return d.(*api.AddVrfResponse), err
 }
 
-func (s *Server) ModNeighbor(ctx context.Context, arg *api.ModNeighborArguments) (*api.Error, error) {
-	return s.mod(REQ_MOD_NEIGHBOR, arg)
+func (s *Server) DeleteVrf(ctx context.Context, arg *api.DeleteVrfRequest) (*api.DeleteVrfResponse, error) {
+	d, err := s.get(REQ_DELETE_VRF, arg)
+	return d.(*api.DeleteVrfResponse), err
+}
+
+func (s *Server) AddNeighbor(ctx context.Context, arg *api.AddNeighborRequest) (*api.AddNeighborResponse, error) {
+	d, err := s.get(REQ_GRPC_ADD_NEIGHBOR, arg)
+	return d.(*api.AddNeighborResponse), err
+}
+
+func (s *Server) DeleteNeighbor(ctx context.Context, arg *api.DeleteNeighborRequest) (*api.DeleteNeighborResponse, error) {
+	d, err := s.get(REQ_GRPC_DELETE_NEIGHBOR, arg)
+	return d.(*api.DeleteNeighborResponse), err
 }
 
 func (s *Server) GetDefinedSet(ctx context.Context, arg *api.DefinedSet) (*api.DefinedSet, error) {
@@ -385,8 +457,19 @@ func (s *Server) GetDefinedSets(arg *api.DefinedSet, stream api.GobgpApi_GetDefi
 	})
 }
 
-func (s *Server) ModDefinedSet(ctx context.Context, arg *api.ModDefinedSetArguments) (*api.Error, error) {
-	return s.mod(REQ_MOD_DEFINED_SET, arg)
+func (s *Server) AddDefinedSet(ctx context.Context, arg *api.AddDefinedSetRequest) (*api.AddDefinedSetResponse, error) {
+	d, err := s.get(REQ_ADD_DEFINED_SET, arg)
+	return d.(*api.AddDefinedSetResponse), err
+}
+
+func (s *Server) DeleteDefinedSet(ctx context.Context, arg *api.DeleteDefinedSetRequest) (*api.DeleteDefinedSetResponse, error) {
+	d, err := s.get(REQ_DELETE_DEFINED_SET, arg)
+	return d.(*api.DeleteDefinedSetResponse), err
+}
+
+func (s *Server) ReplaceDefinedSet(ctx context.Context, arg *api.ReplaceDefinedSetRequest) (*api.ReplaceDefinedSetResponse, error) {
+	d, err := s.get(REQ_REPLACE_DEFINED_SET, arg)
+	return d.(*api.ReplaceDefinedSetResponse), err
 }
 
 func (s *Server) GetStatement(ctx context.Context, arg *api.Statement) (*api.Statement, error) {
@@ -405,8 +488,19 @@ func (s *Server) GetStatements(arg *api.Statement, stream api.GobgpApi_GetStatem
 	})
 }
 
-func (s *Server) ModStatement(ctx context.Context, arg *api.ModStatementArguments) (*api.Error, error) {
-	return s.mod(REQ_MOD_STATEMENT, arg)
+func (s *Server) AddStatement(ctx context.Context, arg *api.AddStatementRequest) (*api.AddStatementResponse, error) {
+	d, err := s.get(REQ_ADD_STATEMENT, arg)
+	return d.(*api.AddStatementResponse), err
+}
+
+func (s *Server) DeleteStatement(ctx context.Context, arg *api.DeleteStatementRequest) (*api.DeleteStatementResponse, error) {
+	d, err := s.get(REQ_DELETE_STATEMENT, arg)
+	return d.(*api.DeleteStatementResponse), err
+}
+
+func (s *Server) ReplaceStatement(ctx context.Context, arg *api.ReplaceStatementRequest) (*api.ReplaceStatementResponse, error) {
+	d, err := s.get(REQ_REPLACE_STATEMENT, arg)
+	return d.(*api.ReplaceStatementResponse), err
 }
 
 func (s *Server) GetPolicy(ctx context.Context, arg *api.Policy) (*api.Policy, error) {
@@ -449,8 +543,14 @@ func (s *Server) GetGlobalConfig(ctx context.Context, arg *api.Arguments) (*api.
 	return d.(*api.Global), nil
 }
 
-func (s *Server) ModGlobalConfig(ctx context.Context, arg *api.ModGlobalConfigArguments) (*api.Error, error) {
-	return s.mod(REQ_MOD_GLOBAL_CONFIG, arg)
+func (s *Server) StartServer(ctx context.Context, arg *api.StartServerRequest) (*api.StartServerResponse, error) {
+	d, err := s.get(REQ_START_SERVER, arg)
+	return d.(*api.StartServerResponse), err
+}
+
+func (s *Server) StopServer(ctx context.Context, arg *api.StopServerRequest) (*api.StopServerResponse, error) {
+	d, err := s.get(REQ_STOP_SERVER, arg)
+	return d.(*api.StopServerResponse), err
 }
 
 type GrpcRequest struct {

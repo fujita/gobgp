@@ -383,23 +383,25 @@ func modDefinedSet(settype string, modtype string, args []string) error {
 	if d, err = parseDefinedSet(settype, args); err != nil {
 		return err
 	}
-	var op api.Operation
 	switch modtype {
 	case CMD_ADD:
-		op = api.Operation_ADD
+		_, err = client.AddDefinedSet(context.Background(), &api.AddDefinedSetRequest{
+			Set: d,
+		})
 	case CMD_DEL:
+		all := false
 		if len(args) < 2 {
-			op = api.Operation_DEL_ALL
-		} else {
-			op = api.Operation_DEL
+			all = true
 		}
+		_, err = client.DeleteDefinedSet(context.Background(), &api.DeleteDefinedSetRequest{
+			Set: d,
+			All: all,
+		})
 	case CMD_SET:
-		op = api.Operation_REPLACE
+		_, err = client.ReplaceDefinedSet(context.Background(), &api.ReplaceDefinedSetRequest{
+			Set: d,
+		})
 	}
-	_, err = client.ModDefinedSet(context.Background(), &api.ModDefinedSetArguments{
-		Operation: op,
-		Set:       d,
-	})
 	return err
 }
 
@@ -581,46 +583,29 @@ func modStatement(op string, args []string) error {
 	if len(args) < 1 {
 		return fmt.Errorf("usage: gobgp policy statement %s <name>", op)
 	}
-	name := args[0]
-	var o api.Operation
+	stmt := &api.Statement{
+		Name: args[0],
+	}
+	var err error
 	switch op {
 	case CMD_ADD:
-		o = api.Operation_ADD
+		_, err = client.AddStatement(context.Background(), &api.AddStatementRequest{
+			Statement: stmt,
+		})
 	case CMD_DEL:
-		o = api.Operation_DEL_ALL
+		_, err = client.DeleteStatement(context.Background(), &api.DeleteStatementRequest{
+			Statement: stmt,
+		})
 	default:
 		return fmt.Errorf("invalid operation: %s", op)
 	}
-	stmt := &api.Statement{
-		Name: name,
-	}
-	arg := &api.ModStatementArguments{
-		Operation: o,
-		Statement: stmt,
-	}
-	_, err := client.ModStatement(context.Background(), arg)
 	return err
 }
 
 func modCondition(name, op string, args []string) error {
-	var o api.Operation
-	switch op {
-	case CMD_ADD:
-		o = api.Operation_ADD
-	case CMD_DEL:
-		o = api.Operation_DEL
-	case CMD_SET:
-		o = api.Operation_REPLACE
-	default:
-		return fmt.Errorf("invalid operation: %s", op)
-	}
 	stmt := &api.Statement{
 		Name:       name,
 		Conditions: &api.Conditions{},
-	}
-	arg := &api.ModStatementArguments{
-		Operation: o,
-		Statement: stmt,
 	}
 	usage := fmt.Sprintf("usage: gobgp policy statement %s %s condition", name, op)
 	if len(args) < 1 {
@@ -761,29 +746,30 @@ func modCondition(name, op string, args []string) error {
 			return fmt.Errorf("%s rpki { valid | invalid | not-found }", usage)
 		}
 	}
-	_, err := client.ModStatement(context.Background(), arg)
+	var err error
+	switch op {
+	case CMD_ADD:
+		_, err = client.AddStatement(context.Background(), &api.AddStatementRequest{
+			Statement: stmt,
+		})
+	case CMD_DEL:
+		_, err = client.DeleteStatement(context.Background(), &api.DeleteStatementRequest{
+			Statement: stmt,
+		})
+	case CMD_SET:
+		_, err = client.ReplaceStatement(context.Background(), &api.ReplaceStatementRequest{
+			Statement: stmt,
+		})
+	default:
+		return fmt.Errorf("invalid operation: %s", op)
+	}
 	return err
 }
 
 func modAction(name, op string, args []string) error {
-	var o api.Operation
-	switch op {
-	case CMD_ADD:
-		o = api.Operation_ADD
-	case CMD_DEL:
-		o = api.Operation_DEL
-	case CMD_SET:
-		o = api.Operation_REPLACE
-	default:
-		return fmt.Errorf("invalid operation: %s", op)
-	}
 	stmt := &api.Statement{
 		Name:    name,
 		Actions: &api.Actions{},
-	}
-	arg := &api.ModStatementArguments{
-		Operation: o,
-		Statement: stmt,
 	}
 	usage := fmt.Sprintf("usage: gobgp policy statement %s %s action", name, op)
 	if len(args) < 1 {
@@ -880,7 +866,23 @@ func modAction(name, op string, args []string) error {
 			Address: args[0],
 		}
 	}
-	_, err := client.ModStatement(context.Background(), arg)
+	var err error
+	switch op {
+	case CMD_ADD:
+		_, err = client.AddStatement(context.Background(), &api.AddStatementRequest{
+			Statement: stmt,
+		})
+	case CMD_DEL:
+		_, err = client.DeleteStatement(context.Background(), &api.DeleteStatementRequest{
+			Statement: stmt,
+		})
+	case CMD_SET:
+		_, err = client.ReplaceStatement(context.Background(), &api.ReplaceStatementRequest{
+			Statement: stmt,
+		})
+	default:
+		return fmt.Errorf("invalid operation: %s", op)
+	}
 	return err
 }
 

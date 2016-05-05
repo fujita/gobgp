@@ -107,7 +107,7 @@ func showVrf(name string) error {
 }
 
 func modVrf(typ string, args []string) error {
-	var arg *api.ModVrfArguments
+	var err error
 	switch typ {
 	case CMD_ADD:
 		if len(args) < 6 || args[1] != "rd" || args[3] != "rt" {
@@ -147,8 +147,7 @@ func modVrf(typ string, args []string) error {
 			}
 		}
 		buf, _ := rd.Serialize()
-		arg = &api.ModVrfArguments{
-			Operation: api.Operation_ADD,
+		arg := &api.AddVrfRequest{
 			Vrf: &api.Vrf{
 				Name:     name,
 				Rd:       buf,
@@ -156,19 +155,18 @@ func modVrf(typ string, args []string) error {
 				ExportRt: exportRt,
 			},
 		}
+		_, err = client.AddVrf(context.Background(), arg)
 	case CMD_DEL:
 		if len(args) != 1 {
 			return fmt.Errorf("Usage: gobgp vrf del <vrf name>")
 		}
-		arg = &api.ModVrfArguments{
-			Operation: api.Operation_DEL,
+		arg := &api.DeleteVrfRequest{
 			Vrf: &api.Vrf{
 				Name: args[0],
 			},
 		}
+		_, err = client.DeleteVrf(context.Background(), arg)
 	}
-
-	_, err := client.ModVrf(context.Background(), arg)
 	return err
 }
 
