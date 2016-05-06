@@ -33,27 +33,24 @@ func TestModPolicyAssign(t *testing.T) {
 			RouterId: "1.1.1.1",
 		},
 	})
-	err := s.handleGrpcModPolicy(&GrpcRequest{
-		Data: &api.ModPolicyArguments{
-			Operation: api.Operation_ADD,
+	_, err := s.handleGrpcAddPolicy(&GrpcRequest{
+		Data: &api.AddPolicyRequest{
 			Policy: &api.Policy{
 				Name: "p1",
 			},
 		},
 	})
 	assert.Nil(err)
-	err = s.handleGrpcModPolicy(&GrpcRequest{
-		Data: &api.ModPolicyArguments{
-			Operation: api.Operation_ADD,
+	_, err = s.handleGrpcAddPolicy(&GrpcRequest{
+		Data: &api.AddPolicyRequest{
 			Policy: &api.Policy{
 				Name: "p2",
 			},
 		},
 	})
 	assert.Nil(err)
-	err = s.handleGrpcModPolicy(&GrpcRequest{
-		Data: &api.ModPolicyArguments{
-			Operation: api.Operation_ADD,
+	_, err = s.handleGrpcAddPolicy(&GrpcRequest{
+		Data: &api.AddPolicyRequest{
 			Policy: &api.Policy{
 				Name: "p3",
 			},
