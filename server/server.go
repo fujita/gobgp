@@ -2249,10 +2249,25 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 			}
 		}
 		close(grpcReq.ResponseCh)
-	case REQ_MOD_POLICY:
-		err := server.handleGrpcModPolicy(grpcReq)
+	case REQ_ADD_POLICY:
+		data, err := server.handleGrpcAddPolicy(grpcReq)
 		grpcReq.ResponseCh <- &GrpcResponse{
 			ResponseErr: err,
+			Data:        data,
+		}
+		close(grpcReq.ResponseCh)
+	case REQ_DELETE_POLICY:
+		data, err := server.handleGrpcDeletePolicy(grpcReq)
+		grpcReq.ResponseCh <- &GrpcResponse{
+			ResponseErr: err,
+			Data:        data,
+		}
+		close(grpcReq.ResponseCh)
+	case REQ_REPLACE_POLICY:
+		data, err := server.handleGrpcReplacePolicy(grpcReq)
+		grpcReq.ResponseCh <- &GrpcResponse{
+			ResponseErr: err,
+			Data:        data,
 		}
 		close(grpcReq.ResponseCh)
 	case REQ_POLICY_ASSIGNMENT:
@@ -2790,56 +2805,66 @@ func (server *BgpServer) policyInUse(x *table.Policy) bool {
 	return false
 }
 
-func (server *BgpServer) handleGrpcModPolicy(grpcReq *GrpcRequest) error {
+func (server *BgpServer) handleGrpcAddPolicy(grpcReq *GrpcRequest) (*api.AddPolicyResponse, error) {
 	policyMutex.Lock()
 	defer policyMutex.Unlock()
-	arg := grpcReq.Data.(*api.ModPolicyArguments)
+	rsp := &api.AddPolicyResponse{}
+	arg := grpcReq.Data.(*api.AddPolicyRequest)
 	x, err := table.NewPolicyFromApiStruct(arg.Policy, server.policy.DefinedSetMap)
 	if err != nil {
-		return err
+		return rsp, err
 	}
 	pMap := server.policy.PolicyMap
 	sMap := server.policy.StatementMap
 	name := x.Name()
 	y, ok := pMap[name]
-	if arg.Operation != api.Operation_ADD && !ok {
-		return fmt.Errorf("not found policy: %s", name)
+	if arg.ReferExistingStatements {
+		err = x.FillUp(sMap)
+	} else {
+		for _, s := range x.Statements {
+			if _, ok := sMap[s.Name]; ok {
+				return rsp, fmt.Errorf("statement %s already defined", s.Name)
+			}
+			sMap[s.Name] = s
+		}
 	}
-	switch arg.Operation {
-	case api.Operation_ADD, api.Operation_REPLACE:
-		if arg.ReferExistingStatements {
-			err = x.FillUp(sMap)
-			if err != nil {
-				return err
-			}
-		} else {
-			for _, s := range x.Statements {
-				if _, ok := sMap[s.Name]; ok {
-					return fmt.Errorf("statement %s already defined", s.Name)
-				}
-				sMap[s.Name] = s
-			}
-		}
-		if arg.Operation == api.Operation_REPLACE {
-			err = y.Replace(x)
-		} else if ok {
-			err = y.Add(x)
-		} else {
-			pMap[name] = x
-		}
-	case api.Operation_DEL:
-		err = y.Remove(x)
-	case api.Operation_DEL_ALL:
+	if ok {
+		err = y.Add(x)
+	} else {
+		pMap[name] = x
+	}
+	return &api.AddPolicyResponse{}, err
+}
+
+func (server *BgpServer) handleGrpcDeletePolicy(grpcReq *GrpcRequest) (*api.DeletePolicyResponse, error) {
+	policyMutex.Lock()
+	defer policyMutex.Unlock()
+	rsp := &api.DeletePolicyResponse{}
+	arg := grpcReq.Data.(*api.DeletePolicyRequest)
+	x, err := table.NewPolicyFromApiStruct(arg.Policy, server.policy.DefinedSetMap)
+	if err != nil {
+		return rsp, err
+	}
+	pMap := server.policy.PolicyMap
+	sMap := server.policy.StatementMap
+	name := x.Name()
+	y, ok := pMap[name]
+	if !ok {
+		return rsp, fmt.Errorf("not found policy: %s", name)
+	}
+	if arg.All {
 		if server.policyInUse(y) {
-			return fmt.Errorf("can't delete. policy %s is in use", name)
+			return rsp, fmt.Errorf("can't delete. policy %s is in use", name)
 		}
 		log.WithFields(log.Fields{
 			"Topic": "Policy",
 			"Key":   name,
 		}).Debug("delete policy")
 		delete(pMap, name)
+	} else {
+		err = y.Remove(x)
 	}
-	if err == nil && arg.Operation != api.Operation_ADD && !arg.PreserveStatements {
+	if err == nil && !arg.PreserveStatements {
 		for _, s := range y.Statements {
 			if !server.policy.StatementInUse(s) {
 				log.WithFields(log.Fields{
@@ -2850,7 +2875,51 @@ func (server *BgpServer) handleGrpcModPolicy(grpcReq *GrpcRequest) error {
 			}
 		}
 	}
-	return err
+	return rsp, err
+}
+
+func (server *BgpServer) handleGrpcReplacePolicy(grpcReq *GrpcRequest) (*api.ReplacePolicyResponse, error) {
+	policyMutex.Lock()
+	defer policyMutex.Unlock()
+	rsp := &api.ReplacePolicyResponse{}
+	arg := grpcReq.Data.(*api.ReplacePolicyRequest)
+	x, err := table.NewPolicyFromApiStruct(arg.Policy, server.policy.DefinedSetMap)
+	if err != nil {
+		return rsp, err
+	}
+	pMap := server.policy.PolicyMap
+	sMap := server.policy.StatementMap
+	name := x.Name()
+	y, ok := pMap[name]
+	if !ok {
+		return rsp, fmt.Errorf("not found policy: %s", name)
+	}
+	if arg.ReferExistingStatements {
+		if err = x.FillUp(sMap); err != nil {
+			return rsp, err
+		}
+	} else {
+		for _, s := range x.Statements {
+			if _, ok := sMap[s.Name]; ok {
+				return rsp, fmt.Errorf("statement %s already defined", s.Name)
+			}
+			sMap[s.Name] = s
+		}
+	}
+
+	err = y.Replace(x)
+	if err == nil && !arg.PreserveStatements {
+		for _, s := range y.Statements {
+			if !server.policy.StatementInUse(s) {
+				log.WithFields(log.Fields{
+					"Topic": "Policy",
+					"Key":   s.Name,
+				}).Debug("delete unused statement")
+				delete(sMap, s.Name)
+			}
+		}
+	}
+	return rsp, err
 }
 
 func (server *BgpServer) getPolicyInfo(a *api.PolicyAssignment) (string, table.PolicyDirection, error) {

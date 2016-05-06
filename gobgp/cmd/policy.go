@@ -892,33 +892,43 @@ func modPolicy(modtype string, args []string) error {
 	}
 	name := args[0]
 	args = args[1:]
-	var op api.Operation
-	switch modtype {
-	case CMD_ADD:
-		op = api.Operation_ADD
-	case CMD_DEL:
-		if len(args) < 1 {
-			op = api.Operation_DEL_ALL
-		} else {
-			op = api.Operation_DEL
-		}
-	case CMD_SET:
-		op = api.Operation_REPLACE
-	}
 	stmts := make([]*api.Statement, 0, len(args))
 	for _, n := range args {
 		stmts = append(stmts, &api.Statement{Name: n})
 	}
-	arg := &api.ModPolicyArguments{
-		Operation: op,
-		Policy: &api.Policy{
-			Name:       name,
-			Statements: stmts,
-		},
-		ReferExistingStatements: true,
-		PreserveStatements:      true,
+	var err error
+	switch modtype {
+	case CMD_ADD:
+		_, err = client.AddPolicy(context.Background(), &api.AddPolicyRequest{
+			Policy: &api.Policy{
+				Name:       name,
+				Statements: stmts,
+			},
+			ReferExistingStatements: true,
+		})
+	case CMD_DEL:
+		all := false
+		if len(args) < 1 {
+			all = true
+		}
+		_, err = client.DeletePolicy(context.Background(), &api.DeletePolicyRequest{
+			Policy: &api.Policy{
+				Name:       name,
+				Statements: stmts,
+			},
+			All:                all,
+			PreserveStatements: true,
+		})
+	case CMD_SET:
+		_, err = client.ReplacePolicy(context.Background(), &api.ReplacePolicyRequest{
+			Policy: &api.Policy{
+				Name:       name,
+				Statements: stmts,
+			},
+			ReferExistingStatements: true,
+			PreserveStatements:      true,
+		})
 	}
-	_, err := client.ModPolicy(context.Background(), arg)
 	return err
 }
 
