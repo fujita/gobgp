@@ -70,7 +70,9 @@ service GobgpApi {
   rpc ReplaceStatement(ReplaceStatementRequest) returns (ReplaceStatementResponse) {}
   rpc GetPolicy(Policy) returns (Policy) {}
   rpc GetPolicies(Policy) returns (stream Policy) {}
-  rpc ModPolicy(ModPolicyArguments) returns (Error) {}
+  rpc AddPolicy(AddPolicyRequest) returns (AddPolicyResponse) {}
+  rpc DeletePolicy(DeletePolicyRequest) returns (DeletePolicyResponse) {}
+  rpc ReplacePolicy(ReplacePolicyRequest) returns (ReplacePolicyResponse) {}
   rpc GetPolicyAssignment(PolicyAssignment) returns (PolicyAssignment) {}
   rpc ModPolicyAssignment(ModPolicyAssignmentArguments) returns (Error) {}
 }
@@ -281,18 +283,40 @@ message ReplaceStatementRequest {
 message ReplaceStatementResponse {
 }
 
-message ModPolicyArguments {
-    Operation operation = 1;
-    Policy policy = 2;
+message AddPolicyRequest {
+    Policy policy = 1;
     // if this flag is set, gobgpd won't define new statements
     // but refer existing statements using statement's names in this arguments.
-    // this flag only works with Operation_ADD
-    bool refer_existing_statements = 3;
+    bool refer_existing_statements = 2;
+}
+
+message AddPolicyResponse {
+}
+
+message DeletePolicyRequest {
+    Policy policy = 1;
     // if this flag is set, gobgpd won't delete any statements
     // even if some statements get not used by any policy by this operation.
-    // this flag means nothing if it is used with Operation_ADD
-    bool preserve_statements = 4;
+    bool preserve_statements = 2;
+    bool all = 3;
 }
+
+message DeletePolicyResponse {
+}
+
+message ReplacePolicyRequest {
+    Policy policy = 1;
+    // if this flag is set, gobgpd won't define new statements
+    // but refer existing statements using statement's names in this arguments.
+    bool refer_existing_statements = 2;
+    // if this flag is set, gobgpd won't delete any statements
+    // even if some statements get not used by any policy by this operation.
+    bool preserve_statements = 3;
+}
+
+message ReplacePolicyResponse {
+}
+
 
 message ModPolicyAssignmentArguments {
     Operation operation = 1;

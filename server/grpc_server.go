@@ -87,7 +87,9 @@ const (
 	REQ_DELETE_STATEMENT
 	REQ_REPLACE_STATEMENT
 	REQ_POLICY
-	REQ_MOD_POLICY
+	REQ_ADD_POLICY
+	REQ_DELETE_POLICY
+	REQ_REPLACE_POLICY
 	REQ_POLICY_ASSIGNMENT
 	REQ_MOD_POLICY_ASSIGNMENT
 	REQ_BMP_NEIGHBORS
@@ -519,8 +521,19 @@ func (s *Server) GetPolicies(arg *api.Policy, stream api.GobgpApi_GetPoliciesSer
 	})
 }
 
-func (s *Server) ModPolicy(ctx context.Context, arg *api.ModPolicyArguments) (*api.Error, error) {
-	return s.mod(REQ_MOD_POLICY, arg)
+func (s *Server) AddPolicy(ctx context.Context, arg *api.AddPolicyRequest) (*api.AddPolicyResponse, error) {
+	d, err := s.get(REQ_ADD_POLICY, arg)
+	return d.(*api.AddPolicyResponse), err
+}
+
+func (s *Server) DeletePolicy(ctx context.Context, arg *api.DeletePolicyRequest) (*api.DeletePolicyResponse, error) {
+	d, err := s.get(REQ_DELETE_POLICY, arg)
+	return d.(*api.DeletePolicyResponse), err
+}
+
+func (s *Server) ReplacePolicy(ctx context.Context, arg *api.ReplacePolicyRequest) (*api.ReplacePolicyResponse, error) {
+	d, err := s.get(REQ_REPLACE_POLICY, arg)
+	return d.(*api.ReplacePolicyResponse), err
 }
 
 func (s *Server) GetPolicyAssignment(ctx context.Context, arg *api.PolicyAssignment) (*api.PolicyAssignment, error) {
