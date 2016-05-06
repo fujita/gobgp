@@ -3270,13 +3270,13 @@ func (server *BgpServer) handleModRpki(grpcReq *GrpcRequest) {
 	case *api.DeleteRpkiRequest:
 		done(grpcReq, &api.DeleteRpkiResponse{}, server.roaManager.DeleteServer(arg.Address))
 	case *api.EnableRpkiRequest:
-		done(grpcReq, &api.EnableRpkiResponse{}, server.roaManager.operate(api.Operation_ENABLE, arg.Address))
+		done(grpcReq, &api.EnableRpkiResponse{}, server.roaManager.Enable(arg.Address))
 	case *api.DisableRpkiRequest:
-		done(grpcReq, &api.DisableRpkiResponse{}, server.roaManager.operate(api.Operation_DISABLE, arg.Address))
+		done(grpcReq, &api.DisableRpkiResponse{}, server.roaManager.Disable(arg.Address))
 	case *api.ResetRpkiRequest:
-		done(grpcReq, &api.ResetRpkiResponse{}, server.roaManager.operate(api.Operation_RESET, arg.Address))
+		done(grpcReq, &api.ResetRpkiResponse{}, server.roaManager.Reset(arg.Address))
 	case *api.SoftResetRpkiRequest:
-		done(grpcReq, &api.SoftResetRpkiResponse{}, server.roaManager.operate(api.Operation_SOFTRESET, arg.Address))
+		done(grpcReq, &api.SoftResetRpkiResponse{}, server.roaManager.SoftReset(arg.Address))
 	}
 }
 

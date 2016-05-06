@@ -214,20 +214,45 @@ func (m *roaManager) deleteAllROA(network string) {
 	}
 }
 
-func (m *roaManager) operate(op api.Operation, address string) error {
+func (m *roaManager) Enable(address string) error {
 	for network, client := range m.clientMap {
 		add, _, _ := net.SplitHostPort(network)
 		if add == address {
-			switch op {
-			case api.Operation_ENABLE:
-				client.enable(client.serialNumber)
-			case api.Operation_DISABLE:
-			case api.Operation_RESET:
-				client.reset()
-			case api.Operation_SOFTRESET:
-				client.softReset()
-				m.deleteAllROA(network)
-			}
+			client.enable(client.serialNumber)
+			return nil
+		}
+	}
+	return fmt.Errorf("roa server not found %s", address)
+}
+
+func (m *roaManager) Disable(address string) error {
+	for network, client := range m.clientMap {
+		add, _, _ := net.SplitHostPort(network)
+		if add == address {
+			client.reset()
+			return nil
+		}
+	}
+	return fmt.Errorf("roa server not found %s", address)
+}
+
+func (m *roaManager) Reset(address string) error {
+	for network, client := range m.clientMap {
+		add, _, _ := net.SplitHostPort(network)
+		if add == address {
+			client.reset()
+			return nil
+		}
+	}
+	return fmt.Errorf("roa server not found %s", address)
+}
+
+func (m *roaManager) SoftReset(address string) error {
+	for network, client := range m.clientMap {
+		add, _, _ := net.SplitHostPort(network)
+		if add == address {
+			client.softReset()
+			m.deleteAllROA(network)
 			return nil
 		}
 	}

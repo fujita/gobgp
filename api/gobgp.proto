@@ -363,18 +363,6 @@ enum Resource {
     VRF = 4;
 }
 
-enum Operation {
-    ADD = 0;
-    DEL = 1;
-    DEL_ALL = 2;
-    REPLACE = 3;
-    ENABLE = 4;
-    DISABLE = 5;
-    RESET = 6;
-    SOFTRESET = 7;
-    INITIALIZE = 8;
-}
-
 message Path {
     bytes nlri = 1;
     repeated bytes pattrs = 2;
