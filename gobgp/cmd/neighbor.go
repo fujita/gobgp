@@ -705,14 +705,18 @@ func modNeighborPolicy(remoteIP net.IP, policyType, cmdType string, args []strin
 		usage = fmt.Sprintf("usage: gobgp global policy %s %s", policyType, cmdType)
 	}
 
-	arg := &api.ModPolicyAssignmentArguments{
-		Assignment: &api.PolicyAssignment{
-			Type:     typ,
-			Resource: r,
-			Name:     remoteIP.String(),
-		},
+	assign := &api.PolicyAssignment{
+		Type:     typ,
+		Resource: r,
+		Name:     remoteIP.String(),
 	}
+	ps := make([]*api.Policy, 0, len(args))
+	for _, name := range args {
+		ps = append(ps, &api.Policy{Name: name})
+	}
+	assign.Policies = ps
 
+	var err error
 	switch cmdType {
 	case CMD_ADD, CMD_SET:
 		if len(args) < 1 {
@@ -724,24 +728,26 @@ func modNeighborPolicy(remoteIP net.IP, policyType, cmdType string, args []strin
 		if err != nil {
 			return fmt.Errorf("%s\n%s <policy name>... [default {%s|%s}]", err, usage, "accept", "reject")
 		}
+		assign.Default = def
 		if cmdType == CMD_ADD {
-			arg.Operation = api.Operation_ADD
+			_, err = client.AddPolicyAssignment(context.Background(), &api.AddPolicyAssignmentRequest{
+				Assignment: assign,
+			})
 		} else {
-			arg.Operation = api.Operation_REPLACE
+			_, err = client.ReplacePolicyAssignment(context.Background(), &api.ReplacePolicyAssignmentRequest{
+				Assignment: assign,
+			})
 		}
-		arg.Assignment.Default = def
 	case CMD_DEL:
-		arg.Operation = api.Operation_DEL
+		all := false
 		if len(args) == 0 {
-			arg.Operation = api.Operation_DEL_ALL
+			all = true
 		}
+		_, err = client.DeletePolicyAssignment(context.Background(), &api.DeletePolicyAssignmentRequest{
+			Assignment: assign,
+			All:        all,
+		})
 	}
-	ps := make([]*api.Policy, 0, len(args))
-	for _, name := range args {
-		ps = append(ps, &api.Policy{Name: name})
-	}
-	arg.Assignment.Policies = ps
-	_, err := client.ModPolicyAssignment(context.Background(), arg)
 	return err
 }
 

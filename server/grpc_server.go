@@ -91,7 +91,9 @@ const (
 	REQ_DELETE_POLICY
 	REQ_REPLACE_POLICY
 	REQ_POLICY_ASSIGNMENT
-	REQ_MOD_POLICY_ASSIGNMENT
+	REQ_ADD_POLICY_ASSIGNMENT
+	REQ_DELETE_POLICY_ASSIGNMENT
+	REQ_REPLACE_POLICY_ASSIGNMENT
 	REQ_BMP_NEIGHBORS
 	REQ_BMP_GLOBAL
 	REQ_BMP_ADJ_IN
@@ -544,8 +546,19 @@ func (s *Server) GetPolicyAssignment(ctx context.Context, arg *api.PolicyAssignm
 	return d.(*api.PolicyAssignment), nil
 }
 
-func (s *Server) ModPolicyAssignment(ctx context.Context, arg *api.ModPolicyAssignmentArguments) (*api.Error, error) {
-	return s.mod(REQ_MOD_POLICY_ASSIGNMENT, arg)
+func (s *Server) AddPolicyAssignment(ctx context.Context, arg *api.AddPolicyAssignmentRequest) (*api.AddPolicyAssignmentResponse, error) {
+	d, err := s.get(REQ_ADD_POLICY_ASSIGNMENT, arg)
+	return d.(*api.AddPolicyAssignmentResponse), err
+}
+
+func (s *Server) DeletePolicyAssignment(ctx context.Context, arg *api.DeletePolicyAssignmentRequest) (*api.DeletePolicyAssignmentResponse, error) {
+	d, err := s.get(REQ_DELETE_POLICY_ASSIGNMENT, arg)
+	return d.(*api.DeletePolicyAssignmentResponse), err
+}
+
+func (s *Server) ReplacePolicyAssignment(ctx context.Context, arg *api.ReplacePolicyAssignmentRequest) (*api.ReplacePolicyAssignmentResponse, error) {
+	d, err := s.get(REQ_REPLACE_POLICY_ASSIGNMENT, arg)
+	return d.(*api.ReplacePolicyAssignmentResponse), err
 }
 
 func (s *Server) GetGlobalConfig(ctx context.Context, arg *api.Arguments) (*api.Global, error) {
