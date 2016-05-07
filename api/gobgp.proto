@@ -25,8 +25,7 @@ service GobgpApi {
   rpc GetGlobalConfig(Arguments) returns (Global) {}
   rpc AddNeighbor(AddNeighborRequest) returns (AddNeighborResponse) {}
   rpc DeleteNeighbor(DeleteNeighborRequest) returns (DeleteNeighborResponse) {}
-  rpc GetNeighbors(Arguments) returns (stream Peer) {}
-  rpc GetNeighbor(Arguments) returns (Peer) {}
+  rpc GetNeighbor(GetNeighborRequest) returns (GetNeighborResponse) {}
   rpc GetRib(Table) returns (Table) {}
   rpc ValidateRib(ValidateRibRequest) returns (ValidateRibResponse) {}
   rpc Reset(Arguments) returns (Error) {}
@@ -86,6 +85,13 @@ message Error {
     }
     ErrorCode code = 1;
     string msg = 2;
+}
+
+message GetNeighborRequest {
+}
+
+message GetNeighborResponse {
+    repeated Peer peers = 1;
 }
 
 message Arguments {

@@ -33,7 +33,6 @@ const (
 	REQ_START_SERVER
 	REQ_STOP_SERVER
 	REQ_NEIGHBOR
-	REQ_NEIGHBORS
 	REQ_ADJ_RIB_IN
 	REQ_ADJ_RIB_OUT
 	REQ_LOCAL_RIB
@@ -125,18 +124,12 @@ func (s *Server) Serve() error {
 	return nil
 }
 
-func (s *Server) GetNeighbor(ctx context.Context, arg *api.Arguments) (*api.Peer, error) {
+func (s *Server) GetNeighbor(ctx context.Context, arg *api.GetNeighborRequest) (*api.GetNeighborResponse, error) {
 	var rf bgp.RouteFamily
-	req := NewGrpcRequest(REQ_NEIGHBOR, arg.Name, rf, nil)
+	req := NewGrpcRequest(REQ_NEIGHBOR, "", rf, nil)
 	s.bgpServerCh <- req
-
 	res := <-req.ResponseCh
-	if err := res.Err(); err != nil {
-		log.Debug(err.Error())
-		return nil, err
-	}
-
-	return res.Data.(*api.Peer), nil
+	return res.Data.(*api.GetNeighborResponse), res.Err()
 }
 
 func handleMultipleResponses(req *GrpcRequest, f func(*GrpcResponse) error) error {
@@ -152,16 +145,6 @@ func handleMultipleResponses(req *GrpcRequest, f func(*GrpcResponse) error) erro
 		}
 	}
 	return nil
-}
-
-func (s *Server) GetNeighbors(_ *api.Arguments, stream api.GobgpApi_GetNeighborsServer) error {
-	var rf bgp.RouteFamily
-	req := NewGrpcRequest(REQ_NEIGHBORS, "", rf, nil)
-	s.bgpServerCh <- req
-
-	return handleMultipleResponses(req, func(res *GrpcResponse) error {
-		return stream.Send(res.Data.(*api.Peer))
-	})
 }
 
 func (s *Server) GetRib(ctx context.Context, arg *api.Table) (*api.Table, error) {

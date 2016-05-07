@@ -23,7 +23,6 @@ import (
 	"github.com/osrg/gobgp/packet/bgp"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
-	"io"
 	"net"
 	"sort"
 	"strconv"
@@ -32,20 +31,13 @@ import (
 )
 
 func getNeighbors() (peers, error) {
-	arg := &api.Arguments{}
-	stream, e := client.GetNeighbors(context.Background(), arg)
+	r, e := client.GetNeighbor(context.Background(), &api.GetNeighborRequest{})
 	if e != nil {
 		fmt.Println(e)
 		return nil, e
 	}
 	m := peers{}
-	for {
-		p, e := stream.Recv()
-		if e == io.EOF {
-			break
-		} else if e != nil {
-			return nil, e
-		}
+	for _, p := range r.Peers {
 		if neighborsOpts.Transport != "" {
 			addr := net.ParseIP(p.Conf.NeighborAddress)
 			if addr.To4() != nil {
@@ -61,6 +53,19 @@ func getNeighbors() (peers, error) {
 		m = append(m, ApiStruct2Peer(p))
 	}
 	return m, nil
+}
+
+func getNeighbor(addr string) (*Peer, error) {
+	l, e := getNeighbors()
+	if e != nil {
+		return nil, e
+	}
+	for _, p := range l {
+		if p.Conf.RemoteIp.String() == addr {
+			return p, nil
+		}
+	}
+	return nil, fmt.Errorf("Neighbor that has %v doesn't exist.", addr)
 }
 
 func showNeighbors() error {
@@ -143,15 +148,10 @@ func showNeighbors() error {
 }
 
 func showNeighbor(args []string) error {
-	arg := &api.Arguments{
-		Name: args[0],
-	}
-	peer, e := client.GetNeighbor(context.Background(), arg)
+	p, e := getNeighbor(args[0])
 	if e != nil {
 		return e
 	}
-	p := ApiStruct2Peer(peer)
-
 	if globalOpts.Json {
 		j, _ := json.Marshal(p)
 		fmt.Println(string(j))
@@ -496,13 +496,11 @@ func showNeighborRib(r string, name string, args []string) error {
 	switch r {
 	case CMD_LOCAL, CMD_ADJ_IN, CMD_ACCEPTED, CMD_REJECTED, CMD_ADJ_OUT:
 		if len(rib.Destinations) == 0 {
-			peer, err := client.GetNeighbor(context.Background(), &api.Arguments{
-				Name: name,
-			})
+			peer, err := getNeighbor(name)
 			if err != nil {
 				return err
 			}
-			if ApiStruct2Peer(peer).Info.BgpState != "BGP_FSM_ESTABLISHED" {
+			if peer.Info.BgpState != "BGP_FSM_ESTABLISHED" {
 				return fmt.Errorf("Neighbor %v's BGP session is not established", name)
 			}
 		}
