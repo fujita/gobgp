@@ -1849,17 +1849,6 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 		if len(pathList) > 0 {
 			msgs, _ = server.propagateUpdate(nil, pathList)
 		}
-	case REQ_NEIGHBORS:
-		results := make([]*GrpcResponse, len(server.neighborMap))
-		i := 0
-		for _, peer := range server.neighborMap {
-			result := &GrpcResponse{
-				Data: peer.ToApiStruct(),
-			}
-			results[i] = result
-			i++
-		}
-		go sendMultipleResponses(grpcReq, results)
 	case REQ_BMP_NEIGHBORS:
 		//TODO: merge REQ_NEIGHBORS and REQ_BMP_NEIGHBORS
 		msgs := make([]*bmp.BMPMessage, 0, len(server.neighborMap))
@@ -1880,16 +1869,16 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 		}
 		close(grpcReq.ResponseCh)
 	case REQ_NEIGHBOR:
-		peer, err := server.checkNeighborRequest(grpcReq)
-		if err != nil {
-			break
+		l := []*api.Peer{}
+		for _, peer := range server.neighborMap {
+			l = append(l, peer.ToApiStruct())
 		}
-		result := &GrpcResponse{
-			Data: peer.ToApiStruct(),
+		grpcReq.ResponseCh <- &GrpcResponse{
+			Data: &api.GetNeighborResponse{
+				Peers: l,
+			},
 		}
-		grpcReq.ResponseCh <- result
 		close(grpcReq.ResponseCh)
-
 	case REQ_ADJ_RIB_IN, REQ_ADJ_RIB_OUT:
 		arg := grpcReq.Data.(*api.Table)
 		d := &api.Table{
