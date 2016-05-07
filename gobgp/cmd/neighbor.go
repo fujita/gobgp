@@ -710,11 +710,6 @@ func modNeighborPolicy(remoteIP net.IP, policyType, cmdType string, args []strin
 		Resource: r,
 		Name:     remoteIP.String(),
 	}
-	ps := make([]*api.Policy, 0, len(args))
-	for _, name := range args {
-		ps = append(ps, &api.Policy{Name: name})
-	}
-	assign.Policies = ps
 
 	var err error
 	switch cmdType {
@@ -729,15 +724,21 @@ func modNeighborPolicy(remoteIP net.IP, policyType, cmdType string, args []strin
 			return fmt.Errorf("%s\n%s <policy name>... [default {%s|%s}]", err, usage, "accept", "reject")
 		}
 		assign.Default = def
-		if cmdType == CMD_ADD {
-			_, err = client.AddPolicyAssignment(context.Background(), &api.AddPolicyAssignmentRequest{
-				Assignment: assign,
-			})
-		} else {
-			_, err = client.ReplacePolicyAssignment(context.Background(), &api.ReplacePolicyAssignmentRequest{
-				Assignment: assign,
-			})
-		}
+	}
+	ps := make([]*api.Policy, 0, len(args))
+	for _, name := range args {
+		ps = append(ps, &api.Policy{Name: name})
+	}
+	assign.Policies = ps
+	switch cmdType {
+	case CMD_ADD:
+		_, err = client.AddPolicyAssignment(context.Background(), &api.AddPolicyAssignmentRequest{
+			Assignment: assign,
+		})
+	case CMD_SET:
+		_, err = client.ReplacePolicyAssignment(context.Background(), &api.ReplacePolicyAssignmentRequest{
+			Assignment: assign,
+		})
 	case CMD_DEL:
 		all := false
 		if len(args) == 0 {
