@@ -408,10 +408,7 @@ func (s *Server) get(typ int, d interface{}) (interface{}, error) {
 	req := NewGrpcRequest(typ, "", bgp.RouteFamily(0), d)
 	s.bgpServerCh <- req
 	res := <-req.ResponseCh
-	if err := res.Err(); err != nil {
-		return nil, err
-	}
-	return res.Data, nil
+	return res.Data, res.Err()
 }
 
 func (s *Server) mod(typ int, d interface{}) (*api.Error, error) {
