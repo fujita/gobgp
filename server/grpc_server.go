@@ -63,7 +63,7 @@ const (
 	REQ_VALIDATE_RIB
 	// TODO: delete
 	REQ_INITIALIZE_RPKI
-	REQ_RPKI
+	REQ_GET_RPKI
 	REQ_ADD_RPKI
 	REQ_DELETE_RPKI
 	REQ_ENABLE_RPKI
@@ -360,22 +360,18 @@ func (s *Server) SoftResetRpki(ctx context.Context, arg *api.SoftResetRpkiReques
 	return d.(*api.SoftResetRpkiResponse), err
 }
 
-func (s *Server) GetRPKI(arg *api.Arguments, stream api.GobgpApi_GetRPKIServer) error {
-	req := NewGrpcRequest(REQ_RPKI, "", bgp.RouteFamily(arg.Family), nil)
+func (s *Server) GetRpki(ctx context.Context, arg *api.GetRpkiRequest) (*api.GetRpkiResponse, error) {
+	req := NewGrpcRequest(REQ_GET_RPKI, "", bgp.RouteFamily(arg.Family), nil)
 	s.bgpServerCh <- req
-
-	return handleMultipleResponses(req, func(res *GrpcResponse) error {
-		return stream.Send(res.Data.(*api.RPKI))
-	})
+	res := <-req.ResponseCh
+	return res.Data.(*api.GetRpkiResponse), res.Err()
 }
 
-func (s *Server) GetROA(arg *api.Arguments, stream api.GobgpApi_GetROAServer) error {
-	req := NewGrpcRequest(REQ_ROA, arg.Name, bgp.RouteFamily(arg.Family), nil)
+func (s *Server) GetRoa(ctx context.Context, arg *api.GetRoaRequest) (*api.GetRoaResponse, error) {
+	req := NewGrpcRequest(REQ_ROA, "", bgp.RouteFamily(arg.Family), nil)
 	s.bgpServerCh <- req
-
-	return handleMultipleResponses(req, func(res *GrpcResponse) error {
-		return stream.Send(res.Data.(*api.ROA))
-	})
+	res := <-req.ResponseCh
+	return res.Data.(*api.GetRoaResponse), res.Err()
 }
 
 func (s *Server) GetVrfs(arg *api.Arguments, stream api.GobgpApi_GetVrfsServer) error {

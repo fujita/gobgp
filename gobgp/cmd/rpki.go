@@ -21,33 +21,20 @@ import (
 	"github.com/osrg/gobgp/packet/bgp"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
-	"io"
 	"net"
 	"time"
 )
 
 func showRPKIServer(args []string) error {
-	arg := &api.Arguments{}
-
-	stream, err := client.GetRPKI(context.Background(), arg)
+	rsp, err := client.GetRpki(context.Background(), &api.GetRpkiRequest{})
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
-	servers := make([]*api.RPKI, 0)
-	for {
-		r, err := stream.Recv()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return err
-		}
-		servers = append(servers, r)
-	}
 	if len(args) == 0 {
 		format := "%-23s %-6s %-10s %s\n"
 		fmt.Printf(format, "Session", "State", "Uptime", "#IPv4/IPv6 records")
-		for _, r := range servers {
+		for _, r := range rsp.Servers {
 			s := "Down"
 			uptime := "never"
 			if r.State.Up == true {
@@ -58,7 +45,7 @@ func showRPKIServer(args []string) error {
 			fmt.Printf(format, net.JoinHostPort(r.Conf.Address, r.Conf.RemotePort), s, uptime, fmt.Sprintf("%d/%d", r.State.RecordIpv4, r.State.RecordIpv6))
 		}
 	} else {
-		for _, r := range servers {
+		for _, r := range rsp.Servers {
 			if r.Conf.Address == args[0] {
 				up := "Down"
 				if r.State.Up == true {
@@ -90,13 +77,10 @@ func showRPKITable(args []string) error {
 	if err != nil {
 		exitWithError(err)
 	}
-	arg := &api.Arguments{
+	arg := &api.GetRoaRequest{
 		Family: uint32(family),
 	}
-	if len(args) > 0 {
-		arg.Name = args[0]
-	}
-	stream, err := client.GetROA(context.Background(), arg)
+	rsp, err := client.GetRoa(context.Background(), arg)
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -110,13 +94,7 @@ func showRPKITable(args []string) error {
 		format = "%-42s %-6s %-10s %s\n"
 	}
 	fmt.Printf(format, "Network", "Maxlen", "AS", "Server")
-	for {
-		r, err := stream.Recv()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return err
-		}
+	for _, r := range rsp.Roas {
 		if len(args) > 0 && args[0] != r.Conf.Address {
 			continue
 		}
