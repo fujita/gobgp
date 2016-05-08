@@ -85,7 +85,7 @@ const (
 	REQ_ADD_STATEMENT
 	REQ_DELETE_STATEMENT
 	REQ_REPLACE_STATEMENT
-	REQ_POLICY
+	REQ_GET_POLICY
 	REQ_ADD_POLICY
 	REQ_DELETE_POLICY
 	REQ_REPLACE_POLICY
@@ -459,20 +459,9 @@ func (s *Server) ReplaceStatement(ctx context.Context, arg *api.ReplaceStatement
 	return d.(*api.ReplaceStatementResponse), err
 }
 
-func (s *Server) GetPolicy(ctx context.Context, arg *api.Policy) (*api.Policy, error) {
-	d, err := s.get(REQ_POLICY, arg)
-	if err != nil {
-		return nil, err
-	}
-	return d.(*api.Policy), nil
-}
-
-func (s *Server) GetPolicies(arg *api.Policy, stream api.GobgpApi_GetPoliciesServer) error {
-	req := NewGrpcRequest(REQ_POLICY, "", bgp.RouteFamily(0), arg)
-	s.bgpServerCh <- req
-	return handleMultipleResponses(req, func(res *GrpcResponse) error {
-		return stream.Send(res.Data.(*api.Policy))
-	})
+func (s *Server) GetPolicy(ctx context.Context, arg *api.GetPolicyRequest) (*api.GetPolicyResponse, error) {
+	d, err := s.get(REQ_GET_POLICY, arg)
+	return d.(*api.GetPolicyResponse), err
 }
 
 func (s *Server) AddPolicy(ctx context.Context, arg *api.AddPolicyRequest) (*api.AddPolicyResponse, error) {

@@ -24,7 +24,6 @@ import (
 	"github.com/osrg/gobgp/table"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
-	"io"
 	"net"
 	"regexp"
 	"sort"
@@ -478,31 +477,23 @@ func printPolicy(indent int, pd *api.Policy) {
 }
 
 func showPolicy(args []string) error {
+	rsp, err := client.GetPolicy(context.Background(), &api.GetPolicyRequest{})
+	if err != nil {
+		return err
+	}
 	m := policies{}
 	if len(args) > 0 {
-		arg := &api.Policy{
-			Name: args[0],
-		}
-		p, e := client.GetPolicy(context.Background(), arg)
-		if e != nil {
-			return e
-		}
-		m = append(m, p)
-	} else {
-		arg := &api.Policy{}
-		stream, e := client.GetPolicies(context.Background(), arg)
-		if e != nil {
-			return e
-		}
-		for {
-			p, e := stream.Recv()
-			if e == io.EOF {
+		for _, p := range rsp.Policies {
+			if args[0] == p.Name {
+				m = append(m, p)
 				break
-			} else if e != nil {
-				return e
 			}
-			m = append(m, p)
 		}
+		if len(m) == 0 {
+			return fmt.Errorf("not found %s", args[0])
+		}
+	} else {
+		m = rsp.Policies
 	}
 	if globalOpts.Json {
 		j, _ := json.Marshal(m)

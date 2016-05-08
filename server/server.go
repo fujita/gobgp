@@ -2229,11 +2229,11 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 			Data:        data,
 		}
 		close(grpcReq.ResponseCh)
-	case REQ_POLICY:
-		if err := server.handleGrpcGetPolicy(grpcReq); err != nil {
-			grpcReq.ResponseCh <- &GrpcResponse{
-				ResponseErr: err,
-			}
+	case REQ_GET_POLICY:
+		rsp, err := server.handleGrpcGetPolicy(grpcReq)
+		grpcReq.ResponseCh <- &GrpcResponse{
+			ResponseErr: err,
+			Data:        rsp,
 		}
 		close(grpcReq.ResponseCh)
 	case REQ_ADD_POLICY:
@@ -2740,26 +2740,12 @@ func (server *BgpServer) handleGrpcReplaceStatement(grpcReq *GrpcRequest) (*api.
 	return &api.ReplaceStatementResponse{}, err
 }
 
-func (server *BgpServer) handleGrpcGetPolicy(grpcReq *GrpcRequest) error {
-	arg := grpcReq.Data.(*api.Policy)
-	name := arg.Name
-	found := false
+func (server *BgpServer) handleGrpcGetPolicy(grpcReq *GrpcRequest) (*api.GetPolicyResponse, error) {
+	policies := make([]*api.Policy, 0, len(server.policy.PolicyMap))
 	for _, s := range server.policy.PolicyMap {
-		if name != "" && name != s.Name() {
-			continue
-		}
-		grpcReq.ResponseCh <- &GrpcResponse{
-			Data: s.ToApiStruct(),
-		}
-		found = true
-		if name != "" {
-			break
-		}
+		policies = append(policies, s.ToApiStruct())
 	}
-	if !found {
-		return fmt.Errorf("not found %s", name)
-	}
-	return nil
+	return &api.GetPolicyResponse{Policies: policies}, nil
 }
 
 func (server *BgpServer) policyInUse(x *table.Policy) bool {
