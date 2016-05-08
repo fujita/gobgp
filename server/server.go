@@ -2257,11 +2257,11 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 			Data:        data,
 		}
 		close(grpcReq.ResponseCh)
-	case REQ_POLICY_ASSIGNMENT:
-		if err := server.handleGrpcGetPolicyAssignment(grpcReq); err != nil {
-			grpcReq.ResponseCh <- &GrpcResponse{
-				ResponseErr: err,
-			}
+	case REQ_GET_POLICY_ASSIGNMENT:
+		data, err := server.handleGrpcGetPolicyAssignment(grpcReq)
+		grpcReq.ResponseCh <- &GrpcResponse{
+			ResponseErr: err,
+			Data:        data,
 		}
 		close(grpcReq.ResponseCh)
 	case REQ_ADD_POLICY_ASSIGNMENT:
@@ -2920,22 +2920,19 @@ func (server *BgpServer) getPolicyInfo(a *api.PolicyAssignment) (string, table.P
 
 }
 
-func (server *BgpServer) handleGrpcGetPolicyAssignment(grpcReq *GrpcRequest) error {
-	arg := grpcReq.Data.(*api.PolicyAssignment)
-	id, dir, err := server.getPolicyInfo(arg)
+func (server *BgpServer) handleGrpcGetPolicyAssignment(grpcReq *GrpcRequest) (*api.GetPolicyAssignmentResponse, error) {
+	rsp := &api.GetPolicyAssignmentResponse{}
+	id, dir, err := server.getPolicyInfo(grpcReq.Data.(*api.GetPolicyAssignmentRequest).Assignment)
 	if err != nil {
-		return err
+		return rsp, err
 	}
-	arg.Default = server.policy.GetDefaultPolicy(id, dir).ToApiStruct()
+	rsp.Assignment.Default = server.policy.GetDefaultPolicy(id, dir).ToApiStruct()
 	ps := server.policy.GetPolicy(id, dir)
-	arg.Policies = make([]*api.Policy, 0, len(ps))
+	rsp.Assignment.Policies = make([]*api.Policy, 0, len(ps))
 	for _, x := range ps {
-		arg.Policies = append(arg.Policies, x.ToApiStruct())
+		rsp.Assignment.Policies = append(rsp.Assignment.Policies, x.ToApiStruct())
 	}
-	grpcReq.ResponseCh <- &GrpcResponse{
-		Data: arg,
-	}
-	return nil
+	return rsp, nil
 }
 
 func (server *BgpServer) handleGrpcAddPolicyAssignment(grpcReq *GrpcRequest) (*api.AddPolicyAssignmentResponse, error) {

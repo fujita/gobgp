@@ -89,7 +89,7 @@ const (
 	REQ_ADD_POLICY
 	REQ_DELETE_POLICY
 	REQ_REPLACE_POLICY
-	REQ_POLICY_ASSIGNMENT
+	REQ_GET_POLICY_ASSIGNMENT
 	REQ_ADD_POLICY_ASSIGNMENT
 	REQ_DELETE_POLICY_ASSIGNMENT
 	REQ_REPLACE_POLICY_ASSIGNMENT
@@ -479,12 +479,9 @@ func (s *Server) ReplacePolicy(ctx context.Context, arg *api.ReplacePolicyReques
 	return d.(*api.ReplacePolicyResponse), err
 }
 
-func (s *Server) GetPolicyAssignment(ctx context.Context, arg *api.PolicyAssignment) (*api.PolicyAssignment, error) {
-	d, err := s.get(REQ_POLICY_ASSIGNMENT, arg)
-	if err != nil {
-		return nil, err
-	}
-	return d.(*api.PolicyAssignment), nil
+func (s *Server) GetPolicyAssignment(ctx context.Context, arg *api.GetPolicyAssignmentRequest) (*api.GetPolicyAssignmentResponse, error) {
+	d, err := s.get(REQ_GET_POLICY_ASSIGNMENT, arg)
+	return d.(*api.GetPolicyAssignmentResponse), err
 }
 
 func (s *Server) AddPolicyAssignment(ctx context.Context, arg *api.AddPolicyAssignmentRequest) (*api.AddPolicyAssignmentResponse, error) {
