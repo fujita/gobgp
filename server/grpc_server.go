@@ -77,7 +77,7 @@ const (
 	REQ_GET_VRF
 	REQ_ADD_PATH
 	REQ_DELETE_PATH
-	REQ_DEFINED_SET
+	REQ_GET_DEFINED_SET
 	REQ_ADD_DEFINED_SET
 	REQ_DELETE_DEFINED_SET
 	REQ_REPLACE_DEFINED_SET
@@ -419,20 +419,9 @@ func (s *Server) DeleteNeighbor(ctx context.Context, arg *api.DeleteNeighborRequ
 	return d.(*api.DeleteNeighborResponse), err
 }
 
-func (s *Server) GetDefinedSet(ctx context.Context, arg *api.DefinedSet) (*api.DefinedSet, error) {
-	d, err := s.get(REQ_DEFINED_SET, arg)
-	if err != nil {
-		return nil, err
-	}
-	return d.(*api.DefinedSet), nil
-}
-
-func (s *Server) GetDefinedSets(arg *api.DefinedSet, stream api.GobgpApi_GetDefinedSetsServer) error {
-	req := NewGrpcRequest(REQ_DEFINED_SET, "", bgp.RouteFamily(0), arg)
-	s.bgpServerCh <- req
-	return handleMultipleResponses(req, func(res *GrpcResponse) error {
-		return stream.Send(res.Data.(*api.DefinedSet))
-	})
+func (s *Server) GetDefinedSet(ctx context.Context, arg *api.GetDefinedSetRequest) (*api.GetDefinedSetResponse, error) {
+	d, err := s.get(REQ_GET_DEFINED_SET, arg)
+	return d.(*api.GetDefinedSetResponse), err
 }
 
 func (s *Server) AddDefinedSet(ctx context.Context, arg *api.AddDefinedSetRequest) (*api.AddDefinedSetResponse, error) {

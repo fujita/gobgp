@@ -150,34 +150,22 @@ func showDefinedSet(v string, args []string) error {
 	default:
 		return fmt.Errorf("unknown defined type: %s", v)
 	}
+	rsp, err := client.GetDefinedSet(context.Background(), &api.GetDefinedSetRequest{Type: typ})
+	if err != nil {
+		return err
+	}
 	m := sets{}
 	if len(args) > 0 {
-		arg := &api.DefinedSet{
-			Type: typ,
-			Name: args[0],
-		}
-		p, e := client.GetDefinedSet(context.Background(), arg)
-		if e != nil {
-			return e
-		}
-		m = append(m, p)
-	} else {
-		arg := &api.DefinedSet{
-			Type: typ,
-		}
-		stream, e := client.GetDefinedSets(context.Background(), arg)
-		if e != nil {
-			return e
-		}
-		for {
-			p, e := stream.Recv()
-			if e == io.EOF {
-				break
-			} else if e != nil {
-				return e
+		for _, set := range rsp.Sets {
+			if args[0] == set.Name {
+				m = append(m, set)
 			}
-			m = append(m, p)
 		}
+		if len(m) == 0 {
+			return fmt.Errorf("not found %s", args[0])
+		}
+	} else {
+		m = rsp.Sets
 	}
 	if globalOpts.Json {
 		j, _ := json.Marshal(m)
