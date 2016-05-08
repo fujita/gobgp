@@ -57,8 +57,7 @@ service GobgpApi {
   rpc AddVrf(AddVrfRequest) returns (AddVrfResponse) ;
   rpc DeleteVrf(DeleteVrfRequest) returns (DeleteVrfResponse);
   rpc GetVrf(GetVrfRequest) returns (GetVrfResponse) {}
-  rpc GetDefinedSet(DefinedSet) returns (DefinedSet) {}
-  rpc GetDefinedSets(DefinedSet) returns (stream DefinedSet) {}
+  rpc GetDefinedSet(GetDefinedSetRequest) returns (GetDefinedSetResponse) {}
   rpc AddDefinedSet(AddDefinedSetRequest) returns (AddDefinedSetResponse) {}
   rpc DeleteDefinedSet(DeleteDefinedSetRequest) returns (DeleteDefinedSetResponse) {}
   rpc ReplaceDefinedSet(ReplaceDefinedSetRequest) returns (ReplaceDefinedSetResponse) {}
@@ -289,6 +288,14 @@ message DeleteVrfRequest {
 }
 
 message DeleteVrfResponse {
+}
+
+message GetDefinedSetRequest {
+    DefinedType type = 1;
+}
+
+message GetDefinedSetResponse {
+    repeated DefinedSet sets = 1;
 }
 
 message AddDefinedSetRequest {

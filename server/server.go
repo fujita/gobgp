@@ -2182,11 +2182,11 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 			msgs = append(msgs, m...)
 		}
 		close(grpcReq.ResponseCh)
-	case REQ_DEFINED_SET:
-		if err := server.handleGrpcGetDefinedSet(grpcReq); err != nil {
-			grpcReq.ResponseCh <- &GrpcResponse{
-				ResponseErr: err,
-			}
+	case REQ_GET_DEFINED_SET:
+		rsp, err := server.handleGrpcGetDefinedSet(grpcReq)
+		grpcReq.ResponseCh <- &GrpcResponse{
+			ResponseErr: err,
+			Data:        rsp,
 		}
 		close(grpcReq.ResponseCh)
 	case REQ_ADD_DEFINED_SET:
@@ -2356,31 +2356,18 @@ ERROR:
 	return msgs
 }
 
-func (server *BgpServer) handleGrpcGetDefinedSet(grpcReq *GrpcRequest) error {
-	arg := grpcReq.Data.(*api.DefinedSet)
+func (server *BgpServer) handleGrpcGetDefinedSet(grpcReq *GrpcRequest) (*api.GetDefinedSetResponse, error) {
+	arg := grpcReq.Data.(*api.GetDefinedSetRequest)
 	typ := table.DefinedType(arg.Type)
-	name := arg.Name
 	set, ok := server.policy.DefinedSetMap[typ]
 	if !ok {
-		return fmt.Errorf("invalid defined-set type: %d", typ)
+		return &api.GetDefinedSetResponse{}, fmt.Errorf("invalid defined-set type: %d", typ)
 	}
-	found := false
+	sets := make([]*api.DefinedSet, 0)
 	for _, s := range set {
-		if name != "" && name != s.Name() {
-			continue
-		}
-		grpcReq.ResponseCh <- &GrpcResponse{
-			Data: s.ToApiStruct(),
-		}
-		found = true
-		if name != "" {
-			break
-		}
+		sets = append(sets, s.ToApiStruct())
 	}
-	if !found {
-		return fmt.Errorf("not found %s", name)
-	}
-	return nil
+	return &api.GetDefinedSetResponse{Sets: sets}, nil
 }
 
 func (server *BgpServer) handleAddNeighbor(c *config.Neighbor) ([]*SenderMsg, error) {
