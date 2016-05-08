@@ -536,31 +536,23 @@ func showPolicy(args []string) error {
 }
 
 func showStatement(args []string) error {
+	rsp, err := client.GetStatement(context.Background(), &api.GetStatementRequest{})
+	if err != nil {
+		return err
+	}
 	m := []*api.Statement{}
 	if len(args) > 0 {
-		arg := &api.Statement{
-			Name: args[0],
-		}
-		p, e := client.GetStatement(context.Background(), arg)
-		if e != nil {
-			return e
-		}
-		m = append(m, p)
-	} else {
-		arg := &api.Statement{}
-		stream, e := client.GetStatements(context.Background(), arg)
-		if e != nil {
-			return e
-		}
-		for {
-			p, e := stream.Recv()
-			if e == io.EOF {
+		for _, s := range rsp.Statements {
+			if args[0] == s.Name {
+				m = append(m, s)
 				break
-			} else if e != nil {
-				return e
 			}
-			m = append(m, p)
 		}
+		if len(m) == 0 {
+			return fmt.Errorf("not found %s", args[0])
+		}
+	} else {
+		m = rsp.Statements
 	}
 	if globalOpts.Json {
 		j, _ := json.Marshal(m)

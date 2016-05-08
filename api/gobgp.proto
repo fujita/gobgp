@@ -62,8 +62,7 @@ service GobgpApi {
   rpc AddDefinedSet(AddDefinedSetRequest) returns (AddDefinedSetResponse) {}
   rpc DeleteDefinedSet(DeleteDefinedSetRequest) returns (DeleteDefinedSetResponse) {}
   rpc ReplaceDefinedSet(ReplaceDefinedSetRequest) returns (ReplaceDefinedSetResponse) {}
-  rpc GetStatement(Statement) returns (Statement) {}
-  rpc GetStatements(Statement) returns (stream Statement) {}
+  rpc GetStatement(GetStatementRequest) returns (GetStatementResponse) {}
   rpc AddStatement(AddStatementRequest) returns (AddStatementResponse) {}
   rpc DeleteStatement(DeleteStatementRequest) returns (DeleteStatementResponse) {}
   rpc ReplaceStatement(ReplaceStatementRequest) returns (ReplaceStatementResponse) {}
@@ -312,6 +311,13 @@ message ReplaceDefinedSetRequest {
 }
 
 message ReplaceDefinedSetResponse {
+}
+
+message GetStatementRequest {
+}
+
+message GetStatementResponse {
+    repeated Statement statements = 1;
 }
 
 message AddStatementRequest {
