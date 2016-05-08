@@ -35,15 +35,15 @@ service GobgpApi {
   rpc Shutdown(Arguments) returns (Error) {}
   rpc Enable(Arguments) returns (Error) {}
   rpc Disable(Arguments) returns (Error) {}
-  rpc AddPath(AddPathRequest) returns (AddPathResponse);
-  rpc DeletePath(DeletePathRequest) returns (DeletePathResponse);
+  rpc AddPath(AddPathRequest) returns (AddPathResponse) {}
+  rpc DeletePath(DeletePathRequest) returns (DeletePathResponse) {}
   rpc MonitorRib(Table) returns (stream Destination) {}
   rpc MonitorBestChanged(Arguments) returns (stream Destination) {}
   rpc MonitorPeerState(Arguments) returns (stream Peer) {}
-  rpc EnableMrt(EnableMrtRequest) returns (EnableMrtResponse);
-  rpc DisableMrt(DisableMrtRequest) returns (DisableMrtResponse);
+  rpc EnableMrt(EnableMrtRequest) returns (EnableMrtResponse) {}
+  rpc DisableMrt(DisableMrtRequest) returns (DisableMrtResponse) {}
   rpc GetMrt(MrtArguments) returns (stream MrtMessage) {}
-  rpc InjectMrt(stream InjectMrtRequest) returns (InjectMrtResponse);
+  rpc InjectMrt(stream InjectMrtRequest) returns (InjectMrtResponse) {}
   rpc AddBmp(AddBmpRequest) returns (AddBmpResponse) {}
   rpc DeleteBmp(DeleteBmpRequest) returns (DeleteBmpResponse) {}
   rpc GetRpki(GetRpkiRequest) returns (GetRpkiResponse) {}
@@ -54,8 +54,8 @@ service GobgpApi {
   rpc ResetRpki(ResetRpkiRequest) returns (ResetRpkiResponse) {}
   rpc SoftResetRpki(SoftResetRpkiRequest) returns (SoftResetRpkiResponse) {}
   rpc GetRoa(GetRoaRequest) returns (GetRoaResponse) {}
-  rpc AddVrf(AddVrfRequest) returns (AddVrfResponse) ;
-  rpc DeleteVrf(DeleteVrfRequest) returns (DeleteVrfResponse);
+  rpc AddVrf(AddVrfRequest) returns (AddVrfResponse) {}
+  rpc DeleteVrf(DeleteVrfRequest) returns (DeleteVrfResponse) {}
   rpc GetVrf(GetVrfRequest) returns (GetVrfResponse) {}
   rpc GetDefinedSet(GetDefinedSetRequest) returns (GetDefinedSetResponse) {}
   rpc AddDefinedSet(AddDefinedSetRequest) returns (AddDefinedSetResponse) {}
