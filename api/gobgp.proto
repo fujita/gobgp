@@ -56,7 +56,7 @@ service GobgpApi {
   rpc GetRoa(GetRoaRequest) returns (GetRoaResponse) {}
   rpc AddVrf(AddVrfRequest) returns (AddVrfResponse) ;
   rpc DeleteVrf(DeleteVrfRequest) returns (DeleteVrfResponse);
-  rpc GetVrfs(Arguments) returns (stream Vrf) {}
+  rpc GetVrf(GetVrfRequest) returns (GetVrfResponse) {}
   rpc GetDefinedSet(DefinedSet) returns (DefinedSet) {}
   rpc GetDefinedSets(DefinedSet) returns (stream DefinedSet) {}
   rpc AddDefinedSet(AddDefinedSetRequest) returns (AddDefinedSetResponse) {}
@@ -269,6 +269,13 @@ message SoftResetRpkiRequest {
 }
 
 message SoftResetRpkiResponse {
+}
+
+message GetVrfRequest {
+}
+
+message GetVrfResponse {
+    repeated Vrf vrfs = 1;
 }
 
 message AddVrfRequest {

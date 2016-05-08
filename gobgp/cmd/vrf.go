@@ -22,31 +22,17 @@ import (
 	"github.com/osrg/gobgp/packet/bgp"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
-	"io"
 	"sort"
 	"strings"
 )
 
 func getVrfs() (vrfs, error) {
-	arg := &api.Arguments{}
-	stream, err := client.GetVrfs(context.Background(), arg)
+	rsp, err := client.GetVrf(context.Background(), &api.GetVrfRequest{})
 	if err != nil {
 		return nil, err
 	}
-	vs := make(vrfs, 0)
-	for {
-		v, err := stream.Recv()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return nil, err
-		}
-		vs = append(vs, v)
-	}
-
-	sort.Sort(vs)
-
-	return vs, nil
+	sort.Sort(vrfs(rsp.Vrfs))
+	return rsp.Vrfs, nil
 }
 
 func showVrfs() error {
