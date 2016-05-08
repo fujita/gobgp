@@ -46,15 +46,15 @@ service GobgpApi {
   rpc InjectMrt(stream InjectMrtRequest) returns (InjectMrtResponse);
   rpc AddBmp(AddBmpRequest) returns (AddBmpResponse) {}
   rpc DeleteBmp(DeleteBmpRequest) returns (DeleteBmpResponse) {}
-  rpc GetRPKI(Arguments) returns (stream RPKI) {}
+  rpc GetRpki(GetRpkiRequest) returns (GetRpkiResponse) {}
   rpc AddRpki(AddRpkiRequest) returns (AddRpkiResponse) {}
   rpc DeleteRpki(DeleteRpkiRequest) returns (DeleteRpkiResponse) {}
   rpc EnableRpki(EnableRpkiRequest) returns (EnableRpkiResponse) {}
   rpc DisableRpki(DisableRpkiRequest) returns (DisableRpkiResponse) {}
   rpc ResetRpki(ResetRpkiRequest) returns (ResetRpkiResponse) {}
   rpc SoftResetRpki(SoftResetRpkiRequest) returns (SoftResetRpkiResponse) {}
-  rpc GetROA(Arguments) returns (stream ROA) {}
-  rpc AddVrf(AddVrfRequest) returns (AddVrfResponse);
+  rpc GetRoa(GetRoaRequest) returns (GetRoaResponse) {}
+  rpc AddVrf(AddVrfRequest) returns (AddVrfResponse) ;
   rpc DeleteVrf(DeleteVrfRequest) returns (DeleteVrfResponse);
   rpc GetVrfs(Arguments) returns (stream Vrf) {}
   rpc GetDefinedSet(DefinedSet) returns (DefinedSet) {}
@@ -186,6 +186,44 @@ message DeleteBmpRequest {
 }
 
 message DeleteBmpResponse {
+}
+
+message RPKIConf {
+    string address = 1;
+    string remote_port = 2;
+}
+
+message RPKIState {
+    int64 uptime = 1;
+    int64 downtime = 2;
+    bool  up = 3;
+    uint32 record_ipv4 = 4;
+    uint32 record_ipv6 = 5;
+    uint32 prefix_ipv4 = 6;
+    uint32 prefix_ipv6 = 7;
+    uint32 serial = 8;
+    int64 received_ipv4 = 9;
+    int64 received_ipv6 = 10;
+    int64 serial_notify = 11;
+    int64 cache_reset = 12;
+    int64 cache_response = 13;
+    int64 end_of_data = 14;
+    int64 error = 15;
+    int64 serial_query = 16;
+    int64 reset_query = 17;
+}
+
+message Rpki {
+    RPKIConf conf = 1;
+    RPKIState state = 2;
+}
+
+message GetRpkiRequest {
+    uint32 family = 1;
+}
+
+message GetRpkiResponse {
+    repeated Rpki servers = 1;
 }
 
 message AddRpkiRequest {
@@ -669,42 +707,20 @@ message MrtMessage {
     bytes data = 1;
 }
 
-message RPKIConf {
-    string address = 1;
-    string remote_port = 2;
-}
-
-message RPKIState {
-    int64 uptime = 1;
-    int64 downtime = 2;
-    bool  up = 3;
-    uint32 record_ipv4 = 4;
-    uint32 record_ipv6 = 5;
-    uint32 prefix_ipv4 = 6;
-    uint32 prefix_ipv6 = 7;
-    uint32 serial = 8;
-    int64 received_ipv4 = 9;
-    int64 received_ipv6 = 10;
-    int64 serial_notify = 11;
-    int64 cache_reset = 12;
-    int64 cache_response = 13;
-    int64 end_of_data = 14;
-    int64 error = 15;
-    int64 serial_query = 16;
-    int64 reset_query = 17;
-}
-
-message RPKI {
-    RPKIConf conf = 1;
-    RPKIState state = 2;
-}
-
-message ROA {
+message Roa {
     uint32 as = 1;
     uint32 prefixlen = 2;
     uint32 maxlen = 3;
     string prefix = 4;
     RPKIConf conf = 5;
+}
+
+message GetRoaRequest {
+    uint32 family = 1;
+}
+
+message GetRoaResponse {
+    repeated Roa roas = 1;
 }
 
 message Vrf {

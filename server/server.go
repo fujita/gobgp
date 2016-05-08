@@ -2321,8 +2321,10 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 		grpcDone(grpcReq, server.roaManager.SetAS(g.Config.As))
 	case REQ_ADD_RPKI, REQ_DELETE_RPKI, REQ_ENABLE_RPKI, REQ_DISABLE_RPKI, REQ_RESET_RPKI, REQ_SOFT_RESET_RPKI:
 		server.handleModRpki(grpcReq)
-	case REQ_ROA, REQ_RPKI:
-		server.roaManager.handleGRPC(grpcReq)
+	case REQ_ROA, REQ_GET_RPKI:
+		rsp := server.roaManager.handleGRPC(grpcReq)
+		grpcReq.ResponseCh <- rsp
+		close(grpcReq.ResponseCh)
 	case REQ_VRF, REQ_VRFS, REQ_ADD_VRF, REQ_DELETE_VRF:
 		pathList := server.handleVrfRequest(grpcReq)
 		if len(pathList) > 0 {
