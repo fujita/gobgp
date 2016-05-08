@@ -640,12 +640,13 @@ func showNeighborPolicy(remoteIP net.IP, policyType string, indent int) error {
 	if remoteIP == nil {
 		r = api.Resource_GLOBAL
 	}
-	arg := &api.PolicyAssignment{
-		Name:     remoteIP.String(),
-		Resource: r,
-		Type:     typ,
+	arg := &api.GetPolicyAssignmentRequest{
+		Assignment: &api.PolicyAssignment{
+			Name:     remoteIP.String(),
+			Resource: r,
+			Type:     typ,
+		},
 	}
-
 	ap, e := client.GetPolicyAssignment(context.Background(), arg)
 	if e != nil {
 		return e
@@ -658,8 +659,8 @@ func showNeighborPolicy(remoteIP net.IP, policyType string, indent int) error {
 	}
 
 	fmt.Printf("%s policy:\n", strings.Title(policyType))
-	fmt.Printf("%sDefault: %s\n", strings.Repeat(" ", indent), ap.Default)
-	for _, p := range ap.Policies {
+	fmt.Printf("%sDefault: %s\n", strings.Repeat(" ", indent), ap.Assignment.Default)
+	for _, p := range ap.Assignment.Policies {
 		fmt.Printf("%sName %s:\n", strings.Repeat(" ", indent), p.Name)
 		printPolicy(indent+4, p)
 	}
