@@ -1547,14 +1547,12 @@ func (server *BgpServer) handleVrfRequest(req *GrpcRequest) []*table.Path {
 			},
 		}
 		goto END
-	case REQ_VRFS:
-		vrfs := server.globalRib.Vrfs
-		for _, vrf := range vrfs {
-			req.ResponseCh <- &GrpcResponse{
-				Data: vrf.ToApiStruct(),
-			}
+	case REQ_GET_VRF:
+		l := make([]*api.Vrf, 0, len(server.globalRib.Vrfs))
+		for _, vrf := range server.globalRib.Vrfs {
+			l = append(l, vrf.ToApiStruct())
 		}
-		goto END
+		result.Data = &api.GetVrfResponse{Vrfs: l}
 	case REQ_ADD_VRF:
 		msgs, result.ResponseErr = server.handleAddVrfRequest(req)
 		result.Data = &api.AddVrfResponse{}
@@ -2334,7 +2332,7 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 		rsp := server.roaManager.handleGRPC(grpcReq)
 		grpcReq.ResponseCh <- rsp
 		close(grpcReq.ResponseCh)
-	case REQ_VRF, REQ_VRFS, REQ_ADD_VRF, REQ_DELETE_VRF:
+	case REQ_VRF, REQ_GET_VRF, REQ_ADD_VRF, REQ_DELETE_VRF:
 		pathList := server.handleVrfRequest(grpcReq)
 		if len(pathList) > 0 {
 			msgs, _ = server.propagateUpdate(nil, pathList)

@@ -74,7 +74,7 @@ const (
 	REQ_ADD_VRF
 	REQ_DELETE_VRF
 	REQ_VRF
-	REQ_VRFS
+	REQ_GET_VRF
 	REQ_ADD_PATH
 	REQ_DELETE_PATH
 	REQ_DEFINED_SET
@@ -374,13 +374,11 @@ func (s *Server) GetRoa(ctx context.Context, arg *api.GetRoaRequest) (*api.GetRo
 	return res.Data.(*api.GetRoaResponse), res.Err()
 }
 
-func (s *Server) GetVrfs(arg *api.Arguments, stream api.GobgpApi_GetVrfsServer) error {
-	req := NewGrpcRequest(REQ_VRFS, "", bgp.RouteFamily(0), nil)
+func (s *Server) GetVrf(ctx context.Context, arg *api.GetVrfRequest) (*api.GetVrfResponse, error) {
+	req := NewGrpcRequest(REQ_GET_VRF, "", bgp.RouteFamily(0), nil)
 	s.bgpServerCh <- req
-
-	return handleMultipleResponses(req, func(res *GrpcResponse) error {
-		return stream.Send(res.Data.(*api.Vrf))
-	})
+	res := <-req.ResponseCh
+	return res.Data.(*api.GetVrfResponse), res.Err()
 }
 
 func (s *Server) get(typ int, d interface{}) (interface{}, error) {
