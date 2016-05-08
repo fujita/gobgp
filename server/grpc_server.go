@@ -29,7 +29,7 @@ import (
 
 const (
 	_ = iota
-	REQ_GLOBAL_CONFIG
+	REQ_GET_SERVER
 	REQ_START_SERVER
 	REQ_STOP_SERVER
 	REQ_NEIGHBOR
@@ -499,12 +499,9 @@ func (s *Server) ReplacePolicyAssignment(ctx context.Context, arg *api.ReplacePo
 	return d.(*api.ReplacePolicyAssignmentResponse), err
 }
 
-func (s *Server) GetGlobalConfig(ctx context.Context, arg *api.Arguments) (*api.Global, error) {
-	d, err := s.get(REQ_GLOBAL_CONFIG, arg)
-	if err != nil {
-		return nil, err
-	}
-	return d.(*api.Global), nil
+func (s *Server) GetServer(ctx context.Context, arg *api.GetServerRequest) (*api.GetServerResponse, error) {
+	d, err := s.get(REQ_GET_SERVER, arg)
+	return d.(*api.GetServerResponse), err
 }
 
 func (s *Server) StartServer(ctx context.Context, arg *api.StartServerRequest) (*api.StartServerResponse, error) {

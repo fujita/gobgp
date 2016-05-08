@@ -1723,16 +1723,18 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 	var err error
 
 	switch grpcReq.RequestType {
-	case REQ_GLOBAL_CONFIG:
+	case REQ_GET_SERVER:
 		g := server.bgpConfig.Global
 		result := &GrpcResponse{
-			Data: &api.Global{
-				As:              g.Config.As,
-				RouterId:        g.Config.RouterId,
-				ListenPort:      g.Config.Port,
-				ListenAddresses: g.Config.LocalAddressList,
-				MplsLabelMin:    g.MplsLabelRange.MinLabel,
-				MplsLabelMax:    g.MplsLabelRange.MaxLabel,
+			Data: &api.GetServerResponse{
+				Global: &api.Global{
+					As:              g.Config.As,
+					RouterId:        g.Config.RouterId,
+					ListenPort:      g.Config.Port,
+					ListenAddresses: g.Config.LocalAddressList,
+					MplsLabelMin:    g.MplsLabelRange.MinLabel,
+					MplsLabelMax:    g.MplsLabelRange.MaxLabel,
+				},
 			},
 		}
 		grpcReq.ResponseCh <- result

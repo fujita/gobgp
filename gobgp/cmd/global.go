@@ -809,10 +809,11 @@ usage: %s rib %s match <MATCH_EXPR> then <THEN_EXPR> -a %%s
 }
 
 func showGlobalConfig(args []string) error {
-	g, err := client.GetGlobalConfig(context.Background(), &api.Arguments{})
+	rsp, err := client.GetServer(context.Background(), &api.GetServerRequest{})
 	if err != nil {
 		return err
 	}
+	g := rsp.Global
 	if globalOpts.Json {
 		j, _ := json.Marshal(g)
 		fmt.Println(string(j))
