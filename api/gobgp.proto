@@ -22,7 +22,7 @@ package gobgpapi;
 service GobgpApi {
   rpc StartServer(StartServerRequest) returns (StartServerResponse) {}
   rpc StopServer(StopServerRequest) returns (StopServerResponse) {}
-  rpc GetGlobalConfig(Arguments) returns (Global) {}
+  rpc GetServer(GetServerRequest) returns (GetServerResponse) {}
   rpc AddNeighbor(AddNeighborRequest) returns (AddNeighborResponse) {}
   rpc DeleteNeighbor(DeleteNeighborRequest) returns (DeleteNeighborResponse) {}
   rpc GetNeighbor(GetNeighborRequest) returns (GetNeighborResponse) {}
@@ -419,8 +419,15 @@ message ReplacePolicyAssignmentRequest {
 message ReplacePolicyAssignmentResponse {
 }
 
+message GetServerRequest {
+}
+
+message GetServerResponse {
+    Global global = 1;
+}
+
 message StartServerRequest {
-    Global global = 2;
+    Global global = 1;
 }
 
 message StartServerResponse {
