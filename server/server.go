@@ -2210,11 +2210,11 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 			Data:        rsp,
 		}
 		close(grpcReq.ResponseCh)
-	case REQ_STATEMENT:
-		if err := server.handleGrpcGetStatement(grpcReq); err != nil {
-			grpcReq.ResponseCh <- &GrpcResponse{
-				ResponseErr: err,
-			}
+	case REQ_GET_STATEMENT:
+		rsp, err := server.handleGrpcGetStatement(grpcReq)
+		grpcReq.ResponseCh <- &GrpcResponse{
+			ResponseErr: err,
+			Data:        rsp,
 		}
 		close(grpcReq.ResponseCh)
 	case REQ_ADD_STATEMENT:
@@ -2708,26 +2708,12 @@ func (server *BgpServer) handleGrpcReplaceDefinedSet(grpcReq *GrpcRequest) (*api
 	return &api.ReplaceDefinedSetResponse{}, d.Replace(s)
 }
 
-func (server *BgpServer) handleGrpcGetStatement(grpcReq *GrpcRequest) error {
-	arg := grpcReq.Data.(*api.Statement)
-	name := arg.Name
-	found := false
+func (server *BgpServer) handleGrpcGetStatement(grpcReq *GrpcRequest) (*api.GetStatementResponse, error) {
+	l := make([]*api.Statement, 0)
 	for _, s := range server.policy.StatementMap {
-		if name != "" && name != s.Name {
-			continue
-		}
-		grpcReq.ResponseCh <- &GrpcResponse{
-			Data: s.ToApiStruct(),
-		}
-		found = true
-		if name != "" {
-			break
-		}
+		l = append(l, s.ToApiStruct())
 	}
-	if !found {
-		return fmt.Errorf("not found %s", name)
-	}
-	return nil
+	return &api.GetStatementResponse{Statements: l}, nil
 }
 
 func (server *BgpServer) handleGrpcAddStatement(grpcReq *GrpcRequest) (*api.AddStatementResponse, error) {

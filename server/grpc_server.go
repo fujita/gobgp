@@ -81,7 +81,7 @@ const (
 	REQ_ADD_DEFINED_SET
 	REQ_DELETE_DEFINED_SET
 	REQ_REPLACE_DEFINED_SET
-	REQ_STATEMENT
+	REQ_GET_STATEMENT
 	REQ_ADD_STATEMENT
 	REQ_DELETE_STATEMENT
 	REQ_REPLACE_STATEMENT
@@ -450,20 +450,9 @@ func (s *Server) ReplaceDefinedSet(ctx context.Context, arg *api.ReplaceDefinedS
 	return d.(*api.ReplaceDefinedSetResponse), err
 }
 
-func (s *Server) GetStatement(ctx context.Context, arg *api.Statement) (*api.Statement, error) {
-	d, err := s.get(REQ_STATEMENT, arg)
-	if err != nil {
-		return nil, err
-	}
-	return d.(*api.Statement), nil
-}
-
-func (s *Server) GetStatements(arg *api.Statement, stream api.GobgpApi_GetStatementsServer) error {
-	req := NewGrpcRequest(REQ_STATEMENT, "", bgp.RouteFamily(0), arg)
-	s.bgpServerCh <- req
-	return handleMultipleResponses(req, func(res *GrpcResponse) error {
-		return stream.Send(res.Data.(*api.Statement))
-	})
+func (s *Server) GetStatement(ctx context.Context, arg *api.GetStatementRequest) (*api.GetStatementResponse, error) {
+	d, err := s.get(REQ_GET_STATEMENT, arg)
+	return d.(*api.GetStatementResponse), err
 }
 
 func (s *Server) AddStatement(ctx context.Context, arg *api.AddStatementRequest) (*api.AddStatementResponse, error) {
