@@ -65,8 +65,7 @@ service GobgpApi {
   rpc AddStatement(AddStatementRequest) returns (AddStatementResponse) {}
   rpc DeleteStatement(DeleteStatementRequest) returns (DeleteStatementResponse) {}
   rpc ReplaceStatement(ReplaceStatementRequest) returns (ReplaceStatementResponse) {}
-  rpc GetPolicy(Policy) returns (Policy) {}
-  rpc GetPolicies(Policy) returns (stream Policy) {}
+  rpc GetPolicy(GetPolicyRequest) returns (GetPolicyResponse) {}
   rpc AddPolicy(AddPolicyRequest) returns (AddPolicyResponse) {}
   rpc DeletePolicy(DeletePolicyRequest) returns (DeletePolicyResponse) {}
   rpc ReplacePolicy(ReplacePolicyRequest) returns (ReplacePolicyResponse) {}
@@ -347,6 +346,13 @@ message ReplaceStatementRequest {
 }
 
 message ReplaceStatementResponse {
+}
+
+message GetPolicyRequest {
+}
+
+message GetPolicyResponse {
+    repeated Policy policies = 1;
 }
 
 message AddPolicyRequest {
