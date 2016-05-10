@@ -518,15 +518,15 @@ message ValidateRibResponse {
 }
 
 message Peer {
-  repeated uint32 families = 2;
-  ApplyPolicy apply_policy = 3;
-  PeerConf conf = 5;
-  EbgpMultihop ebgp_multihop = 6;
-  RouteReflector route_reflector = 10;
-  PeerState info = 11;
-  Timers timers = 12;
-  Transport transport = 13;
-  RouteServer route_server = 15;
+  repeated uint32 families = 1;
+  ApplyPolicy apply_policy = 2;
+  PeerConf conf = 3;
+  EbgpMultihop ebgp_multihop = 4;
+  RouteReflector route_reflector = 5;
+  PeerState info = 6;
+  Timers timers = 7;
+  Transport transport = 8;
+  RouteServer route_server = 9;
 }
 
 message ApplyPolicy {
