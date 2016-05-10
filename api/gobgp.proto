@@ -26,15 +26,13 @@ service GobgpApi {
   rpc AddNeighbor(AddNeighborRequest) returns (AddNeighborResponse) {}
   rpc DeleteNeighbor(DeleteNeighborRequest) returns (DeleteNeighborResponse) {}
   rpc GetNeighbor(GetNeighborRequest) returns (GetNeighborResponse) {}
+  rpc ResetNeighbor(ResetNeighborRequest) returns (ResetNeighborResponse) {}
+  rpc SoftResetNeighbor(SoftResetNeighborRequest) returns (SoftResetNeighborResponse) {}
+  rpc ShutdownNeighbor(ShutdownNeighborRequest) returns (ShutdownNeighborResponse) {}
+  rpc EnableNeighbor(EnableNeighborRequest) returns (EnableNeighborResponse) {}
+  rpc DisableNeighbor(DisableNeighborRequest) returns (DisableNeighborResponse) {}
   rpc GetRib(Table) returns (Table) {}
   rpc ValidateRib(ValidateRibRequest) returns (ValidateRibResponse) {}
-  rpc Reset(Arguments) returns (Error) {}
-  rpc SoftReset(Arguments) returns (Error) {}
-  rpc SoftResetIn(Arguments) returns (Error) {}
-  rpc SoftResetOut(Arguments) returns (Error) {}
-  rpc Shutdown(Arguments) returns (Error) {}
-  rpc Enable(Arguments) returns (Error) {}
-  rpc Disable(Arguments) returns (Error) {}
   rpc AddPath(AddPathRequest) returns (AddPathResponse) {}
   rpc DeletePath(DeletePathRequest) returns (DeletePathResponse) {}
   rpc MonitorRib(Table) returns (stream Destination) {}
@@ -73,15 +71,6 @@ service GobgpApi {
   rpc AddPolicyAssignment(AddPolicyAssignmentRequest) returns (AddPolicyAssignmentResponse) {}
   rpc DeletePolicyAssignment(DeletePolicyAssignmentRequest) returns (DeletePolicyAssignmentResponse) {}
   rpc ReplacePolicyAssignment(ReplacePolicyAssignmentRequest) returns (ReplacePolicyAssignmentResponse) {}
-}
-
-message Error {
-    enum ErrorCode {
-        SUCCESS = 0;
-        FAIL = 1;
-    }
-    ErrorCode code = 1;
-    string msg = 2;
 }
 
 message GetNeighborRequest {
@@ -130,6 +119,47 @@ message DeleteNeighborRequest {
 }
 
 message DeleteNeighborResponse {
+}
+
+message ResetNeighborRequest {
+    string address = 1;
+}
+
+message ResetNeighborResponse {
+}
+
+message SoftResetNeighborRequest {
+    string address = 1;
+    enum SoftResetDirection {
+        IN = 0;
+        OUT = 1;
+        BOTH = 2;
+    }
+    SoftResetDirection direction = 2;
+}
+
+message SoftResetNeighborResponse {
+}
+
+message ShutdownNeighborRequest {
+    string address = 1;
+}
+
+message ShutdownNeighborResponse {
+}
+
+message EnableNeighborRequest {
+    string address = 1;
+}
+
+message EnableNeighborResponse {
+}
+
+message DisableNeighborRequest {
+    string address = 1;
+}
+
+message DisableNeighborResponse {
 }
 
 message MrtArguments {
