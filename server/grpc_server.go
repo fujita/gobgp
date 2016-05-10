@@ -36,11 +36,11 @@ const (
 	REQ_ADJ_RIB_IN
 	REQ_ADJ_RIB_OUT
 	REQ_LOCAL_RIB
-	REQ_NEIGHBOR_SHUTDOWN
 	REQ_NEIGHBOR_RESET
 	REQ_NEIGHBOR_SOFT_RESET
 	REQ_NEIGHBOR_SOFT_RESET_IN
 	REQ_NEIGHBOR_SOFT_RESET_OUT
+	REQ_NEIGHBOR_SHUTDOWN
 	REQ_NEIGHBOR_ENABLE
 	REQ_NEIGHBOR_DISABLE
 	REQ_ADD_NEIGHBOR
@@ -211,45 +211,58 @@ func (s *Server) MonitorPeerState(arg *api.Arguments, stream api.GobgpApi_Monito
 	})
 }
 
-func (s *Server) neighbor(reqType int, arg *api.Arguments) (*api.Error, error) {
-	none := &api.Error{}
-	req := NewGrpcRequest(reqType, arg.Name, bgp.RouteFamily(arg.Family), nil)
+func (s *Server) neighbor(reqType int, address string, d interface{}) (interface{}, error) {
+	req := NewGrpcRequest(reqType, address, bgp.RouteFamily(0), d)
 	s.bgpServerCh <- req
-
 	res := <-req.ResponseCh
-	if err := res.Err(); err != nil {
-		log.Debug(err.Error())
-		return nil, err
+	return res.Data, res.Err()
+}
+
+func (s *Server) ResetNeighbor(ctx context.Context, arg *api.ResetNeighborRequest) (*api.ResetNeighborResponse, error) {
+	d, err := s.neighbor(REQ_NEIGHBOR_RESET, arg.Address, arg)
+	if err == nil {
+		return d.(*api.ResetNeighborResponse), err
 	}
-	return none, nil
+	return nil, err
 }
 
-func (s *Server) Reset(ctx context.Context, arg *api.Arguments) (*api.Error, error) {
-	return s.neighbor(REQ_NEIGHBOR_RESET, arg)
+func (s *Server) SoftResetNeighbor(ctx context.Context, arg *api.SoftResetNeighborRequest) (*api.SoftResetNeighborResponse, error) {
+	op := REQ_NEIGHBOR_SOFT_RESET
+	switch arg.Direction {
+	case api.SoftResetNeighborRequest_IN:
+		op = REQ_NEIGHBOR_SOFT_RESET_IN
+	case api.SoftResetNeighborRequest_OUT:
+		op = REQ_NEIGHBOR_SOFT_RESET_OUT
+	}
+	d, err := s.neighbor(op, arg.Address, arg)
+	if err == nil {
+		return d.(*api.SoftResetNeighborResponse), err
+	}
+	return nil, err
 }
 
-func (s *Server) SoftReset(ctx context.Context, arg *api.Arguments) (*api.Error, error) {
-	return s.neighbor(REQ_NEIGHBOR_SOFT_RESET, arg)
+func (s *Server) ShutdownNeighbor(ctx context.Context, arg *api.ShutdownNeighborRequest) (*api.ShutdownNeighborResponse, error) {
+	d, err := s.neighbor(REQ_NEIGHBOR_SHUTDOWN, arg.Address, arg)
+	if err == nil {
+		return d.(*api.ShutdownNeighborResponse), err
+	}
+	return nil, err
 }
 
-func (s *Server) SoftResetIn(ctx context.Context, arg *api.Arguments) (*api.Error, error) {
-	return s.neighbor(REQ_NEIGHBOR_SOFT_RESET_IN, arg)
+func (s *Server) EnableNeighbor(ctx context.Context, arg *api.EnableNeighborRequest) (*api.EnableNeighborResponse, error) {
+	d, err := s.neighbor(REQ_NEIGHBOR_ENABLE, arg.Address, arg)
+	if err == nil {
+		return d.(*api.EnableNeighborResponse), err
+	}
+	return nil, err
 }
 
-func (s *Server) SoftResetOut(ctx context.Context, arg *api.Arguments) (*api.Error, error) {
-	return s.neighbor(REQ_NEIGHBOR_SOFT_RESET_OUT, arg)
-}
-
-func (s *Server) Shutdown(ctx context.Context, arg *api.Arguments) (*api.Error, error) {
-	return s.neighbor(REQ_NEIGHBOR_SHUTDOWN, arg)
-}
-
-func (s *Server) Enable(ctx context.Context, arg *api.Arguments) (*api.Error, error) {
-	return s.neighbor(REQ_NEIGHBOR_ENABLE, arg)
-}
-
-func (s *Server) Disable(ctx context.Context, arg *api.Arguments) (*api.Error, error) {
-	return s.neighbor(REQ_NEIGHBOR_DISABLE, arg)
+func (s *Server) DisableNeighbor(ctx context.Context, arg *api.DisableNeighborRequest) (*api.DisableNeighborResponse, error) {
+	d, err := s.neighbor(REQ_NEIGHBOR_DISABLE, arg.Address, arg)
+	if err == nil {
+		return d.(*api.DisableNeighborResponse), err
+	}
+	return nil, err
 }
 
 func (s *Server) AddPath(ctx context.Context, arg *api.AddPathRequest) (*api.AddPathResponse, error) {
@@ -386,17 +399,6 @@ func (s *Server) get(typ int, d interface{}) (interface{}, error) {
 	s.bgpServerCh <- req
 	res := <-req.ResponseCh
 	return res.Data, res.Err()
-}
-
-func (s *Server) mod(typ int, d interface{}) (*api.Error, error) {
-	none := &api.Error{}
-	req := NewGrpcRequest(typ, "", bgp.RouteFamily(0), d)
-	s.bgpServerCh <- req
-	res := <-req.ResponseCh
-	if err := res.Err(); err != nil {
-		return none, err
-	}
-	return none, nil
 }
 
 func (s *Server) AddVrf(ctx context.Context, arg *api.AddVrfRequest) (*api.AddVrfResponse, error) {

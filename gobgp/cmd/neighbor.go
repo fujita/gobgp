@@ -588,40 +588,37 @@ func showNeighborRib(r string, name string, args []string) error {
 }
 
 func resetNeighbor(cmd string, remoteIP string, args []string) error {
-	family, err := checkAddressFamily(addr2AddressFamily(net.ParseIP(remoteIP)))
-	if err != nil {
-		return err
-	}
-	arg := &api.Arguments{
-		Name:   remoteIP,
-		Family: uint32(family),
-	}
 	switch cmd {
 	case CMD_RESET:
-		client.Reset(context.Background(), arg)
+		client.ResetNeighbor(context.Background(), &api.ResetNeighborRequest{Address: remoteIP})
 	case CMD_SOFT_RESET:
-		client.SoftReset(context.Background(), arg)
+		client.SoftResetNeighbor(context.Background(), &api.SoftResetNeighborRequest{
+			Address:   remoteIP,
+			Direction: api.SoftResetNeighborRequest_BOTH,
+		})
 	case CMD_SOFT_RESET_IN:
-		client.SoftResetIn(context.Background(), arg)
+		client.SoftResetNeighbor(context.Background(), &api.SoftResetNeighborRequest{
+			Address:   remoteIP,
+			Direction: api.SoftResetNeighborRequest_IN,
+		})
 	case CMD_SOFT_RESET_OUT:
-		client.SoftResetOut(context.Background(), arg)
+		client.SoftResetNeighbor(context.Background(), &api.SoftResetNeighborRequest{
+			Address:   remoteIP,
+			Direction: api.SoftResetNeighborRequest_OUT,
+		})
 	}
 	return nil
 }
 
 func stateChangeNeighbor(cmd string, remoteIP string, args []string) error {
-	arg := &api.Arguments{
-		Family: uint32(bgp.RF_IPv4_UC),
-		Name:   remoteIP,
-	}
 	var err error
 	switch cmd {
 	case CMD_SHUTDOWN:
-		_, err = client.Shutdown(context.Background(), arg)
+		_, err = client.ShutdownNeighbor(context.Background(), &api.ShutdownNeighborRequest{Address: remoteIP})
 	case CMD_ENABLE:
-		_, err = client.Enable(context.Background(), arg)
+		_, err = client.EnableNeighbor(context.Background(), &api.EnableNeighborRequest{Address: remoteIP})
 	case CMD_DISABLE:
-		_, err = client.Disable(context.Background(), arg)
+		_, err = client.DisableNeighbor(context.Background(), &api.DisableNeighborRequest{Address: remoteIP})
 	}
 	return err
 }

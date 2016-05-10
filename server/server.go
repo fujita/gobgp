@@ -1982,7 +1982,7 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 		for _, peer := range peers {
 			msgs = append(msgs, newSenderMsg(peer, nil, m, false))
 		}
-		grpcReq.ResponseCh <- &GrpcResponse{}
+		grpcReq.ResponseCh <- &GrpcResponse{Data: &api.ShutdownNeighborResponse{}}
 		close(grpcReq.ResponseCh)
 
 	case REQ_NEIGHBOR_RESET:
@@ -1996,7 +1996,7 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 			peer.fsm.idleHoldTime = peer.fsm.pConf.Timers.Config.IdleHoldTimeAfterReset
 			msgs = append(msgs, newSenderMsg(peer, nil, m, false))
 		}
-		grpcReq.ResponseCh <- &GrpcResponse{}
+		grpcReq.ResponseCh <- &GrpcResponse{Data: &api.ResetNeighborResponse{}}
 		close(grpcReq.ResponseCh)
 
 	case REQ_NEIGHBOR_SOFT_RESET, REQ_NEIGHBOR_SOFT_RESET_IN:
@@ -2034,7 +2034,7 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 		}
 
 		if grpcReq.RequestType == REQ_NEIGHBOR_SOFT_RESET_IN {
-			grpcReq.ResponseCh <- &GrpcResponse{}
+			grpcReq.ResponseCh <- &GrpcResponse{Data: &api.SoftResetNeighborResponse{}}
 			close(grpcReq.ResponseCh)
 			break
 		}
@@ -2100,7 +2100,7 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 				msgs = append(msgs, newSenderMsg(peer, withdrawnList, nil, false))
 			}
 		}
-		grpcReq.ResponseCh <- &GrpcResponse{}
+		grpcReq.ResponseCh <- &GrpcResponse{Data: &api.SoftResetNeighborResponse{}}
 		close(grpcReq.ResponseCh)
 
 	case REQ_NEIGHBOR_ENABLE, REQ_NEIGHBOR_DISABLE:
@@ -2108,7 +2108,6 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 		if err1 != nil {
 			break
 		}
-		var err api.Error
 		result := &GrpcResponse{}
 		if grpcReq.RequestType == REQ_NEIGHBOR_ENABLE {
 			select {
@@ -2117,13 +2116,11 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 					"Topic": "Peer",
 					"Key":   peer.fsm.pConf.Config.NeighborAddress,
 				}).Debug("ADMIN_STATE_UP requested")
-				err.Code = api.Error_SUCCESS
-				err.Msg = "ADMIN_STATE_UP"
 			default:
 				log.Warning("previous request is still remaining. : ", peer.fsm.pConf.Config.NeighborAddress)
-				err.Code = api.Error_FAIL
-				err.Msg = "previous request is still remaining"
+				result.ResponseErr = fmt.Errorf("previous request is still remaining %v", peer.fsm.pConf.Config.NeighborAddress)
 			}
+			result.Data = &api.EnableNeighborResponse{}
 		} else {
 			select {
 			case peer.fsm.adminStateCh <- ADMIN_STATE_DOWN:
@@ -2131,15 +2128,12 @@ func (server *BgpServer) handleGrpc(grpcReq *GrpcRequest) []*SenderMsg {
 					"Topic": "Peer",
 					"Key":   peer.fsm.pConf.Config.NeighborAddress,
 				}).Debug("ADMIN_STATE_DOWN requested")
-				err.Code = api.Error_SUCCESS
-				err.Msg = "ADMIN_STATE_DOWN"
 			default:
 				log.Warning("previous request is still remaining. : ", peer.fsm.pConf.Config.NeighborAddress)
-				err.Code = api.Error_FAIL
-				err.Msg = "previous request is still remaining"
+				result.ResponseErr = fmt.Errorf("previous request is still remaining %v", peer.fsm.pConf.Config.NeighborAddress)
 			}
+			result.Data = &api.DisableNeighborResponse{}
 		}
-		result.Data = err
 		grpcReq.ResponseCh <- result
 		close(grpcReq.ResponseCh)
 	case REQ_GRPC_ADD_NEIGHBOR:
