@@ -20,52 +20,64 @@ package gobgpapi;
 // Interface exported by the server.
 
 service GobgpApi {
-  rpc GetGlobalConfig(Arguments) returns (Global) {}
-  rpc ModGlobalConfig(ModGlobalConfigArguments) returns (Error) {}
-  rpc GetNeighbors(Arguments) returns (stream Peer) {}
-  rpc GetNeighbor(Arguments) returns (Peer) {}
-  rpc ModNeighbor(ModNeighborArguments) returns(Error) {}
+  rpc StartServer(StartServerRequest) returns (StartServerResponse) {}
+  rpc StopServer(StopServerRequest) returns (StopServerResponse) {}
+  rpc GetServer(GetServerRequest) returns (GetServerResponse) {}
+  rpc AddNeighbor(AddNeighborRequest) returns (AddNeighborResponse) {}
+  rpc DeleteNeighbor(DeleteNeighborRequest) returns (DeleteNeighborResponse) {}
+  rpc GetNeighbor(GetNeighborRequest) returns (GetNeighborResponse) {}
+  rpc ResetNeighbor(ResetNeighborRequest) returns (ResetNeighborResponse) {}
+  rpc SoftResetNeighbor(SoftResetNeighborRequest) returns (SoftResetNeighborResponse) {}
+  rpc ShutdownNeighbor(ShutdownNeighborRequest) returns (ShutdownNeighborResponse) {}
+  rpc EnableNeighbor(EnableNeighborRequest) returns (EnableNeighborResponse) {}
+  rpc DisableNeighbor(DisableNeighborRequest) returns (DisableNeighborResponse) {}
   rpc GetRib(Table) returns (Table) {}
-  rpc Reset(Arguments) returns (Error) {}
-  rpc SoftReset(Arguments) returns (Error) {}
-  rpc SoftResetIn(Arguments) returns (Error) {}
-  rpc SoftResetOut(Arguments) returns (Error) {}
-  rpc Shutdown(Arguments) returns (Error) {}
-  rpc Enable(Arguments) returns (Error) {}
-  rpc Disable(Arguments) returns (Error) {}
-  rpc ModPath(ModPathArguments) returns (ModPathResponse) {}
-  rpc ModPaths(stream ModPathsArguments) returns (Error) {}
+  rpc ValidateRib(ValidateRibRequest) returns (ValidateRibResponse) {}
+  rpc AddPath(AddPathRequest) returns (AddPathResponse) {}
+  rpc DeletePath(DeletePathRequest) returns (DeletePathResponse) {}
   rpc MonitorRib(Table) returns (stream Destination) {}
   rpc MonitorBestChanged(Arguments) returns (stream Destination) {}
   rpc MonitorPeerState(Arguments) returns (stream Peer) {}
+  rpc EnableMrt(EnableMrtRequest) returns (EnableMrtResponse) {}
+  rpc DisableMrt(DisableMrtRequest) returns (DisableMrtResponse) {}
   rpc GetMrt(MrtArguments) returns (stream MrtMessage) {}
-  rpc ModMrt(ModMrtArguments) returns (Error) {}
-  rpc ModBmp(ModBmpArguments) returns (Error) {}
-  rpc GetRPKI(Arguments) returns (stream RPKI) {}
-  rpc ModRPKI(ModRpkiArguments) returns (Error) {}
-  rpc GetROA(Arguments) returns (stream ROA) {}
-  rpc GetVrfs(Arguments) returns (stream Vrf) {}
-  rpc ModVrf(ModVrfArguments) returns (Error) {}
-  rpc GetDefinedSet(DefinedSet) returns (DefinedSet) {}
-  rpc GetDefinedSets(DefinedSet) returns (stream DefinedSet) {}
-  rpc ModDefinedSet(ModDefinedSetArguments) returns (Error) {}
-  rpc GetStatement(Statement) returns (Statement) {}
-  rpc GetStatements(Statement) returns (stream Statement) {}
-  rpc ModStatement(ModStatementArguments) returns (Error) {}
-  rpc GetPolicy(Policy) returns (Policy) {}
-  rpc GetPolicies(Policy) returns (stream Policy) {}
-  rpc ModPolicy(ModPolicyArguments) returns (Error) {}
-  rpc GetPolicyAssignment(PolicyAssignment) returns (PolicyAssignment) {}
-  rpc ModPolicyAssignment(ModPolicyAssignmentArguments) returns (Error) {}
+  rpc InjectMrt(stream InjectMrtRequest) returns (InjectMrtResponse) {}
+  rpc AddBmp(AddBmpRequest) returns (AddBmpResponse) {}
+  rpc DeleteBmp(DeleteBmpRequest) returns (DeleteBmpResponse) {}
+  rpc GetRpki(GetRpkiRequest) returns (GetRpkiResponse) {}
+  rpc AddRpki(AddRpkiRequest) returns (AddRpkiResponse) {}
+  rpc DeleteRpki(DeleteRpkiRequest) returns (DeleteRpkiResponse) {}
+  rpc EnableRpki(EnableRpkiRequest) returns (EnableRpkiResponse) {}
+  rpc DisableRpki(DisableRpkiRequest) returns (DisableRpkiResponse) {}
+  rpc ResetRpki(ResetRpkiRequest) returns (ResetRpkiResponse) {}
+  rpc SoftResetRpki(SoftResetRpkiRequest) returns (SoftResetRpkiResponse) {}
+  rpc GetRoa(GetRoaRequest) returns (GetRoaResponse) {}
+  rpc AddVrf(AddVrfRequest) returns (AddVrfResponse) {}
+  rpc DeleteVrf(DeleteVrfRequest) returns (DeleteVrfResponse) {}
+  rpc GetVrf(GetVrfRequest) returns (GetVrfResponse) {}
+  rpc GetDefinedSet(GetDefinedSetRequest) returns (GetDefinedSetResponse) {}
+  rpc AddDefinedSet(AddDefinedSetRequest) returns (AddDefinedSetResponse) {}
+  rpc DeleteDefinedSet(DeleteDefinedSetRequest) returns (DeleteDefinedSetResponse) {}
+  rpc ReplaceDefinedSet(ReplaceDefinedSetRequest) returns (ReplaceDefinedSetResponse) {}
+  rpc GetStatement(GetStatementRequest) returns (GetStatementResponse) {}
+  rpc AddStatement(AddStatementRequest) returns (AddStatementResponse) {}
+  rpc DeleteStatement(DeleteStatementRequest) returns (DeleteStatementResponse) {}
+  rpc ReplaceStatement(ReplaceStatementRequest) returns (ReplaceStatementResponse) {}
+  rpc GetPolicy(GetPolicyRequest) returns (GetPolicyResponse) {}
+  rpc AddPolicy(AddPolicyRequest) returns (AddPolicyResponse) {}
+  rpc DeletePolicy(DeletePolicyRequest) returns (DeletePolicyResponse) {}
+  rpc ReplacePolicy(ReplacePolicyRequest) returns (ReplacePolicyResponse) {}
+  rpc GetPolicyAssignment(GetPolicyAssignmentRequest) returns (GetPolicyAssignmentResponse) {}
+  rpc AddPolicyAssignment(AddPolicyAssignmentRequest) returns (AddPolicyAssignmentResponse) {}
+  rpc DeletePolicyAssignment(DeletePolicyAssignmentRequest) returns (DeletePolicyAssignmentResponse) {}
+  rpc ReplacePolicyAssignment(ReplacePolicyAssignmentRequest) returns (ReplacePolicyAssignmentResponse) {}
 }
 
-message Error {
-    enum ErrorCode {
-        SUCCESS = 0;
-        FAIL = 1;
-    }
-    ErrorCode code = 1;
-    string msg = 2;
+message GetNeighborRequest {
+}
+
+message GetNeighborResponse {
+    repeated Peer peers = 1;
 }
 
 message Arguments {
@@ -74,30 +86,80 @@ message Arguments {
     string name = 3;
 }
 
-message ModPathArguments {
-    Operation operation = 1;
-    Resource resource = 2;
-    string name = 3;
-    Path path = 4;
-    // uuid field can be only used when operation is DEL
-    bytes uuid = 5;
-    // family field is only used when operation is DEL_ALL
-    uint32 family = 6;
+message AddPathRequest {
+    Resource resource = 1;
+    string vrf_id = 2;
+    Path path = 3;
 }
 
-message ModPathResponse {
+message AddPathResponse {
     bytes uuid = 1;
 }
 
-message ModPathsArguments {
+message DeletePathRequest {
     Resource resource = 1;
-    string name = 2;
-    repeated Path paths = 3;
+    string vrf_id = 2;
+    uint32 family = 3;
+    Path path = 4;
+    bytes uuid = 5;
 }
 
-message ModNeighborArguments {
-    Operation operation = 1;
-    Peer peer = 2;
+message DeletePathResponse {
+}
+
+message AddNeighborRequest {
+    Peer peer = 1;
+}
+
+message AddNeighborResponse {
+}
+
+message DeleteNeighborRequest {
+    Peer peer = 1;
+}
+
+message DeleteNeighborResponse {
+}
+
+message ResetNeighborRequest {
+    string address = 1;
+}
+
+message ResetNeighborResponse {
+}
+
+message SoftResetNeighborRequest {
+    string address = 1;
+    enum SoftResetDirection {
+        IN = 0;
+        OUT = 1;
+        BOTH = 2;
+    }
+    SoftResetDirection direction = 2;
+}
+
+message SoftResetNeighborResponse {
+}
+
+message ShutdownNeighborRequest {
+    string address = 1;
+}
+
+message ShutdownNeighborResponse {
+}
+
+message EnableNeighborRequest {
+    string address = 1;
+}
+
+message EnableNeighborResponse {
+}
+
+message DisableNeighborRequest {
+    string address = 1;
+}
+
+message DisableNeighborResponse {
 }
 
 message MrtArguments {
@@ -107,70 +169,304 @@ message MrtArguments {
     string neighbor_address = 4;
 }
 
-message ModMrtArguments {
-    Operation operation = 1;
-    int32 dump_type = 2;
-    string filename = 3;
-    uint64 interval = 4;
+message EnableMrtRequest {
+    int32 dump_type = 1;
+    string filename = 2;
+    uint64 interval = 3;
 }
 
-message ModBmpArguments {
-    Operation operation = 1;
-    string address = 2;
-    uint32 port = 3;
+message EnableMrtResponse {
+}
+
+message DisableMrtRequest {
+}
+
+message DisableMrtResponse {
+}
+
+message InjectMrtRequest {
+    Resource resource = 1;
+    string vrf_id = 2;
+    repeated Path paths = 3;
+}
+
+message InjectMrtResponse {
+}
+
+message AddBmpRequest {
+    string address = 1;
+    uint32 port = 2;
     enum MonitoringPolicy {
         PRE = 0;
         POST = 1;
         BOTH = 2;
     }
-    MonitoringPolicy type = 4;
+    MonitoringPolicy type = 3;
 }
 
-message ModRpkiArguments {
-    Operation operation = 1;
-    uint32 asn = 2;
-    string address = 3;
-    uint32 port = 4;
-    int64 lifetime = 5;
-    string prefix = 6;
+message AddBmpResponse {
 }
 
-message ModVrfArguments {
-    Operation operation = 1;
-    Vrf vrf = 2;
+message DeleteBmpRequest {
+    string address = 1;
+    uint32 port = 2;
 }
 
-message ModDefinedSetArguments {
-    Operation operation = 1;
-    DefinedSet set = 2;
+message DeleteBmpResponse {
 }
 
-message ModStatementArguments {
-    Operation operation = 1;
-    Statement statement = 2;
+message RPKIConf {
+    string address = 1;
+    string remote_port = 2;
 }
 
-message ModPolicyArguments {
-    Operation operation = 1;
-    Policy policy = 2;
+message RPKIState {
+    int64 uptime = 1;
+    int64 downtime = 2;
+    bool  up = 3;
+    uint32 record_ipv4 = 4;
+    uint32 record_ipv6 = 5;
+    uint32 prefix_ipv4 = 6;
+    uint32 prefix_ipv6 = 7;
+    uint32 serial = 8;
+    int64 received_ipv4 = 9;
+    int64 received_ipv6 = 10;
+    int64 serial_notify = 11;
+    int64 cache_reset = 12;
+    int64 cache_response = 13;
+    int64 end_of_data = 14;
+    int64 error = 15;
+    int64 serial_query = 16;
+    int64 reset_query = 17;
+}
+
+message Rpki {
+    RPKIConf conf = 1;
+    RPKIState state = 2;
+}
+
+message GetRpkiRequest {
+    uint32 family = 1;
+}
+
+message GetRpkiResponse {
+    repeated Rpki servers = 1;
+}
+
+message AddRpkiRequest {
+    string address = 1;
+    uint32 port = 2;
+    int64 lifetime = 3;
+}
+
+message AddRpkiResponse {
+}
+
+message DeleteRpkiRequest {
+    string address = 1;
+    uint32 port = 2;
+}
+
+message DeleteRpkiResponse {
+}
+
+message EnableRpkiRequest {
+    string address = 1;
+}
+
+message EnableRpkiResponse {
+}
+
+message DisableRpkiRequest {
+    string address = 1;
+}
+
+message DisableRpkiResponse {
+}
+
+message ResetRpkiRequest {
+    string address = 1;
+}
+
+message ResetRpkiResponse {
+}
+
+message SoftResetRpkiRequest {
+    string address = 1;
+}
+
+message SoftResetRpkiResponse {
+}
+
+message GetVrfRequest {
+}
+
+message GetVrfResponse {
+    repeated Vrf vrfs = 1;
+}
+
+message AddVrfRequest {
+    Vrf vrf = 1;
+}
+
+message AddVrfResponse {
+}
+
+message DeleteVrfRequest {
+    Vrf vrf = 1;
+}
+
+message DeleteVrfResponse {
+}
+
+message GetDefinedSetRequest {
+    DefinedType type = 1;
+}
+
+message GetDefinedSetResponse {
+    repeated DefinedSet sets = 1;
+}
+
+message AddDefinedSetRequest {
+    DefinedSet set = 1;
+}
+
+message AddDefinedSetResponse {
+}
+
+message DeleteDefinedSetRequest {
+    DefinedSet set = 1;
+    bool all = 2;
+}
+
+message DeleteDefinedSetResponse {
+}
+
+message ReplaceDefinedSetRequest {
+    DefinedSet set = 1;
+}
+
+message ReplaceDefinedSetResponse {
+}
+
+message GetStatementRequest {
+}
+
+message GetStatementResponse {
+    repeated Statement statements = 1;
+}
+
+message AddStatementRequest {
+    Statement statement = 1;
+}
+
+message AddStatementResponse {
+}
+
+message DeleteStatementRequest {
+    Statement statement = 1;
+    bool all = 2;
+}
+
+message DeleteStatementResponse {
+}
+
+message ReplaceStatementRequest {
+    Statement statement = 1;
+}
+
+message ReplaceStatementResponse {
+}
+
+message GetPolicyRequest {
+}
+
+message GetPolicyResponse {
+    repeated Policy policies = 1;
+}
+
+message AddPolicyRequest {
+    Policy policy = 1;
     // if this flag is set, gobgpd won't define new statements
     // but refer existing statements using statement's names in this arguments.
-    // this flag only works with Operation_ADD
-    bool refer_existing_statements = 3;
+    bool refer_existing_statements = 2;
+}
+
+message AddPolicyResponse {
+}
+
+message DeletePolicyRequest {
+    Policy policy = 1;
     // if this flag is set, gobgpd won't delete any statements
     // even if some statements get not used by any policy by this operation.
-    // this flag means nothing if it is used with Operation_ADD
-    bool preserve_statements = 4;
+    bool preserve_statements = 2;
+    bool all = 3;
 }
 
-message ModPolicyAssignmentArguments {
-    Operation operation = 1;
-    PolicyAssignment assignment = 2;
+message DeletePolicyResponse {
 }
 
-message ModGlobalConfigArguments {
-    Operation operation = 1;
-    Global global = 2;
+message ReplacePolicyRequest {
+    Policy policy = 1;
+    // if this flag is set, gobgpd won't define new statements
+    // but refer existing statements using statement's names in this arguments.
+    bool refer_existing_statements = 2;
+    // if this flag is set, gobgpd won't delete any statements
+    // even if some statements get not used by any policy by this operation.
+    bool preserve_statements = 3;
+}
+
+message ReplacePolicyResponse {
+}
+
+message GetPolicyAssignmentRequest {
+    PolicyAssignment assignment = 1;
+}
+
+message GetPolicyAssignmentResponse {
+    PolicyAssignment assignment = 1;
+}
+
+message AddPolicyAssignmentRequest {
+    PolicyAssignment assignment = 1;
+}
+
+message AddPolicyAssignmentResponse {
+}
+
+message DeletePolicyAssignmentRequest {
+    PolicyAssignment assignment = 1;
+    bool all = 2;
+}
+
+message DeletePolicyAssignmentResponse {
+}
+
+message ReplacePolicyAssignmentRequest {
+    PolicyAssignment assignment = 1;
+}
+
+message ReplacePolicyAssignmentResponse {
+}
+
+message GetServerRequest {
+}
+
+message GetServerResponse {
+    Global global = 1;
+}
+
+message StartServerRequest {
+    Global global = 1;
+}
+
+message StartServerResponse {
+}
+
+message StopServerRequest {
+}
+
+message StopServerResponse {
 }
 
 enum Resource {
@@ -179,18 +475,6 @@ enum Resource {
     ADJ_IN = 2;
     ADJ_OUT = 3;
     VRF = 4;
-}
-
-enum Operation {
-    ADD = 0;
-    DEL = 1;
-    DEL_ALL = 2;
-    REPLACE = 3;
-    ENABLE = 4;
-    DISABLE = 5;
-    RESET = 6;
-    SOFTRESET = 7;
-    INITIALIZE = 8;
 }
 
 message Path {
@@ -222,6 +506,15 @@ message Table {
     uint32 family = 3;
     repeated Destination destinations = 4;
     bool post_policy = 5;
+}
+
+message ValidateRibRequest {
+    Resource type = 1;
+    uint32 family = 2;
+    string prefix = 3;
+}
+
+message ValidateRibResponse {
 }
 
 message Peer {
@@ -484,42 +777,20 @@ message MrtMessage {
     bytes data = 1;
 }
 
-message RPKIConf {
-    string address = 1;
-    string remote_port = 2;
-}
-
-message RPKIState {
-    int64 uptime = 1;
-    int64 downtime = 2;
-    bool  up = 3;
-    uint32 record_ipv4 = 4;
-    uint32 record_ipv6 = 5;
-    uint32 prefix_ipv4 = 6;
-    uint32 prefix_ipv6 = 7;
-    uint32 serial = 8;
-    int64 received_ipv4 = 9;
-    int64 received_ipv6 = 10;
-    int64 serial_notify = 11;
-    int64 cache_reset = 12;
-    int64 cache_response = 13;
-    int64 end_of_data = 14;
-    int64 error = 15;
-    int64 serial_query = 16;
-    int64 reset_query = 17;
-}
-
-message RPKI {
-    RPKIConf conf = 1;
-    RPKIState state = 2;
-}
-
-message ROA {
+message Roa {
     uint32 as = 1;
     uint32 prefixlen = 2;
     uint32 maxlen = 3;
     string prefix = 4;
     RPKIConf conf = 5;
+}
+
+message GetRoaRequest {
+    uint32 family = 1;
+}
+
+message GetRoaResponse {
+    repeated Roa roas = 1;
 }
 
 message Vrf {
