@@ -104,7 +104,7 @@ type BgpServer struct {
 	watcherMap  map[WatchEventType][]*Watcher
 	zclient     *zebraClient
 	bmpManager  *bmpClientManager
-	mrt         *mrtWriter
+	mrt         *mrtManager
 }
 
 func NewBgpServer() *BgpServer {
@@ -117,6 +117,7 @@ func NewBgpServer() *BgpServer {
 		watcherMap:  make(map[WatchEventType][]*Watcher),
 	}
 	s.bmpManager = newBmpClientManager(s)
+	s.mrt = newMrtManager(s)
 	return s
 }
 
@@ -2195,40 +2196,26 @@ func (s *BgpServer) ReplacePolicyAssignment(name string, dir table.PolicyDirecti
 	return err
 }
 
-func (s *BgpServer) EnableMrt(c *config.Mrt) (err error) {
+func (s *BgpServer) EnableMrt(c *config.MrtConfig) (err error) {
 	ch := make(chan struct{})
 	defer func() { <-ch }()
 
 	s.mgmtCh <- func() {
 		defer close(ch)
 
-		if s.mrt != nil {
-			err = fmt.Errorf("already enabled")
-		} else {
-			interval := c.Interval
-
-			if interval != 0 && interval < 30 {
-				log.Info("minimum mrt dump interval is 30 seconds")
-				interval = 30
-			}
-			s.mrt, err = newMrtWriter(s, c.DumpType.ToInt(), c.FileName, interval)
-		}
+		err = s.mrt.enable(c)
 	}
 	return err
 }
 
-func (s *BgpServer) DisableMrt() (err error) {
+func (s *BgpServer) DisableMrt(c *config.MrtConfig) (err error) {
 	ch := make(chan struct{})
 	defer func() { <-ch }()
 
 	s.mgmtCh <- func() {
 		defer close(ch)
 
-		if s.mrt != nil {
-			s.mrt.Stop()
-		} else {
-			err = fmt.Errorf("not enabled")
-		}
+		err = s.mrt.disable(c)
 	}
 	return err
 }

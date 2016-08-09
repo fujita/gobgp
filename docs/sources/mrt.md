@@ -35,6 +35,7 @@ router-id = "10.0.255.254"
     neighbor-address = "10.0.255.1"
 
 [[mrt-dump]]
+  [mrt-dump.config]
     dump-type = "updates"
     file-name = "/tmp/updates.dump"
 ```
@@ -57,9 +58,10 @@ router-id = "10.0.255.254"
     neighbor-address = "10.0.255.1"
 
 [[mrt-dump]]
+  [mrt-dump.config]
     dump-type = "updates"
     file-name = "/tmp/log/20060102.1504.dump"
-    interval = 180
+    rotation-interval = 180
 ```
 
 
