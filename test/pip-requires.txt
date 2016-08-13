@@ -4,5 +4,5 @@ pyyaml
 fabric
 netaddr
 nsenter
-docker-py
+docker-py==1.8.1
 ryu
