@@ -43,6 +43,8 @@ matrix:
       go: 1.6
       env: SCENARIO=true
     - os: osx
+      go: 1.7
+    - os: osx
       go: tip
 
 go_import_path: github.com/osrg/gobgp
