@@ -30,6 +30,8 @@ before_install:
 matrix:
   allow_failures:
     - go: tip
+    - os: osx
+      go: 1.6
   exclude:
     - go: 1.5
       env: SCENARIO=true
