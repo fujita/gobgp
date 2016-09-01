@@ -158,7 +158,7 @@ class Container(object):
         self.ip6_addrs = []
         self.is_running = False
         self.eths = []
-        self.tcpdump_running = False
+        self.tcpdump_name = ''
 
         if self.docker_name() in get_containers():
             self.remove()
@@ -232,19 +232,20 @@ class Container(object):
         return -1
 
     def start_tcpdump(self, interface=None, filename=None, expr='tcp port 179'):
-        if self.tcpdump_running:
+        if self.tcpdump_name != '':
             raise Exception('tcpdump already running')
-        self.tcpdump_running = True
         if not interface:
             interface = "eth0"
         if not filename:
             filename = '{0}.dump'.format(interface)
         self.local("tcpdump -i {0} -w {1}/{2} {3}".format(interface, self.shared_volumes[0][1], filename, expr), detach=True)
-        return '{0}/{1}'.format(self.shared_volumes[0][0], filename)
+        self.tcpdump_name = '{0}/{1}'.format(self.shared_volumes[0][0], filename)
+        return self.tcpdump_name
 
     def stop_tcpdump(self):
         self.local("pkill tcpdump")
-        self.tcpdump_running = False
+        print local('ls -l {0}'.format(self.tcpdump_name))
+        self.tcpdump_name = ''
 
 
 class BGPContainer(Container):
