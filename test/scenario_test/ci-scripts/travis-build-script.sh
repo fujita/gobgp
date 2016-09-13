@@ -35,6 +35,9 @@ cd $GOBGP/test/scenario_test
 
 PIDS=()
 
+sudo  PYTHONPATH=$GOBGP/test python bgp_zebra_test.py --gobgp-image $GOBGP_IMAGE --test-prefix z -x &
+PIDS=("${PIDS[@]}" $!)
+
 sudo  PYTHONPATH=$GOBGP/test python route_server_test.py --gobgp-image $GOBGP_IMAGE --test-prefix rs -x &
 PIDS=("${PIDS[@]}" $!)
 
@@ -80,10 +83,6 @@ PIDS=("${PIDS[@]}" $!)
 
 sudo  PYTHONPATH=$GOBGP/test python graceful_restart_test.py --gobgp-image $GOBGP_IMAGE --test-prefix gr -x &
 PIDS=("${PIDS[@]}" $!)
-
-sudo  PYTHONPATH=$GOBGP/test python bgp_zebra_test.py --gobgp-image $GOBGP_IMAGE --test-prefix z -x &
-PIDS=("${PIDS[@]}" $!)
-
 
 for (( i = 0; i < ${#PIDS[@]}; ++i ))
 do

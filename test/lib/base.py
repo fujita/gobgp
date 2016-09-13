@@ -181,7 +181,9 @@ class Container(object):
 
     def wait(self, r=3, s=1):
         for i in range(r):
-            if '/'+self.docker_name() in map(lambda m:m['Names'][0], Client(timeout=30, version='auto').containers()):
+            containers = map(lambda m:m['Names'][0], Client(timeout=30, version='auto').containers())
+            print containers
+            if '/'+self.docker_name() in containers:
                 return
             time.sleep(s)
         raise
