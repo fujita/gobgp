@@ -60,7 +60,7 @@ def try_several_times(f, t=3, s=1):
 
 
 def get_bridges():
-    return try_several_times(lambda : local("brctl show | awk 'NR > 1{print $1}'", capture=True)).split('\n')
+    return try_several_times(lambda : local("docker network ls | awk 'NR > 1{print $2}'", capture=True)).split('\n')
 
 
 def get_containers():
@@ -121,9 +121,11 @@ class Bridge(object):
         def f():
             if self.name in get_bridges():
                 self.delete()
-            local("ip link add {0} type bridge".format(self.name))
+            if self.subnet.version == 4:
+                local("docker network create --driver bridge --subnet {0} {1}".format(subnet, self.name))
+            else:
+                local("docker network create --driver bridge --ipv6 --subnet {0} {1}".format(subnet, self.name))
         try_several_times(f)
-        try_several_times(lambda : local("ip link set up dev {0}".format(self.name)))
 
         self.self_ip = self_ip
         if self_ip:
@@ -138,15 +140,15 @@ class Bridge(object):
     def addif(self, ctn):
         name = ctn.next_if_name()
         self.ctns.append(ctn)
-        if self.with_ip:
-
-            ctn.pipework(self, self.next_ip_address(), name)
+        local("docker network connect {0} {1}".format(self.name, ctn.name))
+        if self.subnet.version == 4:
+            addr = local("docker network inspect {0} -f='{{{{range .Containers}}}}{{{{if eq .Name \"{1}\"}}}}{{{{.IPv4Address}}}}{{{{end}}}}{{{{end}}}}'".format(self.name, ctn.name), capture=True)
         else:
-            ctn.pipework(self, '0/0', name)
+            addr = local("docker network inspect {0} -f='{{{{range .Containers}}}}{{{{if eq .Name \"{1}\"}}}}{{{{.IPv6Address}}}}{{{{end}}}}{{{{end}}}}'".format(self.name, ctn.name), capture=True)
+        ctn.ip_addrs.append(('eth1', addr, self.name))
 
     def delete(self):
-        try_several_times(lambda : local("ip link set down dev {0}".format(self.name)))
-        try_several_times(lambda : local("ip link delete {0} type bridge".format(self.name)))
+        try_several_times(lambda : local("docker network rm {0}".format(self.name)))
 
 
 class Container(object):
