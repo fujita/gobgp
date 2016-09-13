@@ -140,7 +140,10 @@ class Bridge(object):
     def addif(self, ctn):
         name = ctn.next_if_name()
         self.ctns.append(ctn)
-        local("docker network connect {0} {1}".format(self.name, ctn.name))
+        print self.name, ctn.name
+        print local("docker network ls", capture=True)
+        print local("docker network inspect {0}".format(self.name), capture=True)
+        print local("docker network connect {0} {1}".format(self.name, ctn.name), capture=True)
         if self.subnet.version == 4:
             addr = local("docker network inspect {0} -f='{{{{range .Containers}}}}{{{{if eq .Name \"{1}\"}}}}{{{{.IPv4Address}}}}{{{{end}}}}{{{{end}}}}'".format(self.name, ctn.name), capture=True)
         else:
