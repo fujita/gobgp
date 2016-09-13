@@ -141,6 +141,7 @@ class Bridge(object):
         name = ctn.next_if_name()
         self.ctns.append(ctn)
         print self.name, ctn.name
+        print local("docker ps", capture=True)
         print local("docker network ls", capture=True)
         print local("docker network inspect {0}".format(self.name), capture=True)
         print local("docker network connect {0} {1}".format(self.name, ctn.name), capture=True)
@@ -177,6 +178,13 @@ class Container(object):
         name = 'eth{0}'.format(len(self.eths)+1)
         self.eths.append(name)
         return name
+
+    def wait(self, r=3, s=1):
+        for i in range(r):
+            if '/'+self.docker_name() in map(lambda m:m['Names'][0], Client(timeout=30, version='auto').containers()):
+                return
+            time.sleep(s)
+        raise
 
     def run(self):
         c = CmdBuffer(' ')

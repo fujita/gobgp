@@ -83,7 +83,8 @@ class GoBGPTestBase(unittest.TestCase):
         o2 = self.others['ipv4'][1]
         # start up containers of ipv4 environment
         initial_wait_time = max(ctn.run() for ctn in self.ctns['ipv4'])
-        time.sleep(initial_wait_time)
+        for ctn in self.ctns['ipv4']:
+            ctn.wait()
 
         # make ipv4 bridge and set ip to each container
         [self.bridges['br01_v4'].addif(ctn) for ctn in [o1, g1]]
