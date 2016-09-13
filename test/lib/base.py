@@ -144,11 +144,11 @@ class Bridge(object):
         print local("docker ps", capture=True)
         print local("docker network ls", capture=True)
         print local("docker network inspect {0}".format(self.name), capture=True)
-        print local("docker network connect {0} {1}".format(self.name, ctn.name), capture=True)
+        print local("docker network connect {0} {1}".format(self.name, ctn.docker_name()), capture=True)
         if self.subnet.version == 4:
-            addr = local("docker network inspect {0} -f='{{{{range .Containers}}}}{{{{if eq .Name \"{1}\"}}}}{{{{.IPv4Address}}}}{{{{end}}}}{{{{end}}}}'".format(self.name, ctn.name), capture=True)
+            addr = local("docker network inspect {0} -f='{{{{range .Containers}}}}{{{{if eq .Name \"{1}\"}}}}{{{{.IPv4Address}}}}{{{{end}}}}{{{{end}}}}'".format(self.name, ctn.docker_name()), capture=True)
         else:
-            addr = local("docker network inspect {0} -f='{{{{range .Containers}}}}{{{{if eq .Name \"{1}\"}}}}{{{{.IPv6Address}}}}{{{{end}}}}{{{{end}}}}'".format(self.name, ctn.name), capture=True)
+            addr = local("docker network inspect {0} -f='{{{{range .Containers}}}}{{{{if eq .Name \"{1}\"}}}}{{{{.IPv6Address}}}}{{{{end}}}}{{{{end}}}}'".format(self.name, ctn.docker_name()), capture=True)
         ctn.ip_addrs.append(('eth1', addr, self.name))
 
     def delete(self):
