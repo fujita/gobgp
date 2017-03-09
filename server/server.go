@@ -116,6 +116,7 @@ func NewBgpServer() *BgpServer {
 	}
 	s.bmpManager = newBmpClientManager(s)
 	s.mrtManager = newMrtManager(s)
+	s.zclient = newZebraClient(s)
 	return s
 }
 
@@ -265,6 +266,20 @@ func (server *BgpServer) Serve() {
 			server.handleMGMTOp(op)
 		case rmsg := <-server.roaManager.ReceiveROA():
 			server.roaManager.HandleROAEvent(rmsg)
+		case zmsg := <-server.zclient.EventCh:
+			pathList := server.zclient.HandleUpdatedPath(zmsg)
+			best, old, multipath := server.globalRib.ProcessPaths([]string{table.GLOBAL_RIB_NAME}, pathList)
+			if len(best[table.GLOBAL_RIB_NAME]) > 0 {
+				server.notifyBestWatcher(best, multipath)
+				for _, targetPeer := range server.neighborMap {
+					if targetPeer.isRouteServerClient() {
+						continue
+					}
+					if paths := targetPeer.processOutgoingPaths(best[targetPeer.TableID()], old[targetPeer.TableID()]); len(paths) > 0 {
+						sendFsmOutgoingMsg(targetPeer, paths, nil, false)
+					}
+				}
+			}
 		case conn := <-server.acceptCh:
 			passConn(conn)
 		case e, ok := <-server.fsmincomingCh.Out():
@@ -973,16 +988,11 @@ func (s *BgpServer) StartCollector(c *config.CollectorConfig) error {
 
 func (s *BgpServer) StartZebraClient(c *config.ZebraConfig) error {
 	return s.mgmtOperation(func() error {
-		if s.zclient != nil {
-			return fmt.Errorf("already connected to Zebra")
-		}
 		protos := make([]string, 0, len(c.RedistributeRouteTypeList))
 		for _, p := range c.RedistributeRouteTypeList {
 			protos = append(protos, string(p))
 		}
-		var err error
-		s.zclient, err = newZebraClient(s, c.Url, protos, c.Version, c.NexthopTriggerEnable, c.NexthopTriggerDelay)
-		return err
+		return s.zclient.Start(c.Url, protos, c.Version, c.NexthopTriggerEnable, c.NexthopTriggerDelay)
 	}, false)
 }
 
@@ -1181,18 +1191,6 @@ func (s *BgpServer) DeletePath(uuid []byte, f bgp.RouteFamily, vrfId string, pat
 		s.propagateUpdate(nil, deletePathList)
 		return nil
 	}, true)
-}
-
-func (s *BgpServer) UpdatePath(vrfId string, pathList []*table.Path) error {
-	err := s.mgmtOperation(func() error {
-		if err := s.fixupApiPath(vrfId, pathList); err != nil {
-			return err
-		}
-
-		s.propagateUpdate(nil, pathList)
-		return nil
-	}, true)
-	return err
 }
 
 func (s *BgpServer) Start(c *config.Global) error {
