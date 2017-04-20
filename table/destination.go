@@ -272,7 +272,9 @@ func (dest *Destination) Calculate(ids []string) (map[string]*Path, map[string]*
 			if old == nil {
 				return nil, nil
 			}
-			return old.Clone(true), old
+			// nothing (adj-in, rib) refers to the 'old' path. So we can safely modify it rather than Cloning (safer but consume memory)
+			old.IsWithdraw = true
+			return old, old
 		}
 		return best, old
 	}
