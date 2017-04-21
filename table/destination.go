@@ -272,7 +272,17 @@ func (dest *Destination) Calculate(ids []string) (map[string]*Path, map[string]*
 			if old == nil {
 				return nil, nil
 			}
-			return old.Clone(true), old
+			// is it possible that the old path is on knownpath (and oldknown path)
+			// but it's not the best path?
+			// I guess that it's not possible but for safety let's check out.
+			if len(dest.GetAllKnownPathList()) == 0 {
+				// nobody uses this path so avoid the overhead of Clone().
+				old.IsWithdraw = true
+				return old, old
+			} else {
+				// make policy stricter and the old patch will no be delivered.
+				return old.Clone(true), old
+			}
 		}
 		return best, old
 	}
