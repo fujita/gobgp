@@ -519,7 +519,9 @@ func dstsToPaths(id string, dsts []*table.Destination) ([]*table.Path, []*table.
 		best, old, mpath := dst.GetChanges(id, false)
 		bestList = append(bestList, best)
 		oldList = append(oldList, old)
-		mpathList = append(mpathList, mpath)
+		if mpath != nil {
+			mpathList = append(mpathList, mpath)
+		}
 	}
 	return bestList, oldList, mpathList
 }
