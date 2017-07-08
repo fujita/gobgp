@@ -30,6 +30,7 @@ import (
 
 var SelectionOptions config.RouteSelectionOptionsConfig
 var UseMultiplePaths config.UseMultiplePathsConfig
+var localIdBitmap map[string]Bitmap
 
 type BestPathReason string
 
@@ -49,6 +50,24 @@ const (
 	BPR_OLDER              BestPathReason = "Older"
 	BPR_NON_LLGR_STALE     BestPathReason = "no LLGR Stale"
 )
+
+func allocId(dd *Destination) uint32 {
+	if localIdBitmap == nil {
+		localIdBitmap = make(map[string]Bitmap)
+	}
+	if _, ok := localIdBitmap[dd.GetNlri().String()]; !ok {
+		b := NewBitmap(2048)
+		b.Flag(0)
+		localIdBitmap[dd.GetNlri().String()] = b
+	}
+	b := localIdBitmap[dd.GetNlri().String()]
+	return uint32(b.FindandSetZerobit())
+}
+
+func freeId(dd *Destination, id uint32) {
+	b := localIdBitmap[dd.GetNlri().String()]
+	b.Unflag(uint(id))
+}
 
 func IpToRadixkey(b []byte, max uint8) string {
 	var buffer bytes.Buffer
@@ -227,6 +246,20 @@ func (dd *Destination) GetMultiBestPath(id string) []*Path {
 	return getMultiBestPath(id, &dd.knownPathList)
 }
 
+func (dd *Destination) GetAddPathChanges(id string) []*Path {
+	l := make([]*Path, 0, len(dd.newPathList)+len(dd.withdrawList))
+	for _, p := range dd.newPathList {
+		l = append(l, p)
+	}
+	for _, p := range dd.withdrawList {
+		if p.GetNlri().PathLocalIdentifier() != 0 {
+			freeId(dd, p.GetNlri().PathLocalIdentifier())
+		}
+		l = append(l, p.Clone(true))
+	}
+	return l
+}
+
 func (dd *Destination) GetChanges(id string, peerDown bool) (*Path, *Path, []*Path) {
 	best, old := func(id string) (*Path, *Path) {
 		old := getBestPath(id, &dd.oldKnownPathList)
@@ -317,8 +350,16 @@ func (dd *Destination) validatePath(path *Path) {
 // paths from known paths. Also, adds new paths to known paths.
 func (dest *Destination) Calculate() *Destination {
 	oldKnownPathList := dest.knownPathList
+	newPathList := dest.newPathList
+
+	// should be avoid the allocation in the case of no peers with addpath tx
+	for _, p := range newPathList {
+		if p.GetNlri().PathLocalIdentifier() == 0 {
+			p.GetNlri().SetPathLocalIdentifier(allocId(dest))
+		}
+	}
 	// First remove the withdrawn paths.
-	dest.explicitWithdraw()
+	withdrawnPathList := dest.explicitWithdraw()
 	// Do implicit withdrawal
 	dest.implicitWithdraw()
 	// Collect all new paths into known paths.
@@ -333,6 +374,8 @@ func (dest *Destination) Calculate() *Destination {
 		nlri:             dest.nlri,
 		knownPathList:    dest.knownPathList,
 		oldKnownPathList: oldKnownPathList,
+		withdrawList:     withdrawnPathList,
+		newPathList:      newPathList,
 	}
 }
 

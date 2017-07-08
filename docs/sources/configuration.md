@@ -74,6 +74,7 @@
         route-reflector-cluster-id = "192.168.0.1"
     [neighbors.add-paths.config]
         receive = true
+        send-max = 8
     [neighbors.graceful-restart.config]
         enabled = true
         notification-enabled = true

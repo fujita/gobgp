@@ -17,13 +17,14 @@ package server
 
 import (
 	"fmt"
+	"net"
+	"time"
+
 	"github.com/eapache/channels"
 	"github.com/osrg/gobgp/config"
 	"github.com/osrg/gobgp/packet/bgp"
 	"github.com/osrg/gobgp/table"
 	log "github.com/sirupsen/logrus"
-	"net"
-	"time"
 )
 
 const (
@@ -380,13 +381,20 @@ func (peer *Peer) filterpath(path, old *table.Path) *table.Path {
 func (peer *Peer) getBestFromLocal(rfList []bgp.RouteFamily) ([]*table.Path, []*table.Path) {
 	pathList := []*table.Path{}
 	filtered := []*table.Path{}
-	for _, path := range peer.localRib.GetBestPathList(peer.TableID(), peer.toGlobalFamilies(rfList)) {
-		if p := peer.filterpath(path, nil); p != nil {
-			pathList = append(pathList, p)
-		} else {
-			filtered = append(filtered, path)
+	for _, family := range peer.toGlobalFamilies(rfList) {
+		l := func() []*table.Path {
+			if peer.fsm.marshallingOptions != nil && peer.fsm.marshallingOptions.AddPath[family]&bgp.BGP_ADD_PATH_SEND > 0 {
+				return peer.localRib.GetPathList(peer.TableID(), []bgp.RouteFamily{family})
+			}
+			return peer.localRib.GetBestPathList(peer.TableID(), []bgp.RouteFamily{family})
+		}()
+		for _, path := range l {
+			if p := peer.filterpath(path, nil); p != nil {
+				pathList = append(pathList, p)
+			} else {
+				filtered = append(filtered, path)
+			}
 		}
-
 	}
 	if peer.isGracefulRestartEnabled() {
 		for _, family := range rfList {
