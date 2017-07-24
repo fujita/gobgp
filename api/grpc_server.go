@@ -385,6 +385,7 @@ func ToPathApi(path *table.Path) *Path {
 		Uuid:               path.UUID().Bytes(),
 		IsNexthopInvalid:   path.IsNexthopInvalid,
 		Identifier:         nlri.PathIdentifier(),
+		RemoteIdentifier:   nlri.PathLocalIdentifier(),
 	}
 	if s := path.GetSource(); s != nil {
 		p.SourceAsn = s.AS
