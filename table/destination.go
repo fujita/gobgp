@@ -147,6 +147,7 @@ type Destination struct {
 	newPathList      paths
 	oldKnownPathList paths
 	RadixKey         string
+	localIdMap       Bitmap
 }
 
 func NewDestination(nlri bgp.AddrPrefixInterface, known ...*Path) *Destination {
@@ -318,11 +319,21 @@ func (dd *Destination) validatePath(path *Path) {
 func (dest *Destination) Calculate() *Destination {
 	oldKnownPathList := dest.knownPathList
 	// First remove the withdrawn paths.
-	dest.explicitWithdraw()
+	withdrawn := dest.explicitWithdraw()
 	// Do implicit withdrawal
-	dest.implicitWithdraw()
+	for _, path := range append(withdrawn, dest.implicitWithdraw()...) {
+		if id := path.GetNlri().PathLocalIdentifier(); id != 0 {
+			dest.localIdMap.Unflag(uint(id))
+		}
+	}
 	// Collect all new paths into known paths.
 	dest.knownPathList = append(dest.knownPathList, dest.newPathList...)
+	// For now, unconditionally (even )
+	for _, path := range dest.knownPathList {
+		if path.GetNlri().PathIdentifier() == 0 {
+			path.GetNlri().SetPathLocalIdentifier(uint32(dest.localIdMap.FindandSetZeroBit()))
+		}
+	}
 	// Clear new paths as we copied them.
 	dest.newPathList = make([]*Path, 0)
 	// Compute new best path
