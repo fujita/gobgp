@@ -736,15 +736,25 @@ func (server *BgpServer) propagateUpdate(peer *Peer, pathList []*table.Path) {
 		server.notifyBestWatcher(bestList, mpathList)
 	}
 
-	for _, targetPeer := range server.neighborMap {
-		if (peer == nil && targetPeer.isRouteServerClient()) || (peer != nil && peer.isRouteServerClient() != targetPeer.isRouteServerClient()) {
-			continue
+	families := make(map[bgp.RouteFamily][]*table.Destination)
+	for _, dst := range dsts {
+		if families[dst.Family()] == nil {
+			families[dst.Family()] = make([]*table.Destination, 0, len(dsts))
 		}
-		if targetPeer.isRouteServerClient() {
-			bestList, oldList, _ = dstsToPaths(targetPeer.TableID(), dsts)
-		}
-		if paths := targetPeer.processOutgoingPaths(bestList, oldList); len(paths) > 0 {
-			sendFsmOutgoingMsg(targetPeer, paths, nil, false)
+		families[dst.Family()] = append(families[dst.Family()], dst)
+	}
+
+	for _, l := range families {
+		for _, targetPeer := range server.neighborMap {
+			if (peer == nil && targetPeer.isRouteServerClient()) || (peer != nil && peer.isRouteServerClient() != targetPeer.isRouteServerClient()) {
+				continue
+			}
+			if targetPeer.isRouteServerClient() {
+				bestList, oldList, _ = dstsToPaths(targetPeer.TableID(), l)
+			}
+			if paths := targetPeer.processOutgoingPaths(bestList, oldList); len(paths) > 0 {
+				sendFsmOutgoingMsg(targetPeer, paths, nil, false)
+			}
 		}
 	}
 }
