@@ -520,17 +520,21 @@ func (server *BgpServer) notifyPostPolicyUpdateWatcher(peer *Peer, pathList []*t
 	server.notifyWatcher(WATCH_EVENT_TYPE_POST_UPDATE, ev)
 }
 
-func dstsToPaths(id string, dsts []*table.Destination) ([]*table.Path, []*table.Path, [][]*table.Path) {
+func dstsToPaths(id string, dsts []*table.Destination, addpath bool) ([]*table.Path, []*table.Path, [][]*table.Path) {
 	bestList := make([]*table.Path, 0, len(dsts))
 	oldList := make([]*table.Path, 0, len(dsts))
 	mpathList := make([][]*table.Path, 0, len(dsts))
 
 	for _, dst := range dsts {
-		best, old, mpath := dst.GetChanges(id, false)
-		bestList = append(bestList, best)
-		oldList = append(oldList, old)
-		if mpath != nil {
-			mpathList = append(mpathList, mpath)
+		if addpath {
+			bestList = append(bestList, dst.GetAddPathChanges(id)...)
+		} else {
+			best, old, mpath := dst.GetChanges(id, false)
+			bestList = append(bestList, best)
+			oldList = append(oldList, old)
+			if mpath != nil {
+				mpathList = append(mpathList, mpath)
+			}
 		}
 	}
 	return bestList, oldList, mpathList
@@ -547,7 +551,7 @@ func (server *BgpServer) dropPeerAllRoutes(peer *Peer, families []bgp.RouteFamil
 	for _, rf := range families {
 		dsts := rib.DeletePathsByPeer(peer.fsm.peerInfo, rf)
 		if !peer.isRouteServerClient() {
-			bestList, _, mpathList = dstsToPaths(table.GLOBAL_RIB_NAME, dsts)
+			bestList, _, mpathList = dstsToPaths(table.GLOBAL_RIB_NAME, dsts, false)
 			server.notifyBestWatcher(bestList, mpathList)
 		}
 
@@ -556,7 +560,7 @@ func (server *BgpServer) dropPeerAllRoutes(peer *Peer, families []bgp.RouteFamil
 				continue
 			}
 			if targetPeer.isRouteServerClient() {
-				bestList, _, _ = dstsToPaths(targetPeer.TableID(), dsts)
+				bestList, _, _ = dstsToPaths(targetPeer.TableID(), dsts, false)
 			}
 			if paths := targetPeer.processOutgoingPaths(bestList, nil); len(paths) > 0 {
 				sendFsmOutgoingMsg(targetPeer, paths, nil, false)
@@ -729,7 +733,7 @@ func (server *BgpServer) propagateUpdate(peer *Peer, pathList []*table.Path) {
 		server.notifyPostPolicyUpdateWatcher(peer, pathList)
 		dsts = rib.ProcessPaths(pathList)
 
-		bestList, oldList, mpathList = dstsToPaths(table.GLOBAL_RIB_NAME, dsts)
+		bestList, oldList, mpathList = dstsToPaths(table.GLOBAL_RIB_NAME, dsts, false)
 		if len(bestList) == 0 {
 			return
 		}
@@ -750,7 +754,7 @@ func (server *BgpServer) propagateUpdate(peer *Peer, pathList []*table.Path) {
 				continue
 			}
 			if targetPeer.isRouteServerClient() {
-				bestList, oldList, _ = dstsToPaths(targetPeer.TableID(), l)
+				bestList, oldList, _ = dstsToPaths(targetPeer.TableID(), l, false)
 			}
 			if paths := targetPeer.processOutgoingPaths(bestList, oldList); len(paths) > 0 {
 				sendFsmOutgoingMsg(targetPeer, paths, nil, false)
