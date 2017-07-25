@@ -388,13 +388,20 @@ func (peer *Peer) filterpath(path, old *table.Path) *table.Path {
 func (peer *Peer) getBestFromLocal(rfList []bgp.RouteFamily) ([]*table.Path, []*table.Path) {
 	pathList := []*table.Path{}
 	filtered := []*table.Path{}
-	for _, path := range peer.localRib.GetBestPathList(peer.TableID(), peer.toGlobalFamilies(rfList)) {
-		if p := peer.filterpath(path, nil); p != nil {
-			pathList = append(pathList, p)
-		} else {
-			filtered = append(filtered, path)
+	for _, family := range peer.toGlobalFamilies(rfList) {
+		pl := func() []*table.Path {
+			if peer.isAddPathSendEnabled(family) {
+				return peer.localRib.GetPathList(peer.TableID(), []bgp.RouteFamily{family})
+			}
+			return peer.localRib.GetBestPathList(peer.TableID(), []bgp.RouteFamily{family})
+		}()
+		for _, path := range pl {
+			if p := peer.filterpath(path, nil); p != nil {
+				pathList = append(pathList, p)
+			} else {
+				filtered = append(filtered, path)
+			}
 		}
-
 	}
 	if peer.isGracefulRestartEnabled() {
 		for _, family := range rfList {
