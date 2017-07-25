@@ -17,13 +17,14 @@ package server
 
 import (
 	"fmt"
+	"net"
+	"time"
+
 	"github.com/eapache/channels"
 	"github.com/osrg/gobgp/config"
 	"github.com/osrg/gobgp/packet/bgp"
 	"github.com/osrg/gobgp/table"
 	log "github.com/sirupsen/logrus"
-	"net"
-	"time"
 )
 
 const (
@@ -141,6 +142,13 @@ func (peer *Peer) isRouteReflectorClient() bool {
 
 func (peer *Peer) isGracefulRestartEnabled() bool {
 	return peer.fsm.pConf.GracefulRestart.State.Enabled
+}
+
+func (peer *Peer) isAddPathSendEnabled(family bgp.RouteFamily) bool {
+	if mode, y := peer.fsm.rfMap[family]; y && (mode&bgp.BGP_ADD_PATH_SEND) > 0 {
+		return true
+	}
+	return false
 }
 
 func (peer *Peer) isDynamicNeighbor() bool {
