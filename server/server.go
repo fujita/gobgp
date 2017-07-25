@@ -537,6 +537,9 @@ func dstsToPaths(id string, dsts []*table.Destination, addpath bool) ([]*table.P
 			}
 		}
 	}
+	if addpath {
+		oldList = nil
+	}
 	return bestList, oldList, mpathList
 }
 
