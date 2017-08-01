@@ -1,10 +1,18 @@
 # .goreleaser.yml
 # Build customization
 builds:
-  - binary: gobgp
+  - main: ./gobgp/
+    binary: gobgp
     goos:
-      - windows
       - darwin
       - linux
     goarch:
       - amd64
+
+  - main: ./gobgpd/
+    binary: gobgpd
+  
+archive:
+  files:
+    - LICENSE
+    - README.md
