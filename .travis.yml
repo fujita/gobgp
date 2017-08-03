@@ -7,16 +7,23 @@ before_install:
 install: test/scenario_test/ci-scripts/travis-install-script.sh
 script: test/scenario_test/ci-scripts/travis-build-script.sh
 
-_unittest: &_unittest
+_simple_install: &_simple_install
   before_install: true
   install: go get -t ./...
+
+_unittest: &_unittest
+  <<: *_simple_install
   script: go test ./...
 
 _cross_compile: &_cross_compile
   go: 1.7
-  before_install: true
-  install: go get -t ./...
+  <<: *_simple_install
   script: cd gobgpd && go build
+
+_no_install: &_no_install
+  go: 1.7
+  before_install: true
+  install: true
 
 _docker: &_docker
   sudo: required
@@ -55,17 +62,12 @@ matrix:
 #
 # Misc
 #
-    - go: 1.7
-      before_install: true
-      install: true
+    - <<: *_no_install
       script: test -z "$(go fmt ./...)"
-    - go: 1.7
-      before_install: true
-      install: true
+    - <<: *_no_install
       script: test -z "$(go vet ./...)"
-    - go: 1.7
-      before_install: true
-      install: go get ./...
+    - <<: *_simple_install
+      go: 1.7
       script: python test/scenario_test/ci-scripts/build_embeded_go.py docs/sources/lib.md
 #
 # Docker
