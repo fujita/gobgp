@@ -7,6 +7,11 @@ before_install:
 install: test/scenario_test/ci-scripts/travis-install-script.sh
 script: test/scenario_test/ci-scripts/travis-build-script.sh
 
+_unittest: &_unittest
+  before_install: true
+  install: go get -t ./...
+  script: go test ./...
+
 env:
   global:
     - DOCKER_IMAGE=gobgp
@@ -16,10 +21,8 @@ matrix:
   allow_failures:
     - go: tip
   include:
-    - go: 1.7
-      before_install: true
-      install: go get -t ./...
-      script: go test ./...
+    - <<: *_unittest
+      go: 1.7
     - go: 1.8
       before_install: true
       install: go get -t ./...
