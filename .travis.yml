@@ -13,12 +13,12 @@ _unittest: &_unittest
   <<: *_dep_ensure
   script:
     - go test $(go list ./... | grep -v '/vendor/')
-    <<: *_build_script
+    << *_build_script
 
 _build: &_build
   <<: *_dep_ensure
   script:
-    <<: *_build_script
+    << *_build_script
 
 _python: &_python
   language: python
