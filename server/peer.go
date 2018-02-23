@@ -564,10 +564,15 @@ func (peer *Peer) handleUpdate(e *FsmMsg) ([]*table.Path, []bgp.RouteFamily, *bg
 				eor = append(eor, family)
 				continue
 			}
-			if path.Filtered(peer.ID()) != table.POLICY_DIRECTION_IN {
-				paths = append(paths, path)
-			} else {
-				paths = append(paths, path.Clone(true))
+			// RFC4271 9.1.2 Phase 2: Route Selection
+			//
+			// If the AS_PATH attribute of a BGP route contains an AS loop, the BGP
+			// route should be excluded from the Phase 2 decision function.
+			if aspath := path.GetAsPath(); aspath != nil {
+				if !hasOwnASLoop(peer.fsm.peerInfo.LocalAS, int(peer.fsm.pConf.AsPathOptions.Config.AllowOwnAs), aspath) {
+					// this is in adj-in but not goes to the master rib.
+					paths = append(paths, path)
+				}
 			}
 		}
 		return paths, eor, nil

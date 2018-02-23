@@ -674,30 +674,6 @@ func (server *BgpServer) notifyRecvMessageWatcher(peer *Peer, timestamp time.Tim
 	server.notifyMessageWatcher(peer, timestamp, msg, false)
 }
 
-func (server *BgpServer) RSimportPaths(peer *Peer, pathList []*table.Path) []*table.Path {
-	moded := make([]*table.Path, 0, len(pathList)/2)
-	for _, before := range pathList {
-		if isASLoop(peer, before) {
-			before.Filter(peer.ID(), table.POLICY_DIRECTION_IMPORT)
-			continue
-		}
-		after := server.policy.ApplyPolicy(peer.TableID(), table.POLICY_DIRECTION_IMPORT, before, nil)
-		if after == nil {
-			before.Filter(peer.ID(), table.POLICY_DIRECTION_IMPORT)
-		} else if after != before {
-			before.Filter(peer.ID(), table.POLICY_DIRECTION_IMPORT)
-			for _, n := range server.neighborMap {
-				if n == peer {
-					continue
-				}
-				after.Filter(n.ID(), table.POLICY_DIRECTION_IMPORT)
-			}
-			moded = append(moded, after)
-		}
-	}
-	return moded
-}
-
 func (server *BgpServer) propagateUpdate(peer *Peer, pathList []*table.Path) {
 	var dsts []*table.Destination
 
@@ -715,17 +691,15 @@ func (server *BgpServer) propagateUpdate(peer *Peer, pathList []*table.Path) {
 
 	if peer != nil && peer.isRouteServerClient() {
 		rib = server.rsRib
-		for _, path := range pathList {
-			path.Filter(peer.ID(), table.POLICY_DIRECTION_IMPORT)
-		}
-		moded := make([]*table.Path, 0)
-		for _, targetPeer := range server.neighborMap {
-			if !targetPeer.isRouteServerClient() || peer == targetPeer {
-				continue
+		for idx, path := range pathList {
+			if p := server.policy.ApplyPolicy(peer.TableID(), table.POLICY_DIRECTION_IMPORT, path, nil); p != nil {
+				path = p
+			} else {
+				path = path.Clone(true)
 			}
-			moded = append(moded, server.RSimportPaths(targetPeer, pathList)...)
+			pathList[idx] = path
 		}
-		dsts = rib.ProcessPaths(append(pathList, moded...))
+		dsts = rib.ProcessPaths(pathList)
 	} else {
 		for idx, path := range pathList {
 			var options *table.PolicyOptions
@@ -1514,36 +1488,16 @@ func (s *BgpServer) softResetIn(addr string, family bgp.RouteFamily) error {
 			families = peer.configuredRFlist()
 		}
 		for _, path := range peer.adjRibIn.PathList(families, false) {
-			exResult := path.Filtered(peer.ID())
-			path.Filter(peer.ID(), table.POLICY_DIRECTION_NONE)
-
 			// RFC4271 9.1.2 Phase 2: Route Selection
 			//
 			// If the AS_PATH attribute of a BGP route contains an AS loop, the BGP
 			// route should be excluded from the Phase 2 decision function.
-			var asLoop bool
 			if aspath := path.GetAsPath(); aspath != nil {
-				asLoop = hasOwnASLoop(peer.fsm.peerInfo.LocalAS, int(peer.fsm.pConf.AsPathOptions.Config.AllowOwnAs), aspath)
-			}
-
-			if !asLoop && s.policy.ApplyPolicy(peer.ID(), table.POLICY_DIRECTION_IN, path, nil) != nil {
-				pathList = append(pathList, path.Clone(false))
-				// this path still in rib's
-				// knownPathList. We can't
-				// drop
-				// table.POLICY_DIRECTION_IMPORT
-				// flag here. Otherwise, this
-				// path could be the old best
-				// path.
-				if peer.isRouteServerClient() {
-					path.Filter(peer.ID(), table.POLICY_DIRECTION_IMPORT)
-				}
-			} else {
-				path.Filter(peer.ID(), table.POLICY_DIRECTION_IN)
-				if exResult != table.POLICY_DIRECTION_IN {
-					pathList = append(pathList, path.Clone(true))
+				if hasOwnASLoop(peer.fsm.peerInfo.LocalAS, int(peer.fsm.pConf.AsPathOptions.Config.AllowOwnAs), aspath) {
+					continue
 				}
 			}
+			pathList = append(pathList, path.Clone(false))
 		}
 		peer.adjRibIn.RefreshAcceptedNumber(families)
 		s.propagateUpdate(peer, pathList)
@@ -1855,20 +1809,6 @@ func (server *BgpServer) addNeighbor(c *config.Neighbor) error {
 	}
 	peer := NewPeer(&server.bgpConfig.Global, c, rib, server.policy)
 	server.policy.Reset(nil, map[string]config.ApplyPolicy{peer.ID(): c.ApplyPolicy})
-	if peer.isRouteServerClient() {
-		pathList := make([]*table.Path, 0)
-		rfList := peer.configuredRFlist()
-		for _, p := range server.neighborMap {
-			if !p.isRouteServerClient() {
-				continue
-			}
-			pathList = append(pathList, p.getAccepted(rfList)...)
-		}
-		moded := server.RSimportPaths(peer, pathList)
-		if len(moded) > 0 {
-			server.rsRib.ProcessPaths(moded)
-		}
-	}
 	server.neighborMap[addr] = peer
 	if name := c.Config.PeerGroup; name != "" {
 		server.peerGroupMap[name].AddMember(*c)

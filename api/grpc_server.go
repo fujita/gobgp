@@ -388,7 +388,6 @@ func ToPathApi(path *table.Path) *Path {
 		IsWithdraw:         path.IsWithdraw,
 		Validation:         int32(path.ValidationStatus().ToInt()),
 		ValidationDetail:   NewValidationFromTableStruct(path.Validation()),
-		Filtered:           path.Filtered("") == table.POLICY_DIRECTION_IN,
 		Family:             family,
 		Stale:              path.IsStale(),
 		IsFromExternal:     path.IsFromExternal(),

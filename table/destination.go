@@ -228,6 +228,10 @@ func (dd *Destination) GetKnownPathList(id string) []*Path {
 
 func getBestPath(id string, pathList *paths) *Path {
 	for _, p := range *pathList {
+		if id != GLOBAL_RIB_NAME && p.GetSource().Address.String() == id {
+			continue
+		}
+
 		if p.Filtered(id) == POLICY_DIRECTION_NONE && !p.IsNexthopInvalid {
 			return p
 		}

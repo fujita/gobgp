@@ -806,18 +806,10 @@ func showNeighborRib(r string, name string, args []string) error {
 			switch r {
 			case CMD_ACCEPTED:
 				for _, p := range d.GetAllKnownPathList() {
-					if p.Filtered("") > table.POLICY_DIRECTION_NONE {
-						continue
-					}
 					ps = append(ps, p)
 				}
 			case CMD_REJECTED:
-				for _, p := range d.GetAllKnownPathList() {
-					if p.Filtered("") == table.POLICY_DIRECTION_NONE {
-						continue
-					}
-					ps = append(ps, p)
-				}
+				// always nothing
 			default:
 				ps = d.GetAllKnownPathList()
 			}
