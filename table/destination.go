@@ -219,6 +219,10 @@ func (dd *Destination) GetAllKnownPathList() []*Path {
 func (dd *Destination) GetKnownPathList(id string) []*Path {
 	list := make([]*Path, 0, len(dd.knownPathList))
 	for _, p := range dd.knownPathList {
+		if id != GLOBAL_RIB_NAME && p.GetSource().Address.String() == id {
+			continue
+		}
+
 		if p.Filtered(id) == POLICY_DIRECTION_NONE {
 			list = append(list, p)
 		}
