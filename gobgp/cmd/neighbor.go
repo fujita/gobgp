@@ -768,7 +768,7 @@ func showNeighborRib(r string, name string, args []string) error {
 
 	switch r {
 	case CMD_LOCAL, CMD_ADJ_IN, CMD_ACCEPTED, CMD_REJECTED, CMD_ADJ_OUT:
-		if rib.Info("").NumDestination == 0 {
+		if rib.Info("", 0).NumDestination == 0 {
 			peer, err := client.GetNeighbor(name, false)
 			if err != nil {
 				return err

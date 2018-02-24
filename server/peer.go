@@ -324,7 +324,7 @@ func (peer *Peer) filterpath(path, old *table.Path) *table.Path {
 		dst := peer.localRib.GetDestination(path)
 		path = nil
 		// we send a path even if it is not a best path
-		for _, p := range dst.GetKnownPathList(peer.TableID()) {
+		for _, p := range dst.GetKnownPathList(peer.TableID(), peer.AS()) {
 			// just take care not to send back it
 			if peer.ID() != p.GetSource().Address.String() {
 				path = p
@@ -401,9 +401,9 @@ func (peer *Peer) getBestFromLocal(rfList []bgp.RouteFamily) ([]*table.Path, []*
 	for _, family := range peer.toGlobalFamilies(rfList) {
 		pl := func() []*table.Path {
 			if peer.isAddPathSendEnabled(family) {
-				return peer.localRib.GetPathList(peer.TableID(), []bgp.RouteFamily{family})
+				return peer.localRib.GetPathList(peer.TableID(), peer.AS(), []bgp.RouteFamily{family})
 			}
-			return peer.localRib.GetBestPathList(peer.TableID(), []bgp.RouteFamily{family})
+			return peer.localRib.GetBestPathList(peer.TableID(), peer.AS(), []bgp.RouteFamily{family})
 		}()
 		for _, path := range pl {
 			if p := peer.filterpath(path, nil); p != nil {

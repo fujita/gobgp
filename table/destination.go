@@ -216,10 +216,26 @@ func (dd *Destination) GetAllKnownPathList() []*Path {
 	return dd.knownPathList
 }
 
-func (dd *Destination) GetKnownPathList(id string) []*Path {
+func rsFilter(id string, as uint32, path *Path) bool {
+	isASLoop := func(as uint32, path *Path) bool {
+		for _, v := range path.GetAsList() {
+			if as == v {
+				return true
+			}
+		}
+		return false
+	}
+
+	if id != GLOBAL_RIB_NAME && (path.GetSource().Address.String() == id || isASLoop(as, path)) {
+		return true
+	}
+	return false
+}
+
+func (dd *Destination) GetKnownPathList(id string, as uint32) []*Path {
 	list := make([]*Path, 0, len(dd.knownPathList))
 	for _, p := range dd.knownPathList {
-		if id != GLOBAL_RIB_NAME && p.GetSource().Address.String() == id {
+		if rsFilter(id, as, p) {
 			continue
 		}
 
@@ -230,9 +246,9 @@ func (dd *Destination) GetKnownPathList(id string) []*Path {
 	return list
 }
 
-func getBestPath(id string, pathList *paths) *Path {
+func getBestPath(id string, as uint32, pathList *paths) *Path {
 	for _, p := range *pathList {
-		if id != GLOBAL_RIB_NAME && p.GetSource().Address.String() == id {
+		if rsFilter(id, as, p) {
 			continue
 		}
 
@@ -243,8 +259,8 @@ func getBestPath(id string, pathList *paths) *Path {
 	return nil
 }
 
-func (dd *Destination) GetBestPath(id string) *Path {
-	return getBestPath(id, &dd.knownPathList)
+func (dd *Destination) GetBestPath(id string, as uint32) *Path {
+	return getBestPath(id, as, &dd.knownPathList)
 }
 
 func getMultiBestPath(id string, pathList *paths) []*Path {
@@ -278,10 +294,10 @@ func (dd *Destination) GetAddPathChanges(id string) []*Path {
 	return l
 }
 
-func (dd *Destination) GetChanges(id string, peerDown bool) (*Path, *Path, []*Path) {
+func (dd *Destination) GetChanges(id string, as uint32, peerDown bool) (*Path, *Path, []*Path) {
 	best, old := func(id string) (*Path, *Path) {
-		old := getBestPath(id, &dd.oldKnownPathList)
-		best := dd.GetBestPath(id)
+		old := getBestPath(id, as, &dd.oldKnownPathList)
+		best := dd.GetBestPath(id, as)
 		if best != nil && best.Equal(old) {
 			// RFC4684 3.2. Intra-AS VPN Route Distribution
 			// When processing RT membership NLRIs received from internal iBGP
@@ -1019,6 +1035,7 @@ func (dest *Destination) String() string {
 
 type DestinationSelectOption struct {
 	ID        string
+	AS        uint32
 	VRF       *Vrf
 	adj       bool
 	Best      bool
@@ -1035,6 +1052,7 @@ func (old *Destination) Select(option ...DestinationSelectOption) *Destination {
 	adj := false
 	best := false
 	mp := false
+	as := uint32(0)
 	for _, o := range option {
 		if o.ID != "" {
 			id = o.ID
@@ -1045,12 +1063,13 @@ func (old *Destination) Select(option ...DestinationSelectOption) *Destination {
 		adj = o.adj
 		best = o.Best
 		mp = o.MultiPath
+		as = o.AS
 	}
 	var paths []*Path
 	if adj {
 		paths = old.knownPathList
 	} else {
-		paths = old.GetKnownPathList(id)
+		paths = old.GetKnownPathList(id, as)
 		if vrf != nil {
 			ps := make([]*Path, 0, len(paths))
 			for _, p := range paths {

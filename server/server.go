@@ -558,7 +558,7 @@ func (server *BgpServer) notifyPostPolicyUpdateWatcher(peer *Peer, pathList []*t
 	server.notifyWatcher(WATCH_EVENT_TYPE_POST_UPDATE, ev)
 }
 
-func dstsToPaths(id string, dsts []*table.Destination, addpath bool) ([]*table.Path, []*table.Path, [][]*table.Path) {
+func dstsToPaths(id string, as uint32, dsts []*table.Destination, addpath bool) ([]*table.Path, []*table.Path, [][]*table.Path) {
 	if table.SelectionOptions.DisableBestPathSelection {
 		// Note: If best path selection disabled, there is no best path.
 		return nil, nil, nil
@@ -571,7 +571,7 @@ func dstsToPaths(id string, dsts []*table.Destination, addpath bool) ([]*table.P
 		if addpath {
 			bestList = append(bestList, dst.GetAddPathChanges(id)...)
 		} else {
-			best, old, mpath := dst.GetChanges(id, false)
+			best, old, mpath := dst.GetChanges(id, as, false)
 			bestList = append(bestList, best)
 			oldList = append(oldList, old)
 			if mpath != nil {
@@ -596,7 +596,7 @@ func (server *BgpServer) dropPeerAllRoutes(peer *Peer, families []bgp.RouteFamil
 	for _, rf := range families {
 		dsts := rib.DeletePathsByPeer(peer.fsm.peerInfo, rf)
 		if !peer.isRouteServerClient() {
-			gBestList, _, mpathList = dstsToPaths(table.GLOBAL_RIB_NAME, dsts, false)
+			gBestList, _, mpathList = dstsToPaths(table.GLOBAL_RIB_NAME, 0, dsts, false)
 			server.notifyBestWatcher(gBestList, mpathList)
 		}
 
@@ -605,9 +605,9 @@ func (server *BgpServer) dropPeerAllRoutes(peer *Peer, families []bgp.RouteFamil
 				continue
 			}
 			if targetPeer.isAddPathSendEnabled(rf) {
-				bestList, _, _ = dstsToPaths(targetPeer.TableID(), dsts, true)
+				bestList, _, _ = dstsToPaths(targetPeer.TableID(), targetPeer.AS(), dsts, true)
 			} else if targetPeer.isRouteServerClient() {
-				bestList, _, _ = dstsToPaths(targetPeer.TableID(), dsts, false)
+				bestList, _, _ = dstsToPaths(targetPeer.TableID(), targetPeer.AS(), dsts, false)
 			} else {
 				bestList = gBestList
 			}
@@ -739,7 +739,7 @@ func (server *BgpServer) propagateUpdate(peer *Peer, pathList []*table.Path) {
 				if path.IsWithdraw {
 					candidates, _ = peer.getBestFromLocal(peer.configuredRFlist())
 				} else {
-					candidates = rib.GetBestPathList(peer.TableID(), fs)
+					candidates = rib.GetBestPathList(peer.TableID(), 0, fs)
 				}
 				paths := make([]*table.Path, 0, len(candidates))
 				for _, p := range candidates {
@@ -764,7 +764,7 @@ func (server *BgpServer) propagateUpdate(peer *Peer, pathList []*table.Path) {
 		server.notifyPostPolicyUpdateWatcher(peer, pathList)
 		dsts = rib.ProcessPaths(pathList)
 
-		gBestList, gOldList, mpathList = dstsToPaths(table.GLOBAL_RIB_NAME, dsts, false)
+		gBestList, gOldList, mpathList = dstsToPaths(table.GLOBAL_RIB_NAME, 0, dsts, false)
 		server.notifyBestWatcher(gBestList, mpathList)
 	}
 
@@ -792,9 +792,9 @@ func (server *BgpServer) propagateUpdateToNeighbors(peer *Peer, dsts []*table.De
 				continue
 			}
 			if targetPeer.isAddPathSendEnabled(family) {
-				bestList, oldList, _ = dstsToPaths(targetPeer.TableID(), l, true)
+				bestList, oldList, _ = dstsToPaths(targetPeer.TableID(), targetPeer.AS(), l, true)
 			} else if targetPeer.isRouteServerClient() {
-				bestList, oldList, _ = dstsToPaths(targetPeer.TableID(), l, false)
+				bestList, oldList, _ = dstsToPaths(targetPeer.TableID(), targetPeer.AS(), l, false)
 			} else {
 				bestList = gBestList
 				oldList = gOldList
@@ -1280,7 +1280,7 @@ func (server *BgpServer) fixupApiPath(vrfId string, pathList []*table.Path) erro
 			switch r := nlri.RouteTypeData.(type) {
 			case *bgp.EVPNMacIPAdvertisementRoute:
 				// MAC Mobility Extended Community
-				paths := server.globalRib.GetBestPathList(table.GLOBAL_RIB_NAME, []bgp.RouteFamily{bgp.RF_EVPN})
+				paths := server.globalRib.GetBestPathList(table.GLOBAL_RIB_NAME, 0, []bgp.RouteFamily{bgp.RF_EVPN})
 				if m := getMacMobilityExtendedCommunity(r.ETag, r.MacAddress, paths); m != nil {
 					path.SetExtCommunities([]bgp.ExtendedCommunityInterface{m}, false)
 				}
@@ -1334,7 +1334,7 @@ func (s *BgpServer) DeletePath(uuid []byte, f bgp.RouteFamily, vrfId string, pat
 		if len(uuid) > 0 {
 			// Delete locally generated path which has the given UUID
 			path := func() *table.Path {
-				for _, path := range s.globalRib.GetPathList(table.GLOBAL_RIB_NAME, s.globalRib.GetRFlist()) {
+				for _, path := range s.globalRib.GetPathList(table.GLOBAL_RIB_NAME, 0, s.globalRib.GetRFlist()) {
 					if path.IsLocal() && len(path.UUID()) > 0 && bytes.Equal(path.UUID().Bytes(), uuid) {
 						return path
 					}
@@ -1351,7 +1351,7 @@ func (s *BgpServer) DeletePath(uuid []byte, f bgp.RouteFamily, vrfId string, pat
 			if f != 0 {
 				families = []bgp.RouteFamily{f}
 			}
-			for _, path := range s.globalRib.GetPathList(table.GLOBAL_RIB_NAME, families) {
+			for _, path := range s.globalRib.GetPathList(table.GLOBAL_RIB_NAME, 0, families) {
 				if path.IsLocal() {
 					deletePathList = append(deletePathList, path.Clone(true))
 				}
@@ -1373,7 +1373,7 @@ func (s *BgpServer) UpdatePath(vrfId string, pathList []*table.Path) error {
 			return err
 		}
 		dsts := s.globalRib.ProcessPaths(pathList)
-		gBestList, gOldList, gMPathList := dstsToPaths(table.GLOBAL_RIB_NAME, dsts, false)
+		gBestList, gOldList, gMPathList := dstsToPaths(table.GLOBAL_RIB_NAME, 0, dsts, false)
 		s.notifyBestWatcher(gBestList, gMPathList)
 		s.propagateUpdateToNeighbors(nil, dsts, gBestList, gOldList)
 		return nil
@@ -1648,6 +1648,7 @@ func (s *BgpServer) GetAdjRib(addr string, family bgp.RouteFamily, in bool, pref
 			return fmt.Errorf("Neighbor that has %v doesn't exist.", addr)
 		}
 		id := peer.ID()
+		as := peer.AS()
 
 		var adjRib *table.AdjRib
 		if in {
@@ -1657,7 +1658,7 @@ func (s *BgpServer) GetAdjRib(addr string, family bgp.RouteFamily, in bool, pref
 			accepted, _ := peer.getBestFromLocal(peer.configuredRFlist())
 			adjRib.Update(accepted)
 		}
-		rib, err = adjRib.Select(family, false, table.TableSelectOption{ID: id, LookupPrefixes: prefixes})
+		rib, err = adjRib.Select(family, false, table.TableSelectOption{ID: id, AS: as, LookupPrefixes: prefixes})
 		return err
 	}, true)
 	return
@@ -1667,6 +1668,7 @@ func (s *BgpServer) GetRibInfo(addr string, family bgp.RouteFamily) (info *table
 	err = s.mgmtOperation(func() error {
 		m := s.globalRib
 		id := table.GLOBAL_RIB_NAME
+		as := uint32(0)
 		if len(addr) > 0 {
 			peer, ok := s.neighborMap[addr]
 			if !ok {
@@ -1676,9 +1678,10 @@ func (s *BgpServer) GetRibInfo(addr string, family bgp.RouteFamily) (info *table
 				return fmt.Errorf("Neighbor %v doesn't have local rib", addr)
 			}
 			id = peer.ID()
+			as = peer.AS()
 			m = s.rsRib
 		}
-		info, err = m.TableInfo(id, family)
+		info, err = m.TableInfo(id, as, family)
 		return err
 	}, true)
 	return
@@ -2530,6 +2533,7 @@ func (w *Watcher) Generate(t WatchEventType) error {
 			w.notify(&WatchEventAdjIn{PathList: clonePathList(pathList)})
 		case WATCH_EVENT_TYPE_TABLE:
 			rib := w.s.globalRib
+			as := uint32(0)
 			id := table.GLOBAL_RIB_NAME
 			if len(w.opts.tableName) > 0 {
 				peer, ok := w.s.neighborMap[w.opts.tableName]
@@ -2540,6 +2544,7 @@ func (w *Watcher) Generate(t WatchEventType) error {
 					return fmt.Errorf("Neighbor %v doesn't have local rib", w.opts.tableName)
 				}
 				id = peer.ID()
+				as = peer.AS()
 				rib = w.s.rsRib
 			}
 
@@ -2547,7 +2552,7 @@ func (w *Watcher) Generate(t WatchEventType) error {
 				pathList := make(map[string][]*table.Path)
 				for _, t := range rib.Tables {
 					for _, dst := range t.GetSortedDestinations() {
-						if paths := dst.GetKnownPathList(id); len(paths) > 0 {
+						if paths := dst.GetKnownPathList(id, as); len(paths) > 0 {
 							pathList[dst.GetNlri().String()] = clonePathList(paths)
 						}
 					}
@@ -2651,7 +2656,7 @@ func (s *BgpServer) Watch(opts ...WatchOption) (w *Watcher) {
 		}
 		if w.opts.initBest && s.active() == nil {
 			w.notify(&WatchEventBestPath{
-				PathList:      s.globalRib.GetBestPathList(table.GLOBAL_RIB_NAME, nil),
+				PathList:      s.globalRib.GetBestPathList(table.GLOBAL_RIB_NAME, 0, nil),
 				MultiPathList: s.globalRib.GetBestMultiPathList(table.GLOBAL_RIB_NAME, nil),
 			})
 		}
@@ -2706,7 +2711,7 @@ func (s *BgpServer) Watch(opts ...WatchOption) (w *Watcher) {
 					continue
 				}
 				pathsByPeer := make(map[*table.PeerInfo][]*table.Path)
-				for _, path := range s.globalRib.GetPathList(table.GLOBAL_RIB_NAME, []bgp.RouteFamily{rf}) {
+				for _, path := range s.globalRib.GetPathList(table.GLOBAL_RIB_NAME, 0, []bgp.RouteFamily{rf}) {
 					pathsByPeer[path.GetSource()] = append(pathsByPeer[path.GetSource()], path)
 				}
 				for peerInfo, paths := range pathsByPeer {
