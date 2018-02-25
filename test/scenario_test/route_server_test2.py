@@ -81,6 +81,7 @@ class GoBGPTestBase(unittest.TestCase):
 
     def test_03_check_neighbor_rib(self):
         rib = self.gobgp.get_local_rib(self.clients['e2'])
+        print "result ", len(rib)
         self.assertTrue(len(rib) == 1)
         self.assertTrue(len(rib[0]['paths']) == 1)
         path = rib[0]['paths'][0]
