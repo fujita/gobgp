@@ -238,10 +238,7 @@ func (dd *Destination) GetKnownPathList(id string, as uint32) []*Path {
 		if rsFilter(id, as, p) {
 			continue
 		}
-
-		if p.Filtered(id) == POLICY_DIRECTION_NONE {
-			list = append(list, p)
-		}
+		list = append(list, p)
 	}
 	return list
 }
@@ -252,7 +249,7 @@ func getBestPath(id string, as uint32, pathList *paths) *Path {
 			continue
 		}
 
-		if p.Filtered(id) == POLICY_DIRECTION_NONE && !p.IsNexthopInvalid {
+		if !p.IsNexthopInvalid {
 			return p
 		}
 	}
@@ -267,7 +264,7 @@ func getMultiBestPath(id string, pathList *paths) []*Path {
 	list := make([]*Path, 0, len(*pathList))
 	var best *Path
 	for _, p := range *pathList {
-		if p.Filtered(id) == POLICY_DIRECTION_NONE && !p.IsNexthopInvalid {
+		if !p.IsNexthopInvalid {
 			if best == nil {
 				best = p
 				list = append(list, p)
@@ -1103,7 +1100,6 @@ func (old *Destination) Select(option ...DestinationSelectOption) *Destination {
 	new := NewDestination(old.nlri, 0)
 	for _, path := range paths {
 		p := path.Clone(path.IsWithdraw)
-		p.Filter("", path.Filtered(id))
 		new.knownPathList = append(new.knownPathList, p)
 	}
 	return new

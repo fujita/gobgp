@@ -66,47 +66,6 @@ func TestDestinationGetNlri(t *testing.T) {
 	assert.Equal(t, r_nlri, nlri)
 }
 
-func TestCalculate(t *testing.T) {
-	origin := bgp.NewPathAttributeOrigin(0)
-	aspathParam := []bgp.AsPathParamInterface{bgp.NewAs4PathParam(2, []uint32{65001})}
-	aspath := bgp.NewPathAttributeAsPath(aspathParam)
-	nexthop := bgp.NewPathAttributeNextHop("10.0.0.1")
-	med := bgp.NewPathAttributeMultiExitDisc(0)
-	pathAttributes := []bgp.PathAttributeInterface{origin, aspath, nexthop, med}
-	nlri := bgp.NewIPAddrPrefix(24, "10.10.0.101")
-	updateMsg := bgp.NewBGPUpdateMessage(nil, pathAttributes, []*bgp.IPAddrPrefix{nlri})
-	peer1 := &PeerInfo{AS: 1, Address: net.IP{1, 1, 1, 1}}
-	path1 := ProcessMessage(updateMsg, peer1, time.Now())[0]
-	path1.Filter("1", POLICY_DIRECTION_IMPORT)
-
-	action := &AsPathPrependAction{
-		asn:    100,
-		repeat: 10,
-	}
-
-	path2 := action.Apply(path1.Clone(false), nil)
-	path1.Filter("2", POLICY_DIRECTION_IMPORT)
-	path2.Filter("1", POLICY_DIRECTION_IMPORT)
-
-	d := NewDestination(nlri, 0)
-	d.AddNewPath(path1)
-	d.AddNewPath(path2)
-
-	d.Calculate()
-
-	assert.Equal(t, len(d.GetKnownPathList("1", 0)), 0)
-	assert.Equal(t, len(d.GetKnownPathList("2", 0)), 1)
-	assert.Equal(t, len(d.knownPathList), 2)
-
-	d.AddWithdraw(path1.Clone(true))
-
-	d.Calculate()
-
-	assert.Equal(t, len(d.GetKnownPathList("1", 0)), 0)
-	assert.Equal(t, len(d.GetKnownPathList("2", 0)), 0)
-	assert.Equal(t, len(d.knownPathList), 0)
-}
-
 func TestCalculate2(t *testing.T) {
 
 	origin := bgp.NewPathAttributeOrigin(0)
@@ -160,63 +119,6 @@ func TestCalculate2(t *testing.T) {
 
 	// we must have paths from peer1, peer2 and peer3
 	assert.Equal(t, len(d.knownPathList), 3)
-}
-
-func TestImplicitWithdrawCalculate(t *testing.T) {
-	origin := bgp.NewPathAttributeOrigin(0)
-	aspathParam := []bgp.AsPathParamInterface{bgp.NewAs4PathParam(2, []uint32{65001})}
-	aspath := bgp.NewPathAttributeAsPath(aspathParam)
-	nexthop := bgp.NewPathAttributeNextHop("10.0.0.1")
-	med := bgp.NewPathAttributeMultiExitDisc(0)
-	pathAttributes := []bgp.PathAttributeInterface{origin, aspath, nexthop, med}
-	nlri := bgp.NewIPAddrPrefix(24, "10.10.0.101")
-	updateMsg := bgp.NewBGPUpdateMessage(nil, pathAttributes, []*bgp.IPAddrPrefix{nlri})
-	peer1 := &PeerInfo{AS: 1, Address: net.IP{1, 1, 1, 1}}
-	path1 := ProcessMessage(updateMsg, peer1, time.Now())[0]
-	path1.Filter("1", POLICY_DIRECTION_IMPORT)
-
-	// suppose peer2 has import policy to prepend as-path
-	action := &AsPathPrependAction{
-		asn:    100,
-		repeat: 1,
-	}
-
-	path2 := action.Apply(path1.Clone(false), nil)
-	path1.Filter("2", POLICY_DIRECTION_IMPORT)
-	path2.Filter("1", POLICY_DIRECTION_IMPORT)
-	path2.Filter("3", POLICY_DIRECTION_IMPORT)
-
-	d := NewDestination(nlri, 0)
-	d.AddNewPath(path1)
-	d.AddNewPath(path2)
-
-	d.Calculate()
-
-	assert.Equal(t, len(d.GetKnownPathList("1", 0)), 0) // peer "1" is the originator
-	assert.Equal(t, len(d.GetKnownPathList("2", 0)), 1)
-	assert.Equal(t, d.GetKnownPathList("2", 0)[0].GetAsString(), "100 65001") // peer "2" has modified path {100, 65001}
-	assert.Equal(t, len(d.GetKnownPathList("3", 0)), 1)
-	assert.Equal(t, d.GetKnownPathList("3", 0)[0].GetAsString(), "65001") // peer "3" has original path {65001}
-	assert.Equal(t, len(d.knownPathList), 2)
-
-	// say, we removed peer2's import policy and
-	// peer1 advertised new path with the same prefix
-	aspathParam = []bgp.AsPathParamInterface{bgp.NewAs4PathParam(2, []uint32{65001, 65002})}
-	aspath = bgp.NewPathAttributeAsPath(aspathParam)
-	pathAttributes = []bgp.PathAttributeInterface{origin, aspath, nexthop, med}
-	updateMsg = bgp.NewBGPUpdateMessage(nil, pathAttributes, []*bgp.IPAddrPrefix{nlri})
-	path3 := ProcessMessage(updateMsg, peer1, time.Now())[0]
-	path3.Filter("1", POLICY_DIRECTION_IMPORT)
-
-	d.AddNewPath(path3)
-	d.Calculate()
-
-	assert.Equal(t, len(d.GetKnownPathList("1", 0)), 0) // peer "1" is the originator
-	assert.Equal(t, len(d.GetKnownPathList("2", 0)), 1)
-	assert.Equal(t, d.GetKnownPathList("2", 0)[0].GetAsString(), "65001 65002") // peer "2" has new original path {65001, 65002}
-	assert.Equal(t, len(d.GetKnownPathList("3", 0)), 1)
-	assert.Equal(t, d.GetKnownPathList("3", 0)[0].GetAsString(), "65001 65002") // peer "3" has new original path {65001, 65002}
-	assert.Equal(t, len(d.knownPathList), 1)
 }
 
 func TestMedTieBreaker(t *testing.T) {
