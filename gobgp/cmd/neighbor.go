@@ -863,8 +863,6 @@ func showNeighborPolicy(remoteIP, policyType string, indent int) error {
 	var err error
 
 	switch strings.ToLower(policyType) {
-	case "in":
-		assignment, err = client.GetRouteServerInPolicy(remoteIP)
 	case "import":
 		assignment, err = client.GetRouteServerImportPolicy(remoteIP)
 	case "export":
@@ -917,8 +915,6 @@ func modNeighborPolicy(remoteIP, policyType, cmdType string, args []string) erro
 		Name: remoteIP,
 	}
 	switch strings.ToLower(policyType) {
-	case "in":
-		assign.Type = table.POLICY_DIRECTION_IN
 	case "import":
 		assign.Type = table.POLICY_DIRECTION_IMPORT
 	case "export":
