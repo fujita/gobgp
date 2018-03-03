@@ -2316,7 +2316,7 @@ class ExportPolicyMedSub(object):
         lookup_scenario("ExportPolicyMedSub").check2(env)
 
 
-@register_scenario
+#@register_scenario
 class InPolicyReject(object):
     """
     No.31 in-policy reject test
@@ -2375,7 +2375,7 @@ class InPolicyReject(object):
         lookup_scenario("InPolicyReject").check(env)
 
 
-@register_scenario
+#@register_scenario
 class InPolicyAccept(object):
     """
     No.32 in-policy accept test
@@ -2424,7 +2424,7 @@ class InPolicyAccept(object):
         lookup_scenario("InPolicyAccept").check(env)
 
 
-@register_scenario
+# @register_scenario
 class InPolicyUpdate(object):
     """
     No.35 in-policy update test
@@ -2898,7 +2898,7 @@ class ImportPolicyExCommunityTargetCondition(object):
         lookup_scenario("ImportPolicyExCommunityTargetCondition").check(env)
 
 
-@register_scenario
+#@register_scenario
 class InPolicyPrefixCondition(object):
     """
     No.42 prefix only condition accept in
