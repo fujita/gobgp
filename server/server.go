@@ -1785,6 +1785,18 @@ func (s *BgpServer) SoftReset(addr string, family bgp.RouteFamily) error {
 	}, true)
 }
 
+func (s *BgpServer) validateTable(r *table.Table) (v []*table.Validation) {
+	if s.roaManager.enabled() {
+		v := make([]*table.Validation, 0, len(r.GetDestinations()))
+		for _, d := range r.GetDestinations() {
+			for _, p := range d.GetAllKnownPathList() {
+				v = append(v, s.roaManager.validate(p))
+			}
+		}
+	}
+	return
+}
+
 func (s *BgpServer) GetRib(addr string, family bgp.RouteFamily, prefixes []*table.LookupPrefix) (rib *table.Table, v []*table.Validation, err error) {
 	err = s.mgmtOperation(func() error {
 		m := s.globalRib
@@ -1808,14 +1820,7 @@ func (s *BgpServer) GetRib(addr string, family bgp.RouteFamily, prefixes []*tabl
 			return fmt.Errorf("address family: %s not supported", af)
 		}
 		rib, err = tbl.Select(table.TableSelectOption{ID: id, AS: as, LookupPrefixes: prefixes})
-		if s.roaManager.enabled() {
-			v := make([]*table.Validation, 0, len(rib.GetDestinations()))
-			for _, d := range rib.GetDestinations() {
-				for _, p := range d.GetAllKnownPathList() {
-					v = append(v, s.roaManager.validate(p))
-				}
-			}
-		}
+		v = s.validateTable(rib)
 		return err
 	}, true)
 	return
@@ -1847,7 +1852,7 @@ func (s *BgpServer) GetVrfRib(name string, family bgp.RouteFamily, prefixes []*t
 	return
 }
 
-func (s *BgpServer) GetAdjRib(addr string, family bgp.RouteFamily, in bool, prefixes []*table.LookupPrefix) (rib *table.Table, err error) {
+func (s *BgpServer) GetAdjRib(addr string, family bgp.RouteFamily, in bool, prefixes []*table.LookupPrefix) (rib *table.Table, v []*table.Validation, err error) {
 	err = s.mgmtOperation(func() error {
 		peer, ok := s.neighborMap[addr]
 		if !ok {
@@ -1865,6 +1870,7 @@ func (s *BgpServer) GetAdjRib(addr string, family bgp.RouteFamily, in bool, pref
 			adjRib.Update(accepted)
 		}
 		rib, err = adjRib.Select(family, false, table.TableSelectOption{ID: id, AS: as, LookupPrefixes: prefixes})
+		v = s.validateTable(rib)
 		return err
 	}, true)
 	return

@@ -452,7 +452,7 @@ func (s *Server) GetRib(ctx context.Context, arg *GetRibRequest) (*GetRibRespons
 		in = true
 		fallthrough
 	case Resource_ADJ_OUT:
-		tbl, err = s.bgpServer.GetAdjRib(arg.Table.Name, family, in, f())
+		tbl, v, err = s.bgpServer.GetAdjRib(arg.Table.Name, family, in, f())
 	case Resource_VRF:
 		tbl, err = s.bgpServer.GetVrfRib(arg.Table.Name, family, []*table.LookupPrefix{})
 	default:
@@ -473,7 +473,7 @@ func (s *Server) GetRib(ctx context.Context, arg *GetRibRequest) (*GetRibRespons
 				l := make([]*Path, 0, len(paths))
 				for i, p := range paths {
 					pp := ToPathApi(p, getValidation(v, idx))
-					idx += 1
+					idx++
 					switch arg.Table.Type {
 					case Resource_LOCAL, Resource_GLOBAL:
 						if i == 0 && !table.SelectionOptions.DisableBestPathSelection {
@@ -518,7 +518,7 @@ func (s *Server) GetPath(arg *GetPathRequest, stream GobgpApi_GetPathServer) err
 		in = true
 		fallthrough
 	case Resource_ADJ_OUT:
-		tbl, err = s.bgpServer.GetAdjRib(arg.Name, family, in, f())
+		tbl, v, err = s.bgpServer.GetAdjRib(arg.Name, family, in, f())
 	case Resource_VRF:
 		tbl, err = s.bgpServer.GetVrfRib(arg.Name, family, []*table.LookupPrefix{})
 	default:
@@ -533,7 +533,7 @@ func (s *Server) GetPath(arg *GetPathRequest, stream GobgpApi_GetPathServer) err
 		for _, dst := range tbl.GetDestinations() {
 			for i, path := range dst.GetAllKnownPathList() {
 				p := ToPathApi(path, getValidation(v, idx))
-				idx += 1
+				idx++
 				if i == 0 && !table.SelectionOptions.DisableBestPathSelection {
 					switch arg.Type {
 					case Resource_LOCAL, Resource_GLOBAL:
