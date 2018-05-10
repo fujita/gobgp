@@ -112,6 +112,10 @@ func NewROAManager(as uint32) (*roaManager, error) {
 	return m, nil
 }
 
+func (c *roaManager) enabled() bool {
+	return len(c.clientMap) != 0
+}
+
 func (m *roaManager) SetAS(as uint32) error {
 	if m.AS != 0 {
 		return fmt.Errorf("AS was already configured")

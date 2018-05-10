@@ -162,7 +162,7 @@ func TestMonitor(test *testing.T) {
 	}
 	for {
 		// Waits for the initial route will be advertised.
-		rib, err := s.GetRib("", bgp.RF_IPv4_UC, nil)
+		rib, _, err := s.GetRib("", bgp.RF_IPv4_UC, nil)
 		if err != nil {
 			log.Fatal(err)
 		}

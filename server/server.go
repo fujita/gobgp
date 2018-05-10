@@ -1785,7 +1785,7 @@ func (s *BgpServer) SoftReset(addr string, family bgp.RouteFamily) error {
 	}, true)
 }
 
-func (s *BgpServer) GetRib(addr string, family bgp.RouteFamily, prefixes []*table.LookupPrefix) (rib *table.Table, err error) {
+func (s *BgpServer) GetRib(addr string, family bgp.RouteFamily, prefixes []*table.LookupPrefix) (rib *table.Table, v []*table.Validation, err error) {
 	err = s.mgmtOperation(func() error {
 		m := s.globalRib
 		id := table.GLOBAL_RIB_NAME
@@ -1808,6 +1808,14 @@ func (s *BgpServer) GetRib(addr string, family bgp.RouteFamily, prefixes []*tabl
 			return fmt.Errorf("address family: %s not supported", af)
 		}
 		rib, err = tbl.Select(table.TableSelectOption{ID: id, AS: as, LookupPrefixes: prefixes})
+		if s.roaManager.enabled() {
+			v := make([]*table.Validation, 0, len(rib.GetDestinations()))
+			for _, d := range rib.GetDestinations() {
+				for _, p := range d.GetAllKnownPathList() {
+					v = append(v, s.roaManager.validate(p))
+				}
+			}
+		}
 		return err
 	}, true)
 	return
