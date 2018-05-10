@@ -407,7 +407,8 @@ func TestFilterpathWithRejectPolicy(t *testing.T) {
 		path1 := table.NewPath(pi1, nlri, false, pa1, time.Now(), false)
 		new, old := process(rib2, []*table.Path{path1})
 		assert.Equal(t, new, path1)
-		path2 := p2.filterpath(new, old)
+		s := NewBgpServer()
+		path2 := s.filterpath(p2, new, old)
 		if addCommunity {
 			assert.True(t, path2.IsWithdraw)
 		} else {

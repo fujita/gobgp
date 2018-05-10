@@ -863,7 +863,7 @@ func (s *Server) DeleteBmp(ctx context.Context, arg *DeleteBmpRequest) (*DeleteB
 }
 
 func (s *Server) ValidateRib(ctx context.Context, arg *ValidateRibRequest) (*ValidateRibResponse, error) {
-	return &ValidateRibResponse{}, s.bgpServer.ValidateRib(arg.Prefix)
+	return &ValidateRibResponse{}, nil
 }
 
 func (s *Server) AddRpki(ctx context.Context, arg *AddRpkiRequest) (*AddRpkiResponse, error) {
