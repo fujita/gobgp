@@ -1209,6 +1209,8 @@ func TestParseBogusShortData(t *testing.T) {
 func TestFuzzCrashers(t *testing.T) {
 	var crashers = []string{
 		"000000000000000000\x01",
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xb6\xff\xff\xff\f\xff�\x01\xff" +
+			"\xff\xff\xff\xff\x13\x00\xff\xffa\x02",
 	}
 
 	for _, f := range crashers {
