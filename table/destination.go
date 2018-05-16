@@ -1014,7 +1014,7 @@ func (d *Destination) Select(option ...DestinationSelectOption) *Destination {
 	}
 	var paths []*Path
 	if adj != nil {
-		paths = make([]*Path, len(d.adjInPathList))
+		paths = make([]*Path, 0, len(d.adjInPathList))
 		for _, p := range d.adjInPathList {
 			if p.GetSource() == adj {
 				paths = append(paths, p)

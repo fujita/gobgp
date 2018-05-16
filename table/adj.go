@@ -21,26 +21,24 @@ import (
 	"github.com/osrg/gobgp/packet/bgp"
 )
 
-type ribState struct {
-	accepted int
-	count    int
-}
-
 type AdjRib struct {
-	state        map[bgp.RouteFamily]ribState
 	tableManager *TableManager
 	pInfo        *PeerInfo
+	count        map[bgp.RouteFamily]int
+	accepted     map[bgp.RouteFamily]int
 }
 
 func NewAdjRib(t *TableManager, pi *PeerInfo, rfList []bgp.RouteFamily) *AdjRib {
-	table := make(map[bgp.RouteFamily]map[string]*Path)
-	for _, rf := range rfList {
-		table[rf] = make(map[string]*Path)
+	for _, family := range rfList {
+		if _, ok := t.Tables[family]; !ok {
+			t.Tables[family] = NewTable(family)
+		}
 	}
 	return &AdjRib{
-		pInfo:        pi,
 		tableManager: t,
-		state:        make(map[bgp.RouteFamily]ribState),
+		pInfo:        pi,
+		count:        make(map[bgp.RouteFamily]int),
+		accepted:     make(map[bgp.RouteFamily]int),
 	}
 }
 
@@ -48,7 +46,7 @@ func (a *AdjRib) Update(newPath *Path) {
 	t := a.tableManager.Tables[newPath.GetRouteFamily()]
 	d := t.getOrCreateDest(newPath.GetNlri())
 	old := d.updateAdjIn(newPath)
-	s := a.state[newPath.GetRouteFamily()]
+	family := newPath.GetRouteFamily()
 	if newPath.IsWithdraw {
 		if old != nil {
 			a.dropPath(old)
@@ -56,14 +54,14 @@ func (a *AdjRib) Update(newPath *Path) {
 	} else {
 		if old != nil {
 			if old.IsAsLooped() && !newPath.IsLLGRStale() {
-				s.accepted++
+				a.accepted[family]++
 			} else if !old.IsAsLooped() && newPath.IsLLGRStale() {
-				s.accepted--
+				a.accepted[family]--
 			}
 		} else {
-			s.count++
+			a.count[family]++
 			if !newPath.IsAsLooped() {
-				s.accepted++
+				a.accepted[family]++
 			}
 		}
 	}
@@ -94,29 +92,25 @@ func (a *AdjRib) PathList(rfList []bgp.RouteFamily, accepted bool) []*Path {
 
 func (a *AdjRib) Count(rfList []bgp.RouteFamily) int {
 	count := 0
-	for _, rf := range rfList {
-		if _, ok := a.state[rf]; ok {
-			count += a.state[rf].count
-		}
+	for _, f := range rfList {
+		count += a.count[f]
 	}
 	return count
 }
 
 func (a *AdjRib) Accepted(rfList []bgp.RouteFamily) int {
 	accepted := 0
-	for _, rf := range rfList {
-		if _, ok := a.state[rf]; ok {
-			accepted += a.state[rf].accepted
-		}
+	for _, f := range rfList {
+		accepted += a.accepted[f]
 	}
 	return accepted
 }
 
 func (a *AdjRib) dropPath(path *Path) {
-	s := a.state[path.GetRouteFamily()]
-	s.count--
+	f := path.GetRouteFamily()
+	a.count[f]--
 	if !path.IsAsLooped() {
-		s.accepted--
+		a.accepted[f]--
 	}
 }
 
@@ -175,13 +169,13 @@ func (a *AdjRib) Select(family bgp.RouteFamily, accepted bool, option ...TableSe
 }
 
 func (a *AdjRib) TableInfo(family bgp.RouteFamily) (*TableInfo, error) {
-	if s, ok := a.state[family]; !ok {
+	if _, ok := a.tableManager.Tables[family]; !ok {
 		return nil, fmt.Errorf("%s unsupported", family)
 	} else {
 		return &TableInfo{
-			NumDestination: s.count,
-			NumPath:        s.count,
-			NumAccepted:    s.accepted,
+			NumDestination: a.count[family],
+			NumPath:        a.count[family],
+			NumAccepted:    a.accepted[family],
 		}, nil
 	}
 }
