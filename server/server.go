@@ -1689,25 +1689,11 @@ func (s *BgpServer) softResetIn(addr string, family bgp.RouteFamily) error {
 		return err
 	}
 	for _, peer := range peers {
-		pathList := []*table.Path{}
 		families := []bgp.RouteFamily{family}
 		if family == bgp.RouteFamily(0) {
 			families = peer.configuredRFlist()
 		}
-		for _, path := range peer.adjRibIn.PathList(families, false) {
-			// RFC4271 9.1.2 Phase 2: Route Selection
-			//
-			// If the AS_PATH attribute of a BGP route contains an AS loop, the BGP
-			// route should be excluded from the Phase 2 decision function.
-			if aspath := path.GetAsPath(); aspath != nil {
-				if hasOwnASLoop(peer.fsm.peerInfo.LocalAS, int(peer.fsm.pConf.AsPathOptions.Config.AllowOwnAs), aspath) {
-					continue
-				}
-			}
-			pathList = append(pathList, path.Clone(false))
-		}
-		peer.adjRibIn.RefreshAcceptedNumber(families)
-		s.propagateUpdate(peer, pathList)
+		s.propagateUpdate(peer, peer.adjRibIn.PathList(families, true))
 	}
 	return err
 }
@@ -1876,9 +1862,11 @@ func (s *BgpServer) GetAdjRib(addr string, family bgp.RouteFamily, in bool, pref
 		if in {
 			adjRib = peer.adjRibIn
 		} else {
-			adjRib = table.NewAdjRib(id, peer.configuredRFlist())
+			adjRib = table.NewAdjRib(peer.localRib, peer.fsm.peerInfo, peer.configuredRFlist())
 			accepted, _ := s.getBestFromLocal(peer, peer.configuredRFlist())
-			adjRib.Update(accepted)
+			for _, p := range accepted {
+				adjRib.Update(p)
+			}
 		}
 		rib, err = adjRib.Select(family, false, table.TableSelectOption{ID: id, AS: as, LookupPrefixes: prefixes})
 		v = s.validateTable(rib)
@@ -1921,9 +1909,11 @@ func (s *BgpServer) GetAdjRibInfo(addr string, family bgp.RouteFamily, in bool) 
 		if in {
 			adjRib = peer.adjRibIn
 		} else {
-			adjRib = table.NewAdjRib(peer.ID(), peer.configuredRFlist())
+			adjRib = table.NewAdjRib(peer.localRib, peer.fsm.peerInfo, peer.configuredRFlist())
 			accepted, _ := s.getBestFromLocal(peer, peer.configuredRFlist())
-			adjRib.Update(accepted)
+			for _, p := range accepted {
+				adjRib.Update(p)
+			}
 		}
 		info, err = adjRib.TableInfo(family)
 		return err

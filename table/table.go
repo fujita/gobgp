@@ -45,7 +45,7 @@ type TableSelectOption struct {
 	AS             uint32
 	LookupPrefixes []*LookupPrefix
 	VRF            *Vrf
-	adj            bool
+	adj            *PeerInfo
 	Best           bool
 	MultiPath      bool
 }
@@ -341,7 +341,7 @@ func (t *Table) GetKnownPathList(id string, as uint32) []*Path {
 func (t *Table) Select(option ...TableSelectOption) (*Table, error) {
 	id := GLOBAL_RIB_NAME
 	var vrf *Vrf
-	adj := false
+	var adj *PeerInfo
 	prefixes := make([]*LookupPrefix, 0, len(option))
 	best := false
 	mp := false

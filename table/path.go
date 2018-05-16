@@ -96,6 +96,7 @@ type originInfo struct {
 	isFromExternal     bool
 	eor                bool
 	stale              bool
+	asLoop             bool
 }
 
 type RpkiValidationReasonType string
@@ -345,6 +346,14 @@ func (path *Path) root() *Path {
 
 func (path *Path) OriginInfo() *originInfo {
 	return path.root().info
+}
+
+func (path *Path) IsAsLooped() bool {
+	return path.OriginInfo().asLoop
+}
+
+func (path *Path) SetAsLooped(y bool) {
+	path.OriginInfo().asLoop = y
 }
 
 func (path *Path) NoImplicitWithdraw() bool {

@@ -168,6 +168,7 @@ func NewPeerInfo(g *config.Global, p *config.Neighbor) *PeerInfo {
 type Destination struct {
 	routeFamily   bgp.RouteFamily
 	nlri          bgp.AddrPrefixInterface
+	adjInPathList []*Path
 	knownPathList []*Path
 	localIdMap    *Bitmap
 }
@@ -264,6 +265,30 @@ func (dd *Destination) validatePath(path *Path) {
 			"ExpectedRF": dd.routeFamily,
 		}).Error("path is nil or invalid route family")
 	}
+}
+
+func equal(p1, p2 *Path) bool {
+	return p1.GetSource().Equal(p2.GetSource()) && p1.GetNlri().PathIdentifier() == p2.GetNlri().PathIdentifier()
+}
+
+func (d *Destination) updateAdjIn(newPath *Path) *Path {
+	for i, path := range d.adjInPathList {
+		if equal(newPath, path) {
+			if newPath.IsWithdraw {
+				d.adjInPathList = append(d.adjInPathList[:i], d.adjInPathList[i+1:]...)
+			} else {
+				if newPath.Equal(path) {
+					newPath.setTimestamp(path.GetTimestamp())
+				}
+				d.adjInPathList[i] = newPath
+			}
+			return path
+		}
+	}
+	if !newPath.IsWithdraw {
+		d.adjInPathList = append(d.adjInPathList, newPath)
+	}
+	return nil
 }
 
 // Calculates best-path among known paths for this destination.
@@ -959,7 +984,7 @@ type DestinationSelectOption struct {
 	ID        string
 	AS        uint32
 	VRF       *Vrf
-	adj       bool
+	adj       *PeerInfo
 	Best      bool
 	MultiPath bool
 }
@@ -971,7 +996,7 @@ func (d *Destination) MarshalJSON() ([]byte, error) {
 func (d *Destination) Select(option ...DestinationSelectOption) *Destination {
 	id := GLOBAL_RIB_NAME
 	var vrf *Vrf
-	adj := false
+	var adj *PeerInfo
 	best := false
 	mp := false
 	as := uint32(0)
@@ -988,9 +1013,13 @@ func (d *Destination) Select(option ...DestinationSelectOption) *Destination {
 		as = o.AS
 	}
 	var paths []*Path
-	if adj {
-		paths = make([]*Path, len(d.knownPathList))
-		copy(paths, d.knownPathList)
+	if adj != nil {
+		paths = make([]*Path, len(d.adjInPathList))
+		for _, p := range d.adjInPathList {
+			if p.GetSource() == adj {
+				paths = append(paths, p)
+			}
+		}
 	} else {
 		paths = d.GetKnownPathList(id, as)
 		if vrf != nil {
