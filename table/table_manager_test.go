@@ -2128,20 +2128,25 @@ func TestProcessBGPUpdate_Timestamp(t *testing.T) {
 	}
 
 	nlri := []*bgp.IPAddrPrefix{bgp.NewIPAddrPrefix(24, "10.10.10.0")}
-
-	adjRib := NewAdjRib("test", []bgp.RouteFamily{bgp.RF_IPv4_UC, bgp.RF_IPv6_UC})
-	m1 := bgp.NewBGPUpdateMessage(nil, pathAttributes, nlri)
+	families := []bgp.RouteFamily{bgp.RF_IPv4_UC, bgp.RF_IPv6_UC}
+	tm := NewTableManager(families)
 	peer := peerR1()
+	adjRib := NewAdjRib(tm, peer, families)
+	m1 := bgp.NewBGPUpdateMessage(nil, pathAttributes, nlri)
 	pList1 := ProcessMessage(m1, peer, time.Now())
 	path1 := pList1[0]
 	t1 := path1.GetTimestamp()
-	adjRib.Update(pList1)
+	for _, p := range pList1 {
+		adjRib.Update(p)
 
+	}
 	m2 := bgp.NewBGPUpdateMessage(nil, pathAttributes, nlri)
 	pList2 := ProcessMessage(m2, peer, time.Now())
 	//path2 := pList2[0].(*IPv4Path)
 	//t2 = path2.timestamp
-	adjRib.Update(pList2)
+	for _, p := range pList2 {
+		adjRib.Update(p)
+	}
 
 	inList := adjRib.PathList([]bgp.RouteFamily{bgp.RF_IPv4_UC}, false)
 	assert.Equal(t, len(inList), 1)
@@ -2158,7 +2163,9 @@ func TestProcessBGPUpdate_Timestamp(t *testing.T) {
 	m3 := bgp.NewBGPUpdateMessage(nil, pathAttributes2, nlri)
 	pList3 := ProcessMessage(m3, peer, time.Now())
 	t3 := pList3[0].GetTimestamp()
-	adjRib.Update(pList3)
+	for _, p := range pList3 {
+		adjRib.Update(p)
+	}
 
 	inList = adjRib.PathList([]bgp.RouteFamily{bgp.RF_IPv4_UC}, false)
 	assert.Equal(t, len(inList), 1)

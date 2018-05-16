@@ -117,7 +117,7 @@ func NewPeer(g *config.Global, conf *config.Neighbor, loc *table.TableManager, p
 		peer.tableId = table.GLOBAL_RIB_NAME
 	}
 	rfs, _ := config.AfiSafis(conf.AfiSafis).ToRfList()
-	peer.adjRibIn = table.NewAdjRib(peer.ID(), rfs)
+	peer.adjRibIn = table.NewAdjRib(loc, peer.fsm.peerInfo, rfs)
 	return peer
 }
 
@@ -309,10 +309,6 @@ func (peer *Peer) stopPeerRestarting() {
 
 }
 
-func (peer *Peer) getAccepted(rfList []bgp.RouteFamily) []*table.Path {
-	return peer.adjRibIn.PathList(rfList, true)
-}
-
 func (peer *Peer) filterPathFromSourcePeer(path, old *table.Path) *table.Path {
 	if peer.ID() != path.GetSource().Address.String() {
 		return path
@@ -417,40 +413,42 @@ func (peer *Peer) handleUpdate(e *FsmMsg) ([]*table.Path, []bgp.RouteFamily, *bg
 		"attributes":  update.PathAttributes,
 	}).Debug("received update")
 	peer.fsm.pConf.Timers.State.UpdateRecvTime = time.Now().Unix()
-	if len(e.PathList) > 0 {
-		peer.adjRibIn.Update(e.PathList)
-		for _, af := range peer.fsm.pConf.AfiSafis {
-			if msg := peer.doPrefixLimit(af.State.Family, &af.PrefixLimit.Config); msg != nil {
-				return nil, nil, msg
+	paths := make([]*table.Path, 0, len(e.PathList))
+	eor := []bgp.RouteFamily{}
+	for _, path := range e.PathList {
+		if path == nil {
+			continue
+		}
+		if path.IsEOR() {
+			family := path.GetRouteFamily()
+			log.WithFields(log.Fields{
+				"Topic":         "Peer",
+				"Key":           peer.ID(),
+				"AddressFamily": family,
+			}).Debug("EOR received")
+			eor = append(eor, family)
+			continue
+		}
+		// RFC4271 9.1.2 Phase 2: Route Selection
+		//
+		// If the AS_PATH attribute of a BGP route contains an AS loop, the BGP
+		// route should be excluded from the Phase 2 decision function.
+		if aspath := path.GetAsPath(); aspath != nil {
+			if hasOwnASLoop(peer.fsm.peerInfo.LocalAS, int(peer.fsm.pConf.AsPathOptions.Config.AllowOwnAs), aspath) {
+				path.SetAsLooped(true)
 			}
 		}
-		paths := make([]*table.Path, 0, len(e.PathList))
-		eor := []bgp.RouteFamily{}
-		for _, path := range e.PathList {
-			if path.IsEOR() {
-				family := path.GetRouteFamily()
-				log.WithFields(log.Fields{
-					"Topic":         "Peer",
-					"Key":           peer.ID(),
-					"AddressFamily": family,
-				}).Debug("EOR received")
-				eor = append(eor, family)
-				continue
-			}
-			// RFC4271 9.1.2 Phase 2: Route Selection
-			//
-			// If the AS_PATH attribute of a BGP route contains an AS loop, the BGP
-			// route should be excluded from the Phase 2 decision function.
-			if aspath := path.GetAsPath(); aspath != nil {
-				if hasOwnASLoop(peer.fsm.peerInfo.LocalAS, int(peer.fsm.pConf.AsPathOptions.Config.AllowOwnAs), aspath) {
-					continue
-				}
-			}
+		peer.adjRibIn.Update(path)
+		if !path.IsAsLooped() {
 			paths = append(paths, path)
 		}
-		return paths, eor, nil
 	}
-	return nil, nil, nil
+	for _, af := range peer.fsm.pConf.AfiSafis {
+		if msg := peer.doPrefixLimit(af.State.Family, &af.PrefixLimit.Config); msg != nil {
+			return nil, nil, msg
+		}
+	}
+	return paths, eor, nil
 }
 
 func (peer *Peer) startFSMHandler(incoming *channels.InfiniteChannel, stateCh chan *FsmMsg) {
