@@ -558,27 +558,39 @@ func getMultiBestPath(id string, pathList []*Path) []*Path {
 	return list
 }
 
-func (u *Update) GetWithdrawnPath() []*Path {
-	if len(u.KnownPathList) == len(u.OldKnownPathList) {
-		return nil
-	}
+func (u *Update) GetAddpathChange(newPath *Path) (*Path, *Path) {
+	if newPath.IsWithdraw {
+		if len(u.KnownPathList) == len(u.OldKnownPathList) {
+			return nil, nil
+		}
 
-	l := make([]*Path, 0, len(u.OldKnownPathList))
-
-	for _, p := range u.OldKnownPathList {
-		y := func() bool {
-			for _, old := range u.KnownPathList {
-				if p == old {
-					return true
+		for _, p := range u.OldKnownPathList {
+			y := func() bool {
+				for _, old := range u.KnownPathList {
+					if p == old {
+						return true
+					}
+				}
+				return false
+			}()
+			if !y {
+				return p.Clone(true), p
+			}
+		}
+	} else {
+		if len(u.KnownPathList) == len(u.OldKnownPathList) {
+			// implicit withdraw
+			for _, old := range u.OldKnownPathList {
+				if newPath.GetSource().Equal(old.GetSource()) && newPath.GetNlri().PathIdentifier() == old.GetNlri().PathIdentifier() {
+					return newPath, old
 				}
 			}
-			return false
-		}()
-		if !y {
-			l = append(l, p.Clone(true))
+		} else {
+			return newPath, nil
 		}
 	}
-	return l
+	// should not be here
+	return nil, nil
 }
 
 func (u *Update) GetChanges(id string, as uint32, peerDown bool) (*Path, *Path, []*Path) {
