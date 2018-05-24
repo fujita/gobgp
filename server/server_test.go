@@ -268,23 +268,10 @@ func newPeerandInfo(myAs, as uint32, address string, rib *table.TableManager) (*
 	return p, &table.PeerInfo{AS: as, Address: net.ParseIP(address)}
 }
 
-func process(rib *table.TableManager, l []*table.Path) (*table.Path, *table.Path) {
-	dsts := make([]*table.Update, 0)
-	for _, path := range l {
-		dsts = append(dsts, rib.Update(path)...)
-	}
-	news, olds, _ := dstsToPaths(table.GLOBAL_RIB_NAME, 0, dsts)
-	if len(news) != 1 {
-		panic("can't handle multiple paths")
-	}
-	for idx, path := range news {
-		var old *table.Path
-		if olds != nil {
-			old = olds[idx]
-		}
-		return path, old
-	}
-	return nil, nil
+func process(rib *table.TableManager, newPath *table.Path) (*table.Path, *table.Path) {
+	updates := rib.Update(newPath)
+	new, old, _ := updates[0].GetChanges(table.GLOBAL_RIB_NAME, 0, false)
+	return new, old
 }
 
 func TestFilterpathWitheBGP(t *testing.T) {
@@ -308,7 +295,7 @@ func TestFilterpathWitheBGP(t *testing.T) {
 	filterpath(p1, new, old)
 	filterpath(p2, new, old)
 
-	new, old = process(rib, []*table.Path{path1.Clone(true)})
+	new, old = process(rib, path1.Clone(true))
 	assert.Equal(t, new, path2)
 	// p1 and p2 advertized the same prefix and p1's was best. Then p1 withdraw it, so p2 must get withdawal.
 	path := filterpath(p2, new, old)
@@ -318,7 +305,7 @@ func TestFilterpathWitheBGP(t *testing.T) {
 	// p1 should get the new best (from p2)
 	assert.Equal(t, filterpath(p1, new, old), path2)
 
-	new, old = process(rib, []*table.Path{path2.Clone(true)})
+	new, old = process(rib, path2.Clone(true))
 	assert.True(t, new.IsWithdraw)
 	// p2 withdraw so p1 should get withdrawal.
 	path = filterpath(p1, new, old)
@@ -344,14 +331,14 @@ func TestFilterpathWithiBGP(t *testing.T) {
 	path1 := table.NewPath(pi1, nlri, false, pa1, time.Now(), false)
 	//path2 := table.NewPath(pi2, nlri, false, pa2, time.Now(), false)
 
-	new, old := process(rib, []*table.Path{path1})
+	new, old := process(rib, path1)
 	assert.Equal(t, new, path1)
 	path := filterpath(p1, new, old)
 	assert.Nil(t, path)
 	path = filterpath(p2, new, old)
 	assert.Nil(t, path)
 
-	new, old = process(rib, []*table.Path{path1.Clone(true)})
+	new, old = process(rib, path1.Clone(true))
 	path = filterpath(p1, new, old)
 	assert.Nil(t, path)
 	path = filterpath(p2, new, old)
@@ -405,7 +392,7 @@ func TestFilterpathWithRejectPolicy(t *testing.T) {
 			pa1 = append(pa1, bgp.NewPathAttributeCommunities([]uint32{100<<16 | 100}))
 		}
 		path1 := table.NewPath(pi1, nlri, false, pa1, time.Now(), false)
-		new, old := process(rib2, []*table.Path{path1})
+		new, old := process(rib2, path1)
 		assert.Equal(t, new, path1)
 		s := NewBgpServer()
 		path2 := s.filterpath(p2, new, old)
