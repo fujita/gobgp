@@ -278,7 +278,7 @@ func UpdatePathAttrs(global *config.Global, peer *config.Neighbor, info *PeerInf
 			// address for that session.
 			if path.GetRouteFamily() == bgp.RF_RTC_UC {
 				path.SetNexthop(localAddress)
-				path.setPathAttr(bgp.NewPathAttributeOriginatorId(info.LocalID.String()))
+				path.setPathAttr(bgp.NewPathAttributeOriginatorId(info.ID.String()))
 			} else if path.getPathAttr(bgp.BGP_ATTR_TYPE_ORIGINATOR_ID) == nil {
 				if path.IsLocal() {
 					path.setPathAttr(bgp.NewPathAttributeOriginatorId(global.Config.RouterId))
