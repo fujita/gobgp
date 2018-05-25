@@ -466,6 +466,11 @@ func filterpath(peer *Peer, path, old *table.Path) *table.Path {
 func (s *BgpServer) filterpath(peer *Peer, path, old *table.Path) *table.Path {
 	// Special handling for RTM NLRI.
 	if path != nil && path.GetRouteFamily() == bgp.RF_RTC_UC && !path.IsWithdraw {
+		// If the given path's Originator ID attribute is our router Id, then the route reflector
+		// sends back the rtm that we sent, so needs not to send it to avoid the infinite loop.
+		if path.GetOriginatorID().String() == s.bgpConfig.Global.Config.RouterId {
+			return nil
+		}
 		// If the given "path" is locally generated and the same with "old", we
 		// assumes "path" was already sent before. This assumption avoids the
 		// infinite UPDATE loop between Route Reflector and its clients.
