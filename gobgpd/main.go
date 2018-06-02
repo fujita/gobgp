@@ -34,6 +34,7 @@ import (
 
 	api "github.com/osrg/gobgp/api"
 	"github.com/osrg/gobgp/config"
+	"github.com/osrg/gobgp/exporter"
 	"github.com/osrg/gobgp/packet/bgp"
 	"github.com/osrg/gobgp/server"
 	"github.com/osrg/gobgp/table"
@@ -63,6 +64,7 @@ func main() {
 		TLSCertFile     string `long:"tls-cert-file" description:"The TLS cert file"`
 		TLSKeyFile      string `long:"tls-key-file" description:"The TLS key file"`
 		Version         bool   `long:"version" description:"show version number"`
+		EnableExporter  bool   `long:"enable-exporter" description:"enable prometheus exporter default:false"`
 	}
 	_, err := flags.Parse(&opts)
 	if err != nil {
@@ -150,6 +152,13 @@ func main() {
 			log.Fatalf("failed to listen grpc port: %s", err)
 		}
 	}()
+
+	if opts.EnableExporter {
+		e := exporter.NewExporter(opts.GrpcHosts)
+		go func() {
+			e.Serve()
+		}()
+	}
 
 	if opts.ConfigFile != "" {
 		go config.ReadConfigfileServe(opts.ConfigFile, opts.ConfigType, configCh)
