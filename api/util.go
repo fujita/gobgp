@@ -18,6 +18,7 @@ package gobgpapi
 import (
 	"encoding/json"
 	"net"
+	"time"
 
 	"github.com/osrg/gobgp/config"
 	"github.com/osrg/gobgp/packet/bgp"
@@ -37,6 +38,17 @@ func getNLRI(family bgp.RouteFamily, buf []byte) (bgp.AddrPrefixInterface, error
 
 func (d *Destination) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.Paths)
+}
+
+func NewPath(nlri bgp.AddrPrefixInterface, isWithdraw bool, attrs []bgp.PathAttributeInterface, age time.Time) *Path {
+	return &Path{
+		AnyNlri:    MarshalNLRI(nlri),
+		AnyPattrs:  MarshalPathAttributes(attrs),
+		Age:        age.Unix(),
+		IsWithdraw: isWithdraw,
+		Family:     uint32(bgp.AfiSafiToRouteFamily(nlri.AFI(), nlri.SAFI())),
+		Identifier: nlri.PathIdentifier(),
+	}
 }
 
 func (p *Path) MarshalJSON() ([]byte, error) {
