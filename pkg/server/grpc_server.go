@@ -515,83 +515,6 @@ func getValidation(v []*table.Validation, i int) *table.Validation {
 	}
 }
 
-func (s *Server) GetRib(ctx context.Context, arg *api.GetRibRequest) (*api.GetRibResponse, error) {
-	if arg == nil || arg.Table == nil {
-		return nil, fmt.Errorf("invalid request")
-	}
-	f := func() []*table.LookupPrefix {
-		l := make([]*table.LookupPrefix, 0, len(arg.Table.Destinations))
-		for _, p := range arg.Table.Destinations {
-			l = append(l, &table.LookupPrefix{
-				Prefix: p.Prefix,
-				LookupOption: func() table.LookupOption {
-					if p.LongerPrefixes {
-						return table.LOOKUP_LONGER
-					} else if p.ShorterPrefixes {
-						return table.LOOKUP_SHORTER
-					}
-					return table.LOOKUP_EXACT
-				}(),
-			})
-		}
-		return l
-	}
-
-	var in bool
-	var err error
-	var tbl *table.Table
-	var v []*table.Validation
-
-	family := bgp.RouteFamily(arg.Table.Family)
-	switch arg.Table.Type {
-	case api.Resource_LOCAL, api.Resource_GLOBAL:
-		tbl, v, err = s.bgpServer.GetRib(arg.Table.Name, family, f())
-	case api.Resource_ADJ_IN:
-		in = true
-		fallthrough
-	case api.Resource_ADJ_OUT:
-		tbl, v, err = s.bgpServer.GetAdjRib(arg.Table.Name, family, in, f())
-	case api.Resource_VRF:
-		tbl, err = s.bgpServer.GetVrfRib(arg.Table.Name, family, []*table.LookupPrefix{})
-	default:
-		return nil, fmt.Errorf("unsupported resource type: %v", arg.Table.Type)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	tblDsts := tbl.GetDestinations()
-	dsts := make([]*api.Destination, 0, len(tblDsts))
-	idx := 0
-	for _, dst := range tblDsts {
-		dsts = append(dsts, &api.Destination{
-			Prefix: dst.GetNlri().String(),
-			Paths: func(paths []*table.Path) []*api.Path {
-				l := make([]*api.Path, 0, len(paths))
-				for i, p := range paths {
-					pp := ToPathApi(p, getValidation(v, idx))
-					idx++
-					switch arg.Table.Type {
-					case api.Resource_LOCAL, api.Resource_GLOBAL:
-						if i == 0 && !table.SelectionOptions.DisableBestPathSelection {
-							pp.Best = true
-						}
-					}
-					l = append(l, pp)
-				}
-				return l
-			}(dst.GetAllKnownPathList()),
-		})
-	}
-
-	return &api.GetRibResponse{Table: &api.Table{
-		Type:         arg.Table.Type,
-		Family:       uint32(tbl.GetRoutefamily()),
-		Destinations: dsts},
-	}, err
-}
-
 func (s *Server) GetPath(arg *api.GetPathRequest, stream api.GobgpApi_GetPathServer) error {
 	f := func() []*table.LookupPrefix {
 		l := make([]*table.LookupPrefix, 0, len(arg.Prefixes))
@@ -629,6 +552,10 @@ func (s *Server) GetPath(arg *api.GetPathRequest, stream api.GobgpApi_GetPathSer
 	idx := 0
 	return func() error {
 		for _, dst := range tbl.GetDestinations() {
+			d := api.Destination{
+				Prefix: dst.GetNlri().String(),
+				Paths:  make([]*api.Path, 0, len(dst.GetAllKnownPathList())),
+			}
 			for i, path := range dst.GetAllKnownPathList() {
 				p := ToPathApi(path, getValidation(v, idx))
 				idx++
@@ -638,9 +565,10 @@ func (s *Server) GetPath(arg *api.GetPathRequest, stream api.GobgpApi_GetPathSer
 						p.Best = true
 					}
 				}
-				if err := stream.Send(p); err != nil {
-					return err
-				}
+				d.Paths = append(d.Paths, p)
+			}
+			if err := stream.Send(&d); err != nil {
+				return err
 			}
 		}
 		return nil
@@ -648,21 +576,20 @@ func (s *Server) GetPath(arg *api.GetPathRequest, stream api.GobgpApi_GetPathSer
 }
 
 func (s *Server) MonitorRib(arg *api.MonitorRibRequest, stream api.GobgpApi_MonitorRibServer) error {
-	if arg == nil || arg.Table == nil {
+	if arg == nil {
 		return fmt.Errorf("invalid request")
 	}
-	t := arg.Table
 	w, err := func() (*Watcher, error) {
-		switch t.Type {
+		switch arg.Type {
 		case api.Resource_GLOBAL:
 			return s.bgpServer.Watch(WatchBestPath(arg.Current)), nil
 		case api.Resource_ADJ_IN:
-			if t.PostPolicy {
+			if arg.PostPolicy {
 				return s.bgpServer.Watch(WatchPostUpdate(arg.Current)), nil
 			}
 			return s.bgpServer.Watch(WatchUpdate(arg.Current)), nil
 		default:
-			return nil, fmt.Errorf("unsupported resource type: %v", t.Type)
+			return nil, fmt.Errorf("unsupported resource type: %v", arg.Type)
 		}
 	}()
 	if err != nil {
@@ -675,7 +602,7 @@ func (s *Server) MonitorRib(arg *api.MonitorRibRequest, stream api.GobgpApi_Moni
 		sendPath := func(pathList []*table.Path) error {
 			dsts := make(map[string]*api.Destination)
 			for _, path := range pathList {
-				if path == nil || (t.Family != 0 && bgp.RouteFamily(t.Family) != path.GetRouteFamily()) {
+				if path == nil || (arg.Family != 0 && bgp.RouteFamily(arg.Family) != path.GetRouteFamily()) {
 					continue
 				}
 				if dst, y := dsts[path.GetNlri().String()]; y {
@@ -999,10 +926,6 @@ func (s *Server) DeleteBmp(ctx context.Context, arg *api.DeleteBmpRequest) (*api
 	})
 }
 
-func (s *Server) ValidateRib(ctx context.Context, arg *api.ValidateRibRequest) (*api.ValidateRibResponse, error) {
-	return &api.ValidateRibResponse{}, nil
-}
-
 func (s *Server) AddRpki(ctx context.Context, arg *api.AddRpkiRequest) (*api.AddRpkiResponse, error) {
 	return &api.AddRpkiResponse{}, s.bgpServer.AddRpki(&config.RpkiServerConfig{
 		Address:        arg.Address,
@@ -1081,12 +1004,17 @@ func (s *Server) GetRpki(ctx context.Context, arg *api.GetRpkiRequest) (*api.Get
 	return &api.GetRpkiResponse{Servers: l}, nil
 }
 
-func (s *Server) GetRoa(ctx context.Context, arg *api.GetRoaRequest) (*api.GetRoaResponse, error) {
+func (s *Server) GetRoa(arg *api.GetRoaRequest, stream api.GobgpApi_GetRoaServer) error {
 	roas, err := s.bgpServer.GetRoa(bgp.RouteFamily(arg.Family))
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return &api.GetRoaResponse{Roas: NewRoaListFromTableStructList(roas)}, nil
+	for _, roa := range NewRoaListFromTableStructList(roas) {
+		if err := stream.Send(roa); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Server) EnableZebra(ctx context.Context, arg *api.EnableZebraRequest) (*api.EnableZebraResponse, error) {
@@ -2757,7 +2685,7 @@ func (s *Server) GetPolicyAssignment(ctx context.Context, arg *api.GetPolicyAssi
 		Default:  def,
 		Policies: policies,
 	}
-	return &api.GetPolicyAssignmentResponse{NewAPIPolicyAssignmentFromTableStruct(t)}, err
+	return &api.GetPolicyAssignmentResponse{Assignment: NewAPIPolicyAssignmentFromTableStruct(t)}, err
 }
 
 func defaultRouteType(d api.RouteAction) table.RouteType {
@@ -2967,8 +2895,8 @@ func (s *Server) StartServer(ctx context.Context, arg *api.StartServerRequest) (
 	return &api.StartServerResponse{}, s.bgpServer.Start(global)
 }
 
-func (s *Server) StopServer(ctx context.Context, arg *api.StopServerRequest) (*api.StopServerResponse, error) {
-	return &api.StopServerResponse{}, s.bgpServer.Stop()
+func (s *Server) ShutdownServer(ctx context.Context, arg *api.ShutdownServerRequest) (*api.ShutdownServerResponse, error) {
+	return &api.ShutdownServerResponse{}, s.bgpServer.Stop()
 }
 
 func (s *Server) GetRibInfo(ctx context.Context, arg *api.GetRibInfoRequest) (*api.GetRibInfoResponse, error) {
@@ -3013,9 +2941,4 @@ func (s *Server) AddCollector(ctx context.Context, arg *api.AddCollectorRequest)
 		DbName:            arg.DbName,
 		TableDumpInterval: arg.TableDumpInterval,
 	})
-}
-
-func (s *Server) Shutdown(ctx context.Context, arg *api.ShutdownRequest) (*api.ShutdownResponse, error) {
-	s.bgpServer.Shutdown()
-	return &api.ShutdownResponse{}, nil
 }

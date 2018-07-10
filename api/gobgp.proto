@@ -29,7 +29,7 @@ package gobgpapi;
 
 service GobgpApi {
   rpc StartServer(StartServerRequest) returns (StartServerResponse) {}
-  rpc StopServer(StopServerRequest) returns (StopServerResponse) {}
+  rpc ShutdownServer(ShutdownServerRequest) returns (ShutdownServerResponse) {}
   rpc GetServer(GetServerRequest) returns (GetServerResponse) {}
   rpc AddNeighbor(AddNeighborRequest) returns (AddNeighborResponse) {}
   rpc DeleteNeighbor(DeleteNeighborRequest) returns (DeleteNeighborResponse) {}
@@ -40,9 +40,7 @@ service GobgpApi {
   rpc ShutdownNeighbor(ShutdownNeighborRequest) returns (ShutdownNeighborResponse) {}
   rpc EnableNeighbor(EnableNeighborRequest) returns (EnableNeighborResponse) {}
   rpc DisableNeighbor(DisableNeighborRequest) returns (DisableNeighborResponse) {}
-  rpc GetRib(GetRibRequest) returns (GetRibResponse) {}
-  rpc GetPath(GetPathRequest) returns (stream Path) {}
-  rpc ValidateRib(ValidateRibRequest) returns (ValidateRibResponse) {}
+  rpc GetPath(GetPathRequest) returns (stream Destination) {}
   rpc AddPath(AddPathRequest) returns (AddPathResponse) {}
   rpc DeletePath(DeletePathRequest) returns (DeletePathResponse) {}
   rpc MonitorRib(MonitorRibRequest) returns (stream Destination) {}
@@ -59,7 +57,7 @@ service GobgpApi {
   rpc DisableRpki(DisableRpkiRequest) returns (DisableRpkiResponse) {}
   rpc ResetRpki(ResetRpkiRequest) returns (ResetRpkiResponse) {}
   rpc SoftResetRpki(SoftResetRpkiRequest) returns (SoftResetRpkiResponse) {}
-  rpc GetRoa(GetRoaRequest) returns (GetRoaResponse) {}
+  rpc GetRoa(GetRoaRequest) returns (stream Roa) {}
   rpc EnableZebra(EnableZebraRequest) returns (EnableZebraResponse) {}
   rpc AddVrf(AddVrfRequest) returns (AddVrfResponse) {}
   rpc DeleteVrf(DeleteVrfRequest) returns (DeleteVrfResponse) {}
@@ -87,7 +85,6 @@ service GobgpApi {
   rpc UpdatePeerGroup(UpdatePeerGroupRequest) returns (UpdatePeerGroupResponse) {}
   rpc AddDynamicNeighbor(AddDynamicNeighborRequest) returns (AddDynamicNeighborResponse) {}
   rpc AddCollector(AddCollectorRequest) returns (AddCollectorResponse) {}
-  rpc Shutdown(ShutdownRequest) returns (ShutdownResponse) {}
 }
 
 // Constants for address families
@@ -312,8 +309,11 @@ message DeleteBmpResponse {
 }
 
 message MonitorRibRequest {
-    Table table = 1;
-    bool current = 2;
+  Resource type = 1;
+  string name = 2;
+  uint32 family = 3;
+  bool current = 4;
+  bool post_policy = 5;
 }
 
 message RPKIConf {
@@ -576,10 +576,10 @@ message StartServerRequest {
 message StartServerResponse {
 }
 
-message StopServerRequest {
+message ShutdownServerRequest {
 }
 
-message StopServerResponse {
+message ShutdownServerResponse {
 }
 
 enum Resource {
@@ -654,24 +654,6 @@ message Path {
 message Destination {
   string prefix = 1;
   repeated Path paths = 2;
-  bool longer_prefixes = 3;
-  bool shorter_prefixes = 4;
-}
-
-message Table {
-  Resource type = 1;
-  string name = 2;
-  uint32 family = 3;
-  repeated Destination destinations = 4;
-  bool post_policy = 5;
-}
-
-message GetRibRequest {
-  Table table = 1;
-}
-
-message GetRibResponse {
-  Table table = 1;
 }
 
 // API representation of table.LookupOption
@@ -692,15 +674,6 @@ message GetPathRequest {
   string name = 2;
   uint32 family = 3;
   repeated TableLookupPrefix prefixes = 4;
-}
-
-message ValidateRibRequest {
-  Resource type = 1;
-  uint32 family = 2;
-  string prefix = 3;
-}
-
-message ValidateRibResponse {
 }
 
 message Peer {
@@ -1260,10 +1233,6 @@ message GetRoaRequest {
   uint32 family = 1;
 }
 
-message GetRoaResponse {
-  repeated Roa roas = 1;
-}
-
 message Vrf {
   string name = 1;
   // Route Distinguisher must be one of
@@ -1333,10 +1302,4 @@ message AddCollectorRequest {
 }
 
 message AddCollectorResponse {
-}
-
-message ShutdownRequest{
-}
-
-message ShutdownResponse{
 }

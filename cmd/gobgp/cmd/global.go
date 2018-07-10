@@ -1643,7 +1643,7 @@ func NewGlobalCmd() *cobra.Command {
 	allCmd := &cobra.Command{
 		Use: CMD_ALL,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := client.StopServer(); err != nil {
+			if err := client.ShutdownServer(); err != nil {
 				exitWithError(err)
 			}
 		},

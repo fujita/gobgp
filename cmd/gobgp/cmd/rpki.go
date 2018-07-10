@@ -146,17 +146,6 @@ func NewRPKICmd() *cobra.Command {
 		},
 	}
 	tableCmd.PersistentFlags().StringVarP(&subOpts.AddressFamily, "address-family", "a", "", "address family")
-
-	validateCmd := &cobra.Command{
-		Use: "validate",
-		Run: func(cmd *cobra.Command, args []string) {
-			if err := client.ValidateRIBWithRPKI(args...); err != nil {
-				exitWithError(err)
-			}
-		},
-	}
-	rpkiCmd.AddCommand(validateCmd)
-
 	rpkiCmd.AddCommand(tableCmd)
 	return rpkiCmd
 }
