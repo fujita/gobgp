@@ -516,6 +516,7 @@ func (h *FSMHandler) idle() (bgp.FSMState, *FsmStateReason) {
 					"Key":   fsm.pConf.State.NeighborAddress,
 					"State": fsm.state.String(),
 				}).Warn("graceful restart timer expired")
+				fsm.pConf.GracefulRestart.State.PeerRestarting = false
 				return bgp.BGP_FSM_IDLE, NewFsmStateReason(FSM_RESTART_TIMER_EXPIRED, nil, nil)
 			}
 		case conn, ok := <-fsm.connCh:
@@ -615,6 +616,7 @@ func (h *FSMHandler) active() (bgp.FSMState, *FsmStateReason) {
 					"Key":   fsm.pConf.State.NeighborAddress,
 					"State": fsm.state.String(),
 				}).Warn("graceful restart timer expired")
+				fsm.pConf.GracefulRestart.State.PeerRestarting = false
 				return bgp.BGP_FSM_IDLE, NewFsmStateReason(FSM_RESTART_TIMER_EXPIRED, nil, nil)
 			}
 		case err := <-h.stateReasonCh:
@@ -1127,6 +1129,7 @@ func (h *FSMHandler) opensent() (bgp.FSMState, *FsmStateReason) {
 					"Key":   fsm.pConf.State.NeighborAddress,
 					"State": fsm.state.String(),
 				}).Warn("graceful restart timer expired")
+				fsm.pConf.GracefulRestart.State.PeerRestarting = false
 				h.conn.Close()
 				return bgp.BGP_FSM_IDLE, NewFsmStateReason(FSM_RESTART_TIMER_EXPIRED, nil, nil)
 			}
@@ -1363,6 +1366,7 @@ func (h *FSMHandler) openconfirm() (bgp.FSMState, *FsmStateReason) {
 					"Key":   fsm.pConf.State.NeighborAddress,
 					"State": fsm.state.String(),
 				}).Warn("graceful restart timer expired")
+				fsm.pConf.GracefulRestart.State.PeerRestarting = false
 				h.conn.Close()
 				return bgp.BGP_FSM_IDLE, NewFsmStateReason(FSM_RESTART_TIMER_EXPIRED, nil, nil)
 			}
