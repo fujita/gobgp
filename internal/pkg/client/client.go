@@ -91,8 +91,8 @@ func (cli *Client) StartServer(c *config.Global) error {
 	return err
 }
 
-func (cli *Client) StopServer() error {
-	_, err := cli.cli.StopServer(context.Background(), &api.StopServerRequest{})
+func (cli *Client) ShutdownServer() error {
+	_, err := cli.cli.ShutdownServer(context.Background(), &api.ShutdownServerRequest{})
 	return err
 }
 
@@ -245,7 +245,7 @@ func (cli *Client) SoftReset(addr string, family bgp.RouteFamily) error {
 	return cli.softreset(addr, family, api.SoftResetNeighborRequest_BOTH)
 }
 
-func (cli *Client) getRIB(resource api.Resource, name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) (*api.Table, error) {
+func (cli *Client) getRIB(resource api.Resource, name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) ([]*api.Destination, error) {
 	stream, err := cli.cli.GetPath(context.Background(), &api.GetPathRequest{
 		Type:     resource,
 		Family:   uint32(family),
@@ -255,53 +255,37 @@ func (cli *Client) getRIB(resource api.Resource, name string, family bgp.RouteFa
 	if err != nil {
 		return nil, err
 	}
-	pathMap := make(map[string][]*api.Path)
+	dstList := make([]*api.Destination, 0)
 	for {
-		p, err := stream.Recv()
+		d, err := stream.Recv()
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			return nil, err
 		}
-		nlri, err := apiutil.GetNativeNlri(p)
-		if err != nil {
-			return nil, err
-		}
-		nlriStr := nlri.String()
-		pathMap[nlriStr] = append(pathMap[nlriStr], p)
+		dstList = append(dstList, d)
 	}
-	dstList := make([]*api.Destination, 0, len(pathMap))
-	for _, pathList := range pathMap {
-		nlri, _ := apiutil.GetNativeNlri(pathList[0])
-		dstList = append(dstList, &api.Destination{
-			Prefix: nlri.String(),
-			Paths:  pathList,
-		})
-	}
-	return &api.Table{
-		Family:       uint32(family),
-		Destinations: dstList,
-	}, nil
+	return dstList, nil
 }
 
-func (cli *Client) GetRIB(family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) (*api.Table, error) {
+func (cli *Client) GetRIB(family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) ([]*api.Destination, error) {
 	return cli.getRIB(api.Resource_GLOBAL, "", family, prefixes)
 }
 
-func (cli *Client) GetLocalRIB(name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) (*api.Table, error) {
+func (cli *Client) GetLocalRIB(name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) ([]*api.Destination, error) {
 	return cli.getRIB(api.Resource_LOCAL, name, family, prefixes)
 }
 
-func (cli *Client) GetAdjRIBIn(name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) (*api.Table, error) {
+func (cli *Client) GetAdjRIBIn(name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) ([]*api.Destination, error) {
 	return cli.getRIB(api.Resource_ADJ_IN, name, family, prefixes)
 }
 
-func (cli *Client) GetAdjRIBOut(name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) (*api.Table, error) {
+func (cli *Client) GetAdjRIBOut(name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) ([]*api.Destination, error) {
 	return cli.getRIB(api.Resource_ADJ_OUT, name, family, prefixes)
 }
 
-func (cli *Client) GetVRFRIB(name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) (*api.Table, error) {
+func (cli *Client) GetVRFRIB(name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) ([]*api.Destination, error) {
 	return cli.getRIB(api.Resource_VRF, name, family, prefixes)
 }
 
@@ -708,13 +692,24 @@ func (cli *Client) GetRPKI() ([]*config.RpkiServer, error) {
 }
 
 func (cli *Client) GetROA(family bgp.RouteFamily) ([]*api.Roa, error) {
-	rsp, err := cli.cli.GetRoa(context.Background(), &api.GetRoaRequest{
+	stream, err := cli.cli.GetRoa(context.Background(), &api.GetRoaRequest{
 		Family: uint32(family),
 	})
 	if err != nil {
 		return nil, err
 	}
-	return rsp.Roas, nil
+	l := make([]*api.Roa, 0)
+	for {
+		r, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+		l = append(l, r)
+	}
+	return l, nil
 }
 
 func (cli *Client) AddRPKIServer(address string, port, lifetime int) error {
@@ -761,17 +756,6 @@ func (cli *Client) SoftResetRPKIServer(address string) error {
 	return err
 }
 
-func (cli *Client) ValidateRIBWithRPKI(prefixes ...string) error {
-	req := &api.ValidateRibRequest{}
-	if len(prefixes) > 1 {
-		return fmt.Errorf("too many prefixes: %d", len(prefixes))
-	} else if len(prefixes) == 1 {
-		req.Prefix = prefixes[0]
-	}
-	_, err := cli.cli.ValidateRib(context.Background(), req)
-	return err
-}
-
 func (cli *Client) AddBMP(c *config.BmpServerConfig) error {
 	_, err := cli.cli.AddBmp(context.Background(), &api.AddBmpRequest{
 		Address: c.Address,
@@ -799,10 +783,8 @@ func (c *MonitorRIBClient) Recv() (*api.Destination, error) {
 
 func (cli *Client) MonitorRIB(family bgp.RouteFamily, current bool) (*MonitorRIBClient, error) {
 	stream, err := cli.cli.MonitorRib(context.Background(), &api.MonitorRibRequest{
-		Table: &api.Table{
-			Type:   api.Resource_GLOBAL,
-			Family: uint32(family),
-		},
+		Type:    api.Resource_GLOBAL,
+		Family:  uint32(family),
 		Current: current,
 	})
 	if err != nil {
@@ -813,11 +795,9 @@ func (cli *Client) MonitorRIB(family bgp.RouteFamily, current bool) (*MonitorRIB
 
 func (cli *Client) MonitorAdjRIBIn(name string, family bgp.RouteFamily, current bool) (*MonitorRIBClient, error) {
 	stream, err := cli.cli.MonitorRib(context.Background(), &api.MonitorRibRequest{
-		Table: &api.Table{
-			Type:   api.Resource_ADJ_IN,
-			Name:   name,
-			Family: uint32(family),
-		},
+		Type:    api.Resource_ADJ_IN,
+		Name:    name,
+		Family:  uint32(family),
 		Current: current,
 	})
 	if err != nil {

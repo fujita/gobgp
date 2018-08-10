@@ -175,7 +175,7 @@ func main() {
 		for {
 			select {
 			case <-sigCh:
-				apiServer.Shutdown(context.Background(), &api.ShutdownRequest{})
+				apiServer.ShutdownServer(context.Background(), &api.ShutdownServerRequest{})
 				return
 			case newConfig := <-configCh:
 				var added, deleted, updated []config.Neighbor

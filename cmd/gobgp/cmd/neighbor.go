@@ -769,7 +769,7 @@ func showNeighborRib(r string, name string, args []string) error {
 		}
 	}
 
-	var rib *api.Table
+	var rib []*api.Destination
 	switch r {
 	case CMD_GLOBAL:
 		rib, err = client.GetRIB(family, filter)
@@ -791,7 +791,7 @@ func showNeighborRib(r string, name string, args []string) error {
 
 	switch r {
 	case CMD_LOCAL, CMD_ADJ_IN, CMD_ACCEPTED, CMD_REJECTED, CMD_ADJ_OUT:
-		if len(rib.Destinations) == 0 {
+		if len(rib) == 0 {
 			peer, err := client.GetNeighbor(name, false)
 			if err != nil {
 				return err
@@ -804,7 +804,7 @@ func showNeighborRib(r string, name string, args []string) error {
 
 	if globalOpts.Json {
 		d := make(map[string]*apiutil.Destination)
-		for _, dst := range rib.GetDestinations() {
+		for _, dst := range rib {
 			d[dst.Prefix] = apiutil.NewDestination(dst)
 		}
 		j, _ := json.Marshal(d)
@@ -815,7 +815,7 @@ func showNeighborRib(r string, name string, args []string) error {
 	if validationTarget != "" {
 		// show RPKI validation info
 		d := func() *api.Destination {
-			for _, dst := range rib.GetDestinations() {
+			for _, dst := range rib {
 				if dst.Prefix == validationTarget {
 					return dst
 				}
@@ -834,15 +834,15 @@ func showNeighborRib(r string, name string, args []string) error {
 		}
 	} else {
 		// show RIB
-		dsts := rib.GetDestinations()
+		var dsts []*api.Destination
 		switch family {
 		case bgp.RF_IPv4_UC, bgp.RF_IPv6_UC:
 			type d struct {
 				prefix net.IP
 				dst    *api.Destination
 			}
-			l := make([]*d, 0, len(dsts))
-			for _, dst := range dsts {
+			l := make([]*d, 0, len(rib))
+			for _, dst := range rib {
 				_, p, _ := net.ParseCIDR(dst.Prefix)
 				l = append(l, &d{prefix: p.IP, dst: dst})
 			}
@@ -851,10 +851,12 @@ func showNeighborRib(r string, name string, args []string) error {
 				return bytes.Compare(l[i].prefix, l[j].prefix) < 0
 			})
 
-			dsts = make([]*api.Destination, 0, len(dsts))
+			dsts = make([]*api.Destination, 0, len(rib))
 			for _, s := range l {
 				dsts = append(dsts, s.dst)
 			}
+		default:
+			dsts = append(dsts, rib...)
 		}
 
 		for _, d := range dsts {
