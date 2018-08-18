@@ -3203,11 +3203,11 @@ func (s *BgpServer) AddPolicyAssignment(ctx context.Context, r *api.AddPolicyAss
 		if r == nil || r.Assignment == nil {
 			return fmt.Errorf("invalid request")
 		}
-		id, dir, err := s.toPolicyInfo(r.Assignment.Name, r.Assignment.Type)
+		id, dir, err := s.toPolicyInfo(r.Assignment.Name, r.Assignment.Direction)
 		if err != nil {
 			return err
 		}
-		return s.policy.AddPolicyAssignment(id, dir, toPolicyDefinition(r.Assignment.Policies), defaultRouteType(r.Assignment.Default))
+		return s.policy.AddPolicyAssignment(id, dir, toPolicyDefinition(r.Assignment.Policies), defaultRouteType(r.Assignment.DefaultAction))
 	}, false)
 }
 
@@ -3216,7 +3216,7 @@ func (s *BgpServer) DeletePolicyAssignment(ctx context.Context, r *api.DeletePol
 		if r == nil || r.Assignment == nil {
 			return fmt.Errorf("invalid request")
 		}
-		id, dir, err := s.toPolicyInfo(r.Assignment.Name, r.Assignment.Type)
+		id, dir, err := s.toPolicyInfo(r.Assignment.Name, r.Assignment.Direction)
 		if err != nil {
 			return err
 		}
@@ -3229,11 +3229,11 @@ func (s *BgpServer) ReplacePolicyAssignment(ctx context.Context, r *api.ReplaceP
 		if r == nil || r.Assignment == nil {
 			return fmt.Errorf("invalid request")
 		}
-		id, dir, err := s.toPolicyInfo(r.Assignment.Name, r.Assignment.Type)
+		id, dir, err := s.toPolicyInfo(r.Assignment.Name, r.Assignment.Direction)
 		if err != nil {
 			return err
 		}
-		return s.policy.ReplacePolicyAssignment(id, dir, toPolicyDefinition(r.Assignment.Policies), defaultRouteType(r.Assignment.Default))
+		return s.policy.ReplacePolicyAssignment(id, dir, toPolicyDefinition(r.Assignment.Policies), defaultRouteType(r.Assignment.DefaultAction))
 	}, false)
 }
 

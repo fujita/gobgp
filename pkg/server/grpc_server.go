@@ -131,12 +131,12 @@ func NewAfiSafiConfigFromConfigStruct(c *config.AfiSafi) *api.AfiSafiConfig {
 func NewApplyPolicyFromConfigStruct(c *config.ApplyPolicy) *api.ApplyPolicy {
 	applyPolicy := &api.ApplyPolicy{
 		ImportPolicy: &api.PolicyAssignment{
-			Type:    api.PolicyDirection_IMPORT,
-			Default: api.RouteAction(c.Config.DefaultImportPolicy.ToInt()),
+			Direction:     api.PolicyDirection_IMPORT,
+			DefaultAction: api.RouteAction(c.Config.DefaultImportPolicy.ToInt()),
 		},
 		ExportPolicy: &api.PolicyAssignment{
-			Type:    api.PolicyDirection_EXPORT,
-			Default: api.RouteAction(c.Config.DefaultExportPolicy.ToInt()),
+			Direction:     api.PolicyDirection_EXPORT,
+			DefaultAction: api.RouteAction(c.Config.DefaultExportPolicy.ToInt()),
 		},
 	}
 
@@ -910,19 +910,19 @@ func ReadApplyPolicyFromAPIStruct(c *config.ApplyPolicy, a *api.ApplyPolicy) {
 		return
 	}
 	if a.ImportPolicy != nil {
-		c.Config.DefaultImportPolicy = config.IntToDefaultPolicyTypeMap[int(a.ImportPolicy.Default)]
+		c.Config.DefaultImportPolicy = config.IntToDefaultPolicyTypeMap[int(a.ImportPolicy.DefaultAction)]
 		for _, p := range a.ImportPolicy.Policies {
 			c.Config.ImportPolicyList = append(c.Config.ImportPolicyList, p.Name)
 		}
 	}
 	if a.ExportPolicy != nil {
-		c.Config.DefaultExportPolicy = config.IntToDefaultPolicyTypeMap[int(a.ExportPolicy.Default)]
+		c.Config.DefaultExportPolicy = config.IntToDefaultPolicyTypeMap[int(a.ExportPolicy.DefaultAction)]
 		for _, p := range a.ExportPolicy.Policies {
 			c.Config.ExportPolicyList = append(c.Config.ExportPolicyList, p.Name)
 		}
 	}
 	if a.InPolicy != nil {
-		c.Config.DefaultInPolicy = config.IntToDefaultPolicyTypeMap[int(a.InPolicy.Default)]
+		c.Config.DefaultInPolicy = config.IntToDefaultPolicyTypeMap[int(a.InPolicy.DefaultAction)]
 		for _, p := range a.InPolicy.Policies {
 			c.Config.InPolicyList = append(c.Config.InPolicyList, p.Name)
 		}
@@ -2180,7 +2180,7 @@ func toPolicyApi(p *config.PolicyDefinition) *api.Policy {
 
 func NewAPIPolicyAssignmentFromTableStruct(t *table.PolicyAssignment) *api.PolicyAssignment {
 	return &api.PolicyAssignment{
-		Type: func() api.PolicyDirection {
+		Direction: func() api.PolicyDirection {
 			switch t.Type {
 			case table.POLICY_DIRECTION_IMPORT:
 				return api.PolicyDirection_IMPORT
@@ -2190,7 +2190,7 @@ func NewAPIPolicyAssignmentFromTableStruct(t *table.PolicyAssignment) *api.Polic
 			log.Errorf("invalid policy-type: %s", t.Type)
 			return api.PolicyDirection_UNKNOWN
 		}(),
-		Default: func() api.RouteAction {
+		DefaultAction: func() api.RouteAction {
 			switch t.Default {
 			case table.ROUTE_TYPE_ACCEPT:
 				return api.RouteAction_ACCEPT
@@ -2200,12 +2200,6 @@ func NewAPIPolicyAssignmentFromTableStruct(t *table.PolicyAssignment) *api.Polic
 			return api.RouteAction_NONE
 		}(),
 		Name: t.Name,
-		Resource: func() api.Resource {
-			if t.Name != "" {
-				return api.Resource_LOCAL
-			}
-			return api.Resource_GLOBAL
-		}(),
 		Policies: func() []*api.Policy {
 			l := make([]*api.Policy, 0)
 			for _, p := range t.Policies {

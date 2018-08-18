@@ -1111,11 +1111,10 @@ enum PolicyDirection {
 }
 
 message PolicyAssignment {
-  PolicyDirection type = 1;
-  Resource resource = 2;
-  string name = 3;
+  string name = 1;
+  PolicyDirection direction = 2;
   repeated Policy policies = 4;
-  RouteAction default = 5;
+  RouteAction default_action = 5;
 }
 
 message RoutingPolicy {
