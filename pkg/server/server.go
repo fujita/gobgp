@@ -2994,19 +2994,6 @@ func (s *BgpServer) DeleteDefinedSet(ctx context.Context, r *api.DeleteDefinedSe
 	}, false)
 }
 
-func (s *BgpServer) ReplaceDefinedSet(ctx context.Context, r *api.ReplaceDefinedSetRequest) error {
-	return s.mgmtOperation(func() error {
-		if r == nil || r.Set == nil {
-			return fmt.Errorf("invalid request")
-		}
-		set, err := NewDefinedSetFromApiStruct(r.Set)
-		if err != nil {
-			return err
-		}
-		return s.policy.ReplaceDefinedSet(set)
-	}, false)
-}
-
 func (s *BgpServer) ListStatement(ctx context.Context, r *api.ListStatementRequest) ([]*api.Statement, error) {
 	l := make([]*api.Statement, 0)
 	s.mgmtOperation(func() error {
@@ -3039,19 +3026,6 @@ func (s *BgpServer) DeleteStatement(ctx context.Context, r *api.DeleteStatementR
 		st, err := NewStatementFromApiStruct(r.Statement)
 		if err == nil {
 			err = s.policy.DeleteStatement(st, r.All)
-		}
-		return err
-	}, false)
-}
-
-func (s *BgpServer) ReplaceStatement(ctx context.Context, r *api.ReplaceStatementRequest) error {
-	return s.mgmtOperation(func() error {
-		if r == nil || r.Statement == nil {
-			return fmt.Errorf("invalid request")
-		}
-		st, err := NewStatementFromApiStruct(r.Statement)
-		if err == nil {
-			err = s.policy.ReplaceStatement(st)
 		}
 		return err
 	}, false)
@@ -3098,19 +3072,6 @@ func (s *BgpServer) DeletePolicy(ctx context.Context, r *api.DeletePolicyRequest
 		l = append(l, table.GLOBAL_RIB_NAME)
 
 		return s.policy.DeletePolicy(p, r.All, r.PreserveStatements, l)
-	}, false)
-}
-
-func (s *BgpServer) ReplacePolicy(ctx context.Context, r *api.ReplacePolicyRequest) error {
-	return s.mgmtOperation(func() error {
-		if r == nil || r.Policy == nil {
-			return fmt.Errorf("invalid request")
-		}
-		p, err := NewPolicyFromApiStruct(r.Policy)
-		if err == nil {
-			err = s.policy.ReplacePolicy(p, r.ReferExistingStatements, r.PreserveStatements)
-		}
-		return err
 	}, false)
 }
 
