@@ -3185,7 +3185,7 @@ func (s *BgpServer) DeletePolicyAssignment(ctx context.Context, r *api.DeletePol
 	}, false)
 }
 
-func (s *BgpServer) ReplacePolicyAssignment(ctx context.Context, r *api.ReplacePolicyAssignmentRequest) error {
+func (s *BgpServer) SetPolicyAssignment(ctx context.Context, r *api.SetPolicyAssignmentRequest) error {
 	return s.mgmtOperation(func() error {
 		if r == nil || r.Assignment == nil {
 			return fmt.Errorf("invalid request")
@@ -3194,7 +3194,7 @@ func (s *BgpServer) ReplacePolicyAssignment(ctx context.Context, r *api.ReplaceP
 		if err != nil {
 			return err
 		}
-		return s.policy.ReplacePolicyAssignment(id, dir, toPolicyDefinition(r.Assignment.Policies), defaultRouteType(r.Assignment.DefaultAction))
+		return s.policy.SetPolicyAssignment(id, dir, toPolicyDefinition(r.Assignment.Policies), defaultRouteType(r.Assignment.DefaultAction))
 	}, false)
 }
 

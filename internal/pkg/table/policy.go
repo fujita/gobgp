@@ -3804,7 +3804,7 @@ func (r *RoutingPolicy) DeletePolicyAssignment(id string, dir PolicyDirection, p
 	return err
 }
 
-func (r *RoutingPolicy) ReplacePolicyAssignment(id string, dir PolicyDirection, policies []*config.PolicyDefinition, def RouteType) (err error) {
+func (r *RoutingPolicy) SetPolicyAssignment(id string, dir PolicyDirection, policies []*config.PolicyDefinition, def RouteType) (err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

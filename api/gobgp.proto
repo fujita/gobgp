@@ -77,7 +77,7 @@ service GobgpApi {
   rpc AddPolicyAssignment(AddPolicyAssignmentRequest) returns (google.protobuf.Empty);
   rpc DeletePolicyAssignment(DeletePolicyAssignmentRequest) returns (google.protobuf.Empty);
   rpc ListPolicyAssignment(ListPolicyAssignmentRequest) returns (stream ListPolicyAssignmentResponse);
-  rpc ReplacePolicyAssignment(ReplacePolicyAssignmentRequest) returns (google.protobuf.Empty);
+  rpc SetPolicyAssignment(SetPolicyAssignmentRequest) returns (google.protobuf.Empty);
 
   rpc AddRpki(AddRpkiRequest) returns (google.protobuf.Empty);
   rpc DeleteRpki(DeleteRpkiRequest) returns (google.protobuf.Empty);
@@ -380,7 +380,7 @@ message ListPolicyAssignmentResponse {
   PolicyAssignment assignment = 1;
 }
 
-message ReplacePolicyAssignmentRequest {
+message SetPolicyAssignmentRequest {
   PolicyAssignment assignment = 1;
 }
 

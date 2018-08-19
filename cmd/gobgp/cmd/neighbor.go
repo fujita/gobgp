@@ -1114,7 +1114,7 @@ func modNeighborPolicy(remoteIP, policyType, cmdType string, args []string) erro
 			Assignment: assign,
 		})
 	case CMD_SET:
-		_, err = client.ReplacePolicyAssignment(ctx, &api.ReplacePolicyAssignmentRequest{
+		_, err = client.SetPolicyAssignment(ctx, &api.SetPolicyAssignmentRequest{
 			Assignment: assign,
 		})
 	case CMD_DEL:

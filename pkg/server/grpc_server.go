@@ -2321,8 +2321,8 @@ func (s *Server) DeletePolicyAssignment(ctx context.Context, r *api.DeletePolicy
 	return &empty.Empty{}, s.bgpServer.DeletePolicyAssignment(ctx, r)
 }
 
-func (s *Server) ReplacePolicyAssignment(ctx context.Context, r *api.ReplacePolicyAssignmentRequest) (*empty.Empty, error) {
-	return &empty.Empty{}, s.bgpServer.ReplacePolicyAssignment(ctx, r)
+func (s *Server) SetPolicyAssignment(ctx context.Context, r *api.SetPolicyAssignmentRequest) (*empty.Empty, error) {
+	return &empty.Empty{}, s.bgpServer.SetPolicyAssignment(ctx, r)
 }
 
 func (s *Server) GetBgp(ctx context.Context, r *api.GetBgpRequest) (*api.GetBgpResponse, error) {

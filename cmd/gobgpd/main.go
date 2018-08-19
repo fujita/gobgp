@@ -332,7 +332,7 @@ func main() {
 
 						def := toDefaultTable(a.DefaultImportPolicy)
 						ps := toPolicies(a.ImportPolicyList)
-						apiServer.ReplacePolicyAssignment(context.Background(), &api.ReplacePolicyAssignmentRequest{
+						apiServer.SetPolicyAssignment(context.Background(), &api.SetPolicyAssignmentRequest{
 							Assignment: server.NewAPIPolicyAssignmentFromTableStruct(&table.PolicyAssignment{
 								Name:     table.GLOBAL_RIB_NAME,
 								Type:     table.POLICY_DIRECTION_IMPORT,
@@ -343,7 +343,7 @@ func main() {
 
 						def = toDefaultTable(a.DefaultExportPolicy)
 						ps = toPolicies(a.ExportPolicyList)
-						apiServer.ReplacePolicyAssignment(context.Background(), &api.ReplacePolicyAssignmentRequest{
+						apiServer.SetPolicyAssignment(context.Background(), &api.SetPolicyAssignmentRequest{
 							Assignment: server.NewAPIPolicyAssignmentFromTableStruct(&table.PolicyAssignment{
 								Name:     table.GLOBAL_RIB_NAME,
 								Type:     table.POLICY_DIRECTION_EXPORT,
