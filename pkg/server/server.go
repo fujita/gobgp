@@ -1621,7 +1621,7 @@ func (s *BgpServer) SetPolicies(ctx context.Context, r *api.SetPoliciesRequest) 
 
 	getConfig := func(id string) (*config.ApplyPolicy, error) {
 		f := func(id string, dir table.PolicyDirection) (config.DefaultPolicyType, []string, error) {
-			rt, policies, err := s.policy.GetPolicyAssignment(table.GLOBAL_RIB_NAME, dir)
+			rt, policies, err := s.policy.GetPolicyAssignment(id, dir)
 			if err != nil {
 				return config.DEFAULT_POLICY_TYPE_REJECT_ROUTE, nil, err
 			}
