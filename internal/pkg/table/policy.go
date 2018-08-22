@@ -3699,17 +3699,13 @@ func (r *RoutingPolicy) DeletePolicy(x *Policy, all, preserve bool, activeId []s
 	return err
 }
 
-func (r *RoutingPolicy) GetPolicyAssignment(id string, dir PolicyDirection) (RouteType, []*config.PolicyDefinition, error) {
+func (r *RoutingPolicy) GetPolicyAssignment(id string, dir PolicyDirection) (RouteType, []*Policy, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	rt := r.getDefaultPolicy(id, dir)
-
-	ps := r.getPolicy(id, dir)
-	l := make([]*config.PolicyDefinition, 0, len(ps))
-	for _, p := range ps {
-		l = append(l, p.ToConfig())
-	}
+	l := make([]*Policy, 0)
+	l = append(l, r.getPolicy(id, dir)...)
 	return rt, l, nil
 }
 

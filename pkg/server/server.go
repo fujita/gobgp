@@ -1619,16 +1619,57 @@ func (s *BgpServer) UpdatePolicy(ctx context.Context, r *api.UpdatePolicyRequest
 		return err
 	}
 
+	getConfig := func(id string) (*config.ApplyPolicy, error) {
+		f := func(id string, dir table.PolicyDirection) (config.DefaultPolicyType, []string, error) {
+			rt, policies, err := s.policy.GetPolicyAssignment(table.GLOBAL_RIB_NAME, dir)
+			if err != nil {
+				return config.DEFAULT_POLICY_TYPE_REJECT_ROUTE, nil, err
+			}
+			names := make([]string, 0, len(policies))
+			for _, p := range policies {
+				names = append(names, p.Name)
+			}
+			t := config.DEFAULT_POLICY_TYPE_REJECT_ROUTE
+			if rt == table.ROUTE_TYPE_NONE {
+				t = config.DEFAULT_POLICY_TYPE_ACCEPT_ROUTE
+			}
+			return t, names, nil
+		}
+
+		c := &config.ApplyPolicy{}
+		rt, policies, err := f(id, table.POLICY_DIRECTION_IMPORT)
+		if err != nil {
+			return nil, err
+		}
+		c.Config.ImportPolicyList = policies
+		c.Config.DefaultImportPolicy = rt
+		rt, policies, err = f(id, table.POLICY_DIRECTION_EXPORT)
+		if err != nil {
+			return nil, err
+		}
+		c.Config.ExportPolicyList = policies
+		c.Config.DefaultExportPolicy = rt
+		return c, nil
+	}
+
 	return s.mgmtOperation(func() error {
 		ap := make(map[string]config.ApplyPolicy, len(s.neighborMap)+1)
-		ap[table.GLOBAL_RIB_NAME] = s.bgpConfig.Global.ApplyPolicy
+		a, err := getConfig(table.GLOBAL_RIB_NAME)
+		if err != nil {
+			return err
+		}
+		ap[table.GLOBAL_RIB_NAME] = *a
 		for _, peer := range s.neighborMap {
 			peer.fsm.lock.RLock()
 			log.WithFields(log.Fields{
 				"Topic": "Peer",
 				"Key":   peer.fsm.pConf.State.NeighborAddress,
 			}).Info("call set policy")
-			ap[peer.ID()] = peer.fsm.pConf.ApplyPolicy
+			a, err := getConfig(peer.TableID())
+			if err != nil {
+				return err
+			}
+			ap[peer.ID()] = *a
 			peer.fsm.lock.RUnlock()
 		}
 		return s.policy.Reset(rp, ap)
@@ -3130,20 +3171,12 @@ func (s *BgpServer) ListPolicyAssignment(ctx context.Context, r *api.ListPolicyA
 				if err != nil {
 					return err
 				}
-				rt, l, err := s.policy.GetPolicyAssignment(id, dir)
+				rt, policies, err := s.policy.GetPolicyAssignment(id, dir)
 				if err != nil {
 					return err
 				}
-				if len(l) == 0 {
+				if len(policies) == 0 {
 					continue
-				}
-				policies := make([]*table.Policy, 0, len(l))
-				for _, p := range l {
-					np, err := table.NewPolicy(*p)
-					if err != nil {
-						return err
-					}
-					policies = append(policies, np)
 				}
 				t := &table.PolicyAssignment{
 					Name:     name,
