@@ -1629,9 +1629,9 @@ func (s *BgpServer) SetPolicies(ctx context.Context, r *api.SetPoliciesRequest) 
 			for _, p := range policies {
 				names = append(names, p.Name)
 			}
-			t := config.DEFAULT_POLICY_TYPE_REJECT_ROUTE
-			if rt == table.ROUTE_TYPE_ACCEPT {
-				t = config.DEFAULT_POLICY_TYPE_ACCEPT_ROUTE
+			t := config.DEFAULT_POLICY_TYPE_ACCEPT_ROUTE
+			if rt == table.ROUTE_TYPE_REJECT {
+				t = config.DEFAULT_POLICY_TYPE_REJECT_ROUTE
 			}
 			return t, names, nil
 		}
@@ -1665,7 +1665,7 @@ func (s *BgpServer) SetPolicies(ctx context.Context, r *api.SetPoliciesRequest) 
 				"Topic": "Peer",
 				"Key":   peer.fsm.pConf.State.NeighborAddress,
 			}).Info("call set policy")
-			a, err := getConfig(peer.TableID())
+			a, err := getConfig(peer.ID())
 			if err != nil {
 				return err
 			}
