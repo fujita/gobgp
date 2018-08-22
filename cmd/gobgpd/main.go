@@ -273,9 +273,9 @@ func main() {
 					if err != nil {
 						log.Warn(err)
 					} else {
-						apiServer.UpdatePolicy(context.Background(), &api.UpdatePolicyRequest{
-							Sets:     rp.DefinedSet,
-							Policies: rp.PolicyDefinition,
+						apiServer.SetPolicies(context.Background(), &api.SetPoliciesRequest{
+							DefinedSets: rp.DefinedSets,
+							Policies:    rp.Policies,
 						})
 					}
 
@@ -301,9 +301,9 @@ func main() {
 						if err != nil {
 							log.Warn(err)
 						} else {
-							apiServer.UpdatePolicy(context.Background(), &api.UpdatePolicyRequest{
-								Sets:     rp.DefinedSet,
-								Policies: rp.PolicyDefinition,
+							apiServer.SetPolicies(context.Background(), &api.SetPoliciesRequest{
+								DefinedSets: rp.DefinedSets,
+								Policies:    rp.Policies,
 							})
 						}
 					}

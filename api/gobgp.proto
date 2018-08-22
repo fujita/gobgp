@@ -64,7 +64,7 @@ service GobgpApi {
   rpc AddPolicy(AddPolicyRequest) returns (google.protobuf.Empty);
   rpc DeletePolicy(DeletePolicyRequest) returns (google.protobuf.Empty);
   rpc ListPolicy(ListPolicyRequest) returns (stream ListPolicyResponse);
-  rpc UpdatePolicy(UpdatePolicyRequest) returns (google.protobuf.Empty);
+  rpc SetPolicies(SetPoliciesRequest) returns (google.protobuf.Empty);
 
   rpc AddDefinedSet(AddDefinedSetRequest) returns (google.protobuf.Empty);
   rpc DeleteDefinedSet(DeleteDefinedSetRequest) returns (google.protobuf.Empty);
@@ -322,17 +322,18 @@ message ListPolicyResponse {
   Policy policy = 1;
 }
 
-message UpdatePolicyRequest {
-  repeated DefinedSet sets = 1;
+message SetPoliciesRequest {
+  repeated DefinedSet defined_sets = 1;
   repeated Policy policies = 2;
+  repeated PolicyAssignment assignments = 3;
 }
 
 message AddDefinedSetRequest {
-  DefinedSet set = 1;
+  DefinedSet defined_set = 1;
 }
 
 message DeleteDefinedSetRequest {
-  DefinedSet set = 1;
+  DefinedSet defined_set = 1;
   bool all = 2;
 }
 
@@ -342,7 +343,7 @@ message ListDefinedSetRequest {
 }
 
 message ListDefinedSetResponse {
-  DefinedSet set = 1;
+  DefinedSet defined_set = 1;
 }
 
 message AddStatementRequest {
@@ -1097,8 +1098,8 @@ message PolicyAssignment {
 }
 
 message RoutingPolicy {
-  repeated DefinedSet defined_set = 1;
-  repeated Policy policy_definition = 2;
+  repeated DefinedSet defined_sets = 1;
+  repeated Policy policies = 2;
 }
 
 message Roa {

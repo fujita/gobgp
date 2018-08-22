@@ -232,7 +232,7 @@ func showDefinedSet(v string, args []string) error {
 		} else if err != nil {
 			return err
 		}
-		m = append(m, r.Set)
+		m = append(m, r.DefinedSet)
 	}
 
 	if globalOpts.Json {
@@ -443,7 +443,7 @@ func modDefinedSet(settype string, modtype string, args []string) error {
 	switch modtype {
 	case CMD_ADD:
 		_, err = client.AddDefinedSet(ctx, &api.AddDefinedSetRequest{
-			Set: d,
+			DefinedSet: d,
 		})
 	case CMD_DEL:
 		all := false
@@ -451,8 +451,8 @@ func modDefinedSet(settype string, modtype string, args []string) error {
 			all = true
 		}
 		_, err = client.DeleteDefinedSet(ctx, &api.DeleteDefinedSetRequest{
-			Set: d,
-			All: all,
+			DefinedSet: d,
+			All:        all,
 		})
 	}
 	return err

@@ -1613,7 +1613,7 @@ func (s *BgpServer) StopBgp(ctx context.Context, r *api.StopBgpRequest) error {
 	return nil
 }
 
-func (s *BgpServer) UpdatePolicy(ctx context.Context, r *api.UpdatePolicyRequest) error {
+func (s *BgpServer) SetPolicies(ctx context.Context, r *api.SetPoliciesRequest) error {
 	rp, err := NewRoutingPolicyFromApiStruct(r)
 	if err != nil {
 		return err
@@ -3011,10 +3011,10 @@ func (s *BgpServer) ListDefinedSet(ctx context.Context, r *api.ListDefinedSetReq
 
 func (s *BgpServer) AddDefinedSet(ctx context.Context, r *api.AddDefinedSetRequest) error {
 	return s.mgmtOperation(func() error {
-		if r == nil || r.Set == nil {
+		if r == nil || r.DefinedSet == nil {
 			return fmt.Errorf("invalid request")
 		}
-		set, err := NewDefinedSetFromApiStruct(r.Set)
+		set, err := NewDefinedSetFromApiStruct(r.DefinedSet)
 		if err != nil {
 			return err
 		}
@@ -3024,10 +3024,10 @@ func (s *BgpServer) AddDefinedSet(ctx context.Context, r *api.AddDefinedSetReque
 
 func (s *BgpServer) DeleteDefinedSet(ctx context.Context, r *api.DeleteDefinedSetRequest) error {
 	return s.mgmtOperation(func() error {
-		if r == nil || r.Set == nil {
+		if r == nil || r.DefinedSet == nil {
 			return fmt.Errorf("invalid request")
 		}
-		set, err := NewDefinedSetFromApiStruct(r.Set)
+		set, err := NewDefinedSetFromApiStruct(r.DefinedSet)
 		if err != nil {
 			return err
 		}

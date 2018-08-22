@@ -639,8 +639,8 @@ func (s *Server) DisablePeer(ctx context.Context, r *api.DisablePeerRequest) (*e
 	return &empty.Empty{}, s.bgpServer.DisableNeighbor(ctx, r)
 }
 
-func (s *Server) UpdatePolicy(ctx context.Context, r *api.UpdatePolicyRequest) (*empty.Empty, error) {
-	return &empty.Empty{}, s.bgpServer.UpdatePolicy(ctx, r)
+func (s *Server) SetPolicies(ctx context.Context, r *api.SetPoliciesRequest) (*empty.Empty, error) {
+	return &empty.Empty{}, s.bgpServer.SetPolicies(ctx, r)
 }
 
 func NewAPIRoutingPolicyFromConfigStruct(c *config.RoutingPolicy) (*api.RoutingPolicy, error) {
@@ -654,12 +654,12 @@ func NewAPIRoutingPolicyFromConfigStruct(c *config.RoutingPolicy) (*api.RoutingP
 	}
 
 	return &api.RoutingPolicy{
-		DefinedSet:       definedSets,
-		PolicyDefinition: policies,
+		DefinedSets: definedSets,
+		Policies:    policies,
 	}, nil
 }
 
-func NewRoutingPolicyFromApiStruct(arg *api.UpdatePolicyRequest) (*config.RoutingPolicy, error) {
+func NewRoutingPolicyFromApiStruct(arg *api.SetPoliciesRequest) (*config.RoutingPolicy, error) {
 	policyDefinitions := make([]config.PolicyDefinition, 0, len(arg.Policies))
 	for _, p := range arg.Policies {
 		pd, err := NewConfigPolicyFromApiStruct(p)
@@ -669,7 +669,7 @@ func NewRoutingPolicyFromApiStruct(arg *api.UpdatePolicyRequest) (*config.Routin
 		policyDefinitions = append(policyDefinitions, *pd)
 	}
 
-	definedSets, err := NewConfigDefinedSetsFromApiStruct(arg.Sets)
+	definedSets, err := NewConfigDefinedSetsFromApiStruct(arg.DefinedSets)
 	if err != nil {
 		return nil, err
 	}
@@ -1582,7 +1582,7 @@ func (s *Server) ListDefinedSet(r *api.ListDefinedSetRequest, stream api.GobgpAp
 		return err
 	}
 	for _, set := range sets {
-		if err := stream.Send(&api.ListDefinedSetResponse{Set: set}); err != nil {
+		if err := stream.Send(&api.ListDefinedSetResponse{DefinedSet: set}); err != nil {
 			return err
 		}
 	}
