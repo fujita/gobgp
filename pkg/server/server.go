@@ -1630,7 +1630,7 @@ func (s *BgpServer) UpdatePolicy(ctx context.Context, r *api.UpdatePolicyRequest
 				names = append(names, p.Name)
 			}
 			t := config.DEFAULT_POLICY_TYPE_REJECT_ROUTE
-			if rt == table.ROUTE_TYPE_NONE {
+			if rt == table.ROUTE_TYPE_ACCEPT {
 				t = config.DEFAULT_POLICY_TYPE_ACCEPT_ROUTE
 			}
 			return t, names, nil
