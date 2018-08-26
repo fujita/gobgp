@@ -85,7 +85,7 @@ func showRPKIServer(args []string) error {
 }
 
 func showRPKITable(args []string) error {
-	family, err := checkAddressFamily()
+	family, err := checkAddressFamily(IPv4_UC)
 	if err != nil {
 		exitWithError(err)
 	}

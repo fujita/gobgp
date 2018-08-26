@@ -227,92 +227,111 @@ func addr2AddressFamily(a net.IP) *api.Family {
 	return nil
 }
 
-func checkAddressFamily() (*api.Family, error) {
+var (
+	IPv4_UC = &api.Family{
+		Afi:  api.Afi_IP,
+		Safi: api.Safi_UNICAST,
+	}
+	IPv6_UC = &api.Family{
+		Afi:  api.Afi_IP6,
+		Safi: api.Safi_UNICAST,
+	}
+	IPv4_VPN = &api.Family{
+		Afi:  api.Afi_IP,
+		Safi: api.Safi_MPLS_VPN,
+	}
+	IPv6_VPN = &api.Family{
+		Afi:  api.Afi_IP6,
+		Safi: api.Safi_MPLS_VPN,
+	}
+	IPv4_MPLS = &api.Family{
+		Afi:  api.Afi_IP,
+		Safi: api.Safi_MPLS_LABEL,
+	}
+	IPv6_MPLS = &api.Family{
+		Afi:  api.Afi_IP6,
+		Safi: api.Safi_MPLS_LABEL,
+	}
+	EVPN = &api.Family{
+		Afi:  api.Afi_L2VPN,
+		Safi: api.Safi_EVPN,
+	}
+	IPv4_ENCAP = &api.Family{
+		Afi:  api.Afi_IP,
+		Safi: api.Safi_ENCAPSULATION,
+	}
+	IPv6_ENCAP = &api.Family{
+		Afi:  api.Afi_IP6,
+		Safi: api.Safi_ENCAPSULATION,
+	}
+	RTC = &api.Family{
+		Afi:  api.Afi_IP,
+		Safi: api.Safi_ROUTE_TARGET_CONSTRAINTS,
+	}
+	IPv4_FS = &api.Family{
+		Afi:  api.Afi_IP,
+		Safi: api.Safi_FLOW_SPEC_UNICAST,
+	}
+	IPv6_FS = &api.Family{
+		Afi:  api.Afi_IP6,
+		Safi: api.Safi_FLOW_SPEC_UNICAST,
+	}
+	IPv4_VPN_FS = &api.Family{
+		Afi:  api.Afi_IP,
+		Safi: api.Safi_FLOW_SPEC_VPN,
+	}
+	IPv6_VPN_FS = &api.Family{
+		Afi:  api.Afi_IP6,
+		Safi: api.Safi_FLOW_SPEC_VPN,
+	}
+	L2_VPN_FS = &api.Family{
+		Afi:  api.Afi_L2VPN,
+		Safi: api.Safi_FLOW_SPEC_VPN,
+	}
+	OPAQUE = &api.Family{
+		Afi:  api.Afi_OPAQUE,
+		Safi: api.Safi_KEY_VALUE,
+	}
+)
+
+func checkAddressFamily(def *api.Family) (*api.Family, error) {
 	var f *api.Family
 	var e error
 	switch subOpts.AddressFamily {
 	case "ipv4", "v4", "4":
-		f = &api.Family{
-			Afi:  api.Afi_IP,
-			Safi: api.Safi_UNICAST,
-		}
+		f = IPv4_UC
 	case "ipv6", "v6", "6":
-		f = &api.Family{
-			Afi:  api.Afi_IP6,
-			Safi: api.Safi_UNICAST,
-		}
+		f = IPv6_UC
 	case "ipv4-l3vpn", "vpnv4", "vpn-ipv4":
-		f = &api.Family{
-			Afi:  api.Afi_IP,
-			Safi: api.Safi_MPLS_VPN,
-		}
+		f = IPv4_VPN
 	case "ipv6-l3vpn", "vpnv6", "vpn-ipv6":
-		f = &api.Family{
-			Afi:  api.Afi_IP6,
-			Safi: api.Safi_MPLS_VPN,
-		}
+		f = IPv6_VPN
 	case "ipv4-labeled", "ipv4-labelled", "ipv4-mpls":
-		f = &api.Family{
-			Afi:  api.Afi_IP,
-			Safi: api.Safi_MPLS_LABEL,
-		}
+		f = IPv4_MPLS
 	case "ipv6-labeled", "ipv6-labelled", "ipv6-mpls":
-		f = &api.Family{
-			Afi:  api.Afi_IP6,
-			Safi: api.Safi_MPLS_LABEL,
-		}
+		f = IPv6_MPLS
 	case "evpn":
-		f = &api.Family{
-			Afi:  api.Afi_L2VPN,
-			Safi: api.Safi_EVPN,
-		}
+		f = EVPN
 	case "encap", "ipv4-encap":
-		f = &api.Family{
-			Afi:  api.Afi_IP,
-			Safi: api.Safi_ENCAPSULATION,
-		}
+		f = IPv4_ENCAP
 	case "ipv6-encap":
-		f = &api.Family{
-			Afi:  api.Afi_IP6,
-			Safi: api.Safi_ENCAPSULATION,
-		}
+		f = IPv6_ENCAP
 	case "rtc":
-		f = &api.Family{
-			Afi:  api.Afi_IP,
-			Safi: api.Safi_ROUTE_TARGET_CONSTRAINTS,
-		}
+		f = RTC
 	case "ipv4-flowspec", "ipv4-flow", "flow4":
-		f = &api.Family{
-			Afi:  api.Afi_IP,
-			Safi: api.Safi_FLOW_SPEC_UNICAST,
-		}
+		f = IPv4_FS
 	case "ipv6-flowspec", "ipv6-flow", "flow6":
-		f = &api.Family{
-			Afi:  api.Afi_IP6,
-			Safi: api.Safi_FLOW_SPEC_UNICAST,
-		}
+		f = IPv6_FS
 	case "ipv4-l3vpn-flowspec", "ipv4vpn-flowspec", "flowvpn4":
-		f = &api.Family{
-			Afi:  api.Afi_IP,
-			Safi: api.Safi_FLOW_SPEC_VPN,
-		}
+		f = IPv4_VPN_FS
 	case "ipv6-l3vpn-flowspec", "ipv6vpn-flowspec", "flowvpn6":
-		f = &api.Family{
-			Afi:  api.Afi_IP6,
-			Safi: api.Safi_FLOW_SPEC_VPN,
-		}
+		f = IPv6_VPN_FS
 	case "l2vpn-flowspec":
-		f = &api.Family{
-			Afi:  api.Afi_L2VPN,
-			Safi: api.Safi_FLOW_SPEC_VPN,
-		}
+		f = L2_VPN_FS
 	case "opaque":
-		f = &api.Family{
-			Afi:  api.Afi_OPAQUE,
-			Safi: api.Safi_KEY_VALUE,
-		}
+		f = OPAQUE
 	case "":
-		// nothing
+		f = def
 	default:
 		e = fmt.Errorf("unsupported address family: %s", subOpts.AddressFamily)
 	}

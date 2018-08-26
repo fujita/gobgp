@@ -1273,7 +1273,7 @@ func showGlobalRib(args []string) error {
 }
 
 func modPath(resource string, name, modtype string, args []string) error {
-	f, err := checkAddressFamily()
+	f, err := checkAddressFamily(IPv4_UC)
 	if err != nil {
 		return err
 	}
@@ -1575,7 +1575,7 @@ func NewGlobalCmd() *cobra.Command {
 			subcmd := &cobra.Command{
 				Use: CMD_ALL,
 				Run: func(cmd *cobra.Command, args []string) {
-					family, err := checkAddressFamily()
+					family, err := checkAddressFamily(IPv4_UC)
 					if err != nil {
 						exitWithError(err)
 					}

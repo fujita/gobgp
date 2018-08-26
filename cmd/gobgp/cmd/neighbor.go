@@ -697,18 +697,13 @@ func showValidationInfo(p *api.Path, shownAs map[uint32]struct{}) error {
 }
 
 func showRibInfo(r, name string) error {
-	family, err := checkAddressFamily()
+	def := addr2AddressFamily(net.ParseIP(name))
+	if r == CMD_GLOBAL {
+		def = IPv4_UC
+	}
+	family, err := checkAddressFamily(def)
 	if err != nil {
 		return err
-	}
-	if family == nil {
-		family = addr2AddressFamily(net.ParseIP(name))
-		if r == CMD_GLOBAL {
-			family = &api.Family{
-				Afi:  api.Afi_IP,
-				Safi: api.Safi_UNICAST,
-			}
-		}
 	}
 
 	var t api.Resource
@@ -766,28 +761,19 @@ func showNeighborRib(r string, name string, args []string) error {
 	def := addr2AddressFamily(net.ParseIP(name))
 	switch r {
 	case CMD_GLOBAL:
-		def = &api.Family{
-			Afi:  api.Afi_IP,
-			Safi: api.Safi_UNICAST,
-		}
+		def = IPv4_UC
 		showBest = true
 	case CMD_LOCAL:
 		showBest = true
 	case CMD_ADJ_OUT:
 		showAge = false
 	case CMD_VRF:
-		def = &api.Family{
-			Afi:  api.Afi_IP,
-			Safi: api.Safi_UNICAST,
-		}
+		def = IPv4_UC
 		showBest = true
 	}
-	family, err := checkAddressFamily()
+	family, err := checkAddressFamily(def)
 	if err != nil {
 		return err
-	}
-	if family == nil {
-		family = def
 	}
 	rf := apiutil.ToRouteFamily(family.Afi, family.Safi)
 	switch rf {

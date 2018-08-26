@@ -114,7 +114,7 @@ func NewMonitorCmd() *cobra.Command {
 	ribCmd := &cobra.Command{
 		Use: CMD_RIB,
 		Run: func(cmd *cobra.Command, args []string) {
-			family, err := checkAddressFamily()
+			family, err := checkAddressFamily(IPv4_UC)
 			if err != nil {
 				exitWithError(err)
 			}
@@ -184,7 +184,7 @@ func NewMonitorCmd() *cobra.Command {
 				}
 				name = args[0]
 			}
-			family, err := checkAddressFamily()
+			family, err := checkAddressFamily(IPv4_UC)
 			if err != nil {
 				exitWithError(err)
 			}
