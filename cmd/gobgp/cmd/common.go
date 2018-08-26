@@ -212,57 +212,111 @@ func newClient(ctx context.Context) (api.GobgpApiClient, error) {
 	return api.NewGobgpApiClient(conn), nil
 }
 
-func addr2AddressFamily(a net.IP) bgp.RouteFamily {
+func addr2AddressFamily(a net.IP) *api.Family {
 	if a.To4() != nil {
-		return bgp.RF_IPv4_UC
+		return &api.Family{
+			Afi:  api.Afi_IP,
+			Safi: api.Safi_UNICAST,
+		}
 	} else if a.To16() != nil {
-		return bgp.RF_IPv6_UC
+		return &api.Family{
+			Afi:  api.Afi_IP6,
+			Safi: api.Safi_UNICAST,
+		}
 	}
-	return bgp.RouteFamily(0)
+	return nil
 }
 
-func checkAddressFamily(def bgp.RouteFamily) (bgp.RouteFamily, error) {
-	var rf bgp.RouteFamily
+func checkAddressFamily() (*api.Family, error) {
+	var f *api.Family
 	var e error
 	switch subOpts.AddressFamily {
 	case "ipv4", "v4", "4":
-		rf = bgp.RF_IPv4_UC
+		f = &api.Family{
+			Afi:  api.Afi_IP,
+			Safi: api.Safi_UNICAST,
+		}
 	case "ipv6", "v6", "6":
-		rf = bgp.RF_IPv6_UC
+		f = &api.Family{
+			Afi:  api.Afi_IP6,
+			Safi: api.Safi_UNICAST,
+		}
 	case "ipv4-l3vpn", "vpnv4", "vpn-ipv4":
-		rf = bgp.RF_IPv4_VPN
+		f = &api.Family{
+			Afi:  api.Afi_IP,
+			Safi: api.Safi_MPLS_VPN,
+		}
 	case "ipv6-l3vpn", "vpnv6", "vpn-ipv6":
-		rf = bgp.RF_IPv6_VPN
+		f = &api.Family{
+			Afi:  api.Afi_IP6,
+			Safi: api.Safi_MPLS_VPN,
+		}
 	case "ipv4-labeled", "ipv4-labelled", "ipv4-mpls":
-		rf = bgp.RF_IPv4_MPLS
+		f = &api.Family{
+			Afi:  api.Afi_IP,
+			Safi: api.Safi_MPLS_LABEL,
+		}
 	case "ipv6-labeled", "ipv6-labelled", "ipv6-mpls":
-		rf = bgp.RF_IPv6_MPLS
+		f = &api.Family{
+			Afi:  api.Afi_IP6,
+			Safi: api.Safi_MPLS_LABEL,
+		}
 	case "evpn":
-		rf = bgp.RF_EVPN
+		f = &api.Family{
+			Afi:  api.Afi_L2VPN,
+			Safi: api.Safi_EVPN,
+		}
 	case "encap", "ipv4-encap":
-		rf = bgp.RF_IPv4_ENCAP
+		f = &api.Family{
+			Afi:  api.Afi_IP,
+			Safi: api.Safi_ENCAPSULATION,
+		}
 	case "ipv6-encap":
-		rf = bgp.RF_IPv6_ENCAP
+		f = &api.Family{
+			Afi:  api.Afi_IP6,
+			Safi: api.Safi_ENCAPSULATION,
+		}
 	case "rtc":
-		rf = bgp.RF_RTC_UC
+		f = &api.Family{
+			Afi:  api.Afi_IP,
+			Safi: api.Safi_ROUTE_TARGET_CONSTRAINTS,
+		}
 	case "ipv4-flowspec", "ipv4-flow", "flow4":
-		rf = bgp.RF_FS_IPv4_UC
+		f = &api.Family{
+			Afi:  api.Afi_IP,
+			Safi: api.Safi_FLOW_SPEC_UNICAST,
+		}
 	case "ipv6-flowspec", "ipv6-flow", "flow6":
-		rf = bgp.RF_FS_IPv6_UC
+		f = &api.Family{
+			Afi:  api.Afi_IP6,
+			Safi: api.Safi_FLOW_SPEC_UNICAST,
+		}
 	case "ipv4-l3vpn-flowspec", "ipv4vpn-flowspec", "flowvpn4":
-		rf = bgp.RF_FS_IPv4_VPN
+		f = &api.Family{
+			Afi:  api.Afi_IP,
+			Safi: api.Safi_FLOW_SPEC_VPN,
+		}
 	case "ipv6-l3vpn-flowspec", "ipv6vpn-flowspec", "flowvpn6":
-		rf = bgp.RF_FS_IPv6_VPN
+		f = &api.Family{
+			Afi:  api.Afi_IP6,
+			Safi: api.Safi_FLOW_SPEC_VPN,
+		}
 	case "l2vpn-flowspec":
-		rf = bgp.RF_FS_L2_VPN
+		f = &api.Family{
+			Afi:  api.Afi_L2VPN,
+			Safi: api.Safi_FLOW_SPEC_VPN,
+		}
 	case "opaque":
-		rf = bgp.RF_OPAQUE
+		f = &api.Family{
+			Afi:  api.Afi_OPAQUE,
+			Safi: api.Safi_KEY_VALUE,
+		}
 	case "":
-		rf = def
+		// nothing
 	default:
 		e = fmt.Errorf("unsupported address family: %s", subOpts.AddressFamily)
 	}
-	return rf, e
+	return f, e
 }
 
 func printError(err error) {

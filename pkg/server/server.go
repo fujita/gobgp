@@ -1859,7 +1859,7 @@ func (s *BgpServer) DeletePath(ctx context.Context, r *api.DeletePathRequest) er
 		if err != nil {
 			return err
 		}
-		f := bgp.RouteFamily(r.Family)
+		f := bgp.AfiSafiToRouteFamily(uint16(r.Family.Afi), uint8(r.Family.Safi))
 
 		if len(r.Uuid) > 0 {
 			// Delete locally generated path which has the given UUID
@@ -2297,7 +2297,7 @@ func (s *BgpServer) ListPath(ctx context.Context, r *api.ListPathRequest) ([]*ap
 	}
 
 	in := false
-	family := bgp.RouteFamily(r.Family)
+	family := bgp.AfiSafiToRouteFamily(uint16(r.Family.Afi), uint8(r.Family.Safi))
 	var err error
 	switch r.Type {
 	case api.Resource_LOCAL, api.Resource_GLOBAL:
@@ -2390,7 +2390,7 @@ func (s *BgpServer) GetTable(ctx context.Context, r *api.GetTableRequest) (*api.
 	if r == nil || r.Name == "" {
 		return nil, fmt.Errorf("invalid request")
 	}
-	family := bgp.RouteFamily(r.Family)
+	family := bgp.AfiSafiToRouteFamily(uint16(r.Family.Afi), uint8(r.Family.Safi))
 	var in bool
 	var err error
 	var info *table.TableInfo
@@ -3287,7 +3287,8 @@ func (s *BgpServer) ListRpki(ctx context.Context, r *api.ListRpkiRequest) (l []*
 func (s *BgpServer) ListRpkiTable(ctx context.Context, r *api.ListRpkiTableRequest) (l []*api.Roa, err error) {
 	s.mgmtOperation(func() error {
 		var roas []*table.ROA
-		roas, err = s.roaManager.GetRoa(bgp.RouteFamily(r.Family))
+		rf := bgp.AfiSafiToRouteFamily(uint16(r.Family.Afi), uint8(r.Family.Safi))
+		roas, err = s.roaManager.GetRoa(bgp.RouteFamily(rf))
 		if err == nil {
 			l = append(l, NewRoaListFromTableStructList(roas)...)
 		}
