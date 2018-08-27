@@ -73,7 +73,7 @@ func main() {
 
 	_, err := s.AddPath(context.Background(), &api.AddPathRequest{
 		Path: &api.Path{
-			Family:    uint32(api.Family_IPv4),
+			Family:    &api.Family{Afi: api.Afi_IP, Safi: api.Safi_UNICAST},
 			AnyNlri:   nlri,
 			AnyPattrs: attrs,
 		},
