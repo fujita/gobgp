@@ -631,11 +631,10 @@ message PeerConf {
   // PrefixLimit should be removed from here, and list of PrefixLimit in
   // AfiSafi should be used instead.
   repeated PrefixLimit prefix_limits = 14;
-  string local_address = 15;
-  string neighbor_interface = 16;
-  string vrf = 17;
-  uint32 allow_own_as = 18;
-  bool replace_peer_as = 19;
+  string neighbor_interface = 15;
+  string vrf = 16;
+  uint32 allow_own_as = 17;
+  bool replace_peer_as = 18;
 }
 
 message PeerGroupConf {

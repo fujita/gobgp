@@ -287,7 +287,6 @@ func NewPeerFromConfigStruct(pconf *config.Neighbor) *api.Peer {
 			RemoteCap:         remoteCap,
 			LocalCap:          localCap,
 			PrefixLimits:      prefixLimits,
-			LocalAddress:      localAddress,
 			NeighborInterface: pconf.Config.NeighborInterface,
 			Vrf:               pconf.Config.Vrf,
 			AllowOwnAs:        uint32(pconf.AsPathOptions.Config.AllowOwnAs),
@@ -360,7 +359,7 @@ func NewPeerFromConfigStruct(pconf *config.Neighbor) *api.Peer {
 		},
 		Transport: &api.Transport{
 			RemotePort:   uint32(pconf.Transport.Config.RemotePort),
-			LocalAddress: pconf.Transport.Config.LocalAddress,
+			LocalAddress: localAddress,
 			PassiveMode:  pconf.Transport.Config.PassiveMode,
 		},
 		AfiSafis: afiSafis,
