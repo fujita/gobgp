@@ -45,7 +45,7 @@ _docker: &_docker
 env:
   global:
     - DOCKER_IMAGE=gobgp
-    - FROM_IMAGE=osrg/quagga
+    - FROM_IMAGE=tomo/quagga
 
 matrix:
   allow_failures:
