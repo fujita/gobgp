@@ -430,7 +430,7 @@ class QuaggaOSPFContainer(OSPFContainer):
     ZAPI_V2_IMAGE = 'osrg/quagga'
     ZAPI_V3_IMAGE = 'osrg/quagga:v1.0'
 
-    def __init__(self, name, image=ZAPI_V2_IMAGE, zapi_verion=2,
+    def __init__(self, name, image=ZAPI_V3_IMAGE, zapi_verion=2,
                  zebra_config=None, ospfd_config=None):
         if zapi_verion != 2:
             image = self.ZAPI_V3_IMAGE
