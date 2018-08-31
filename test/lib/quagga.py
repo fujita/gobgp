@@ -519,10 +519,7 @@ class QuaggaOSPFContainer(OSPFContainer):
         return
 
     def _start_ospfd(self):
-        if self.zapi_vserion == 2:
-            ospfd_cmd = '/usr/lib/quagga/ospfd'
-        else:
-            ospfd_cmd = 'ospfd'
+        ospfd_cmd = 'ospfd'
         self.local(
             '{0} -f {1}/ospfd.conf'.format(ospfd_cmd, self.SHARED_VOLUME),
             detach=True)
