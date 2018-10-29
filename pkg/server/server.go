@@ -68,7 +68,7 @@ func newTCPListener(address string, port uint32, ch chan *net.TCPConn) (*tcpList
 	}
 	// Note: Set TTL=255 for incoming connection listener in order to accept
 	// connection in case for the neighbor has TTL Security settings.
-	if err := setListenTcpTTLSockopt(l, 255); err != nil {
+	if err := setListenTCPTTLSockopt(l, 255); err != nil {
 		log.WithFields(log.Fields{
 			"Topic": "Peer",
 			"Key":   addr,
