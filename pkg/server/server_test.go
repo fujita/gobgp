@@ -825,31 +825,30 @@ func TestFamiliesForSoftreset(t *testing.T) {
 	assert.NotContains(t, families, bgp.RF_RTC_UC)
 }
 
-func runNewServer(ctx context.Context, as uint32, routerId string, listenPort int32) (*BgpServer, error) {
+func runNewServer(ctx context.Context, as uint32, routerID string, listenPort int32) (*BgpServer, context.CancelFunc, error) {
 	s := NewBgpServer()
 	ctxInner, cancelInner := context.WithCancel(ctx)
 	go s.Serve()
 	go func() {
 		<-ctxInner.Done()
-		stopCtx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+		stopCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		if err := s.StopBgp(stopCtx, &api.StopBgpRequest{}); err != nil {
 			log.Fatalf("Failed to stop server %s: %s", s.bgpConfig.Global.Config.RouterId, err)
 		}
+		cancel()
 	}()
 
 	err := s.StartBgp(ctx, &api.StartBgpRequest{
 		Global: &api.Global{
 			As:         as,
-			RouterId:   routerId,
+			RouterId:   routerID,
 			ListenPort: listenPort,
 		},
 	})
 	if err != nil {
-		cancelInner()
-		return nil, err
+		s = nil
 	}
-
-	return s, nil
+	return s, cancelInner, err
 }
 
 func peerServers(t *testing.T, ctx context.Context, servers []*BgpServer, families []config.AfiSafiType) error {
@@ -936,14 +935,16 @@ func TestDoNotReactToDuplicateRTCMemberships(t *testing.T) {
 	defer cancel()
 	log.SetLevel(log.DebugLevel)
 
-	s1, err := runNewServer(ctx, 1, "1.1.1.1", 10179)
+	s1, cf1, err := runNewServer(ctx, 1, "1.1.1.1", 10179)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s2, err := runNewServer(ctx, 1, "2.2.2.2", 20179)
+	defer func() { cf1() }()
+	s2, cf2, err := runNewServer(ctx, 1, "2.2.2.2", 20179)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() { cf2() }()
 
 	addVrf(t, ctx, s1, "vrf1", "111:111", 1)
 	addVrf(t, ctx, s2, "vrf1", "111:111", 1)
@@ -1013,7 +1014,7 @@ func TestDoNotReactToDuplicateRTCMemberships(t *testing.T) {
 	s1Peer := s2.neighborMap["127.0.0.1"]
 	s2.propagateUpdate(s1Peer, []*table.Path{rtcPath})
 
-	awaitUpdateCtx, _ := context.WithTimeout(ctx, time.Second)
+	awaitUpdateCtx, cancel := context.WithTimeout(ctx, time.Second)
 	for done := false; !done; {
 		select {
 		case ev := <-watcher.Event():
@@ -1026,9 +1027,11 @@ func TestDoNotReactToDuplicateRTCMemberships(t *testing.T) {
 					}
 				}
 			}
+		//case <-timer.C:
 		case <-awaitUpdateCtx.Done():
 			log.Infof("await update done")
 			done = true
 		}
 	}
+	cancel()
 }
