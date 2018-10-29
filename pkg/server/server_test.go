@@ -358,13 +358,13 @@ func TestNumGoroutineWithAddDeleteNeighbor(t *testing.T) {
 	assert.Equal(num, runtime.NumGoroutine())
 }
 
-func newPeerandInfo(myAs, as uint32, address string, rib *table.TableManager) (*Peer, *table.PeerInfo) {
+func newPeerandInfo(myAs, as uint32, address string, rib *table.TableManager) (*peer, *table.PeerInfo) {
 	nConf := &config.Neighbor{Config: config.NeighborConfig{PeerAs: as, NeighborAddress: address}}
 	gConf := &config.Global{Config: config.GlobalConfig{As: myAs}}
 	config.SetDefaultNeighborConfigValues(nConf, nil, gConf)
 	policy := table.NewRoutingPolicy()
 	policy.Reset(&config.RoutingPolicy{}, nil)
-	p := NewPeer(
+	p := newPeer(
 		&config.Global{Config: config.GlobalConfig{As: myAs}},
 		nConf,
 		rib,
@@ -804,7 +804,7 @@ func TestFamiliesForSoftreset(t *testing.T) {
 			},
 		}
 	}
-	peer := &Peer{
+	peer := &peer{
 		fsm: &FSM{
 			pConf: &config.Neighbor{
 				AfiSafis: []config.AfiSafi{f(bgp.RF_RTC_UC), f(bgp.RF_IPv4_UC), f(bgp.RF_IPv6_UC)},
