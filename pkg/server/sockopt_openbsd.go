@@ -348,12 +348,12 @@ func saDelete(address string) error {
 }
 
 const (
-	TCP_MD5SIG       = 0x4 // TCP MD5 Signature (RFC2385)
-	IPV6_MINHOPCOUNT = 73  // Generalized TTL Security Mechanism (RFC5082)
+	tcpMD5SIG       = 0x4 // TCP MD5 Signature (RFC2385)
+	ipv6MinHopCount = 73  // Generalized TTL Security Mechanism (RFC5082)
 )
 
 func setsockoptTcpMD5Sig(sc syscall.RawConn, address string, key string) error {
-	if err := setsockOptInt(sc, syscall.IPPROTO_TCP, TCP_MD5SIG, 1); err != nil {
+	if err := setsockOptInt(sc, syscall.IPPROTO_TCP, tcpMD5SIG, 1); err != nil {
 		return err
 	}
 	if len(key) > 0 {
@@ -398,7 +398,7 @@ func SetTcpMinTTLSockopt(conn *net.TCPConn, ttl int) error {
 	name := syscall.IP_MINTTL
 	if family == syscall.AF_INET6 {
 		level = syscall.IPPROTO_IPV6
-		name = IPV6_MINHOPCOUNT
+		name = ipv6MinHopCount
 	}
 	return setsockOptInt(sc, level, name, ttl)
 }
