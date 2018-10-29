@@ -45,9 +45,7 @@ func (l *tcpListener) Close() error {
 	if err := l.l.Close(); err != nil {
 		return err
 	}
-	select {
-	case <-l.ch:
-	}
+	<-l.ch
 	return nil
 }
 
