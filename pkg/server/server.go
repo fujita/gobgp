@@ -106,7 +106,7 @@ type BgpServer struct {
 	policy       *table.RoutingPolicy
 	listeners    []*tcpListener
 	neighborMap  map[string]*peer
-	peerGroupMap map[string]*PeerGroup
+	peerGroupMap map[string]*peerGroup
 	globalRib    *table.TableManager
 	rsRib        *table.TableManager
 	roaManager   *roaManager
@@ -122,7 +122,7 @@ func NewBgpServer() *BgpServer {
 	roaManager, _ := newROAManager(0)
 	s := &BgpServer{
 		neighborMap:  make(map[string]*peer),
-		peerGroupMap: make(map[string]*PeerGroup),
+		peerGroupMap: make(map[string]*peerGroup),
 		policy:       table.NewRoutingPolicy(),
 		roaManager:   roaManager,
 		mgmtCh:       make(chan *mgmtOp, 1),
@@ -331,10 +331,10 @@ func (server *BgpServer) Serve() {
 	}
 }
 
-func (server *BgpServer) matchLongestDynamicNeighborPrefix(a string) *PeerGroup {
+func (server *BgpServer) matchLongestDynamicNeighborPrefix(a string) *peerGroup {
 	ipAddr := net.ParseIP(a)
 	longestMask := net.CIDRMask(0, 32).String()
-	var longestPG *PeerGroup
+	var longestPG *peerGroup
 	for _, pg := range server.peerGroupMap {
 		for _, d := range pg.dynamicNeighbors {
 			_, netAddr, _ := net.ParseCIDR(d.Config.Prefix)
@@ -1144,7 +1144,7 @@ func (server *BgpServer) handleFSMMessage(peer *peer, e *FsmMsg) {
 		if oldState == bgp.BGP_FSM_ESTABLISHED {
 			t := time.Now()
 			peer.fsm.lock.Lock()
-			if t.Sub(time.Unix(peer.fsm.pConf.Timers.State.Uptime, 0)) < FLOP_THRESHOLD {
+			if t.Sub(time.Unix(peer.fsm.pConf.Timers.State.Uptime, 0)) < flopThreshold {
 				peer.fsm.pConf.State.Flops++
 			}
 			graceful := peer.fsm.reason.Type == FSM_GRACEFUL_RESTART
@@ -2493,7 +2493,7 @@ func (server *BgpServer) addPeerGroup(c *config.PeerGroup) error {
 		"Name":  name,
 	}).Info("Add a peer group configuration")
 
-	server.peerGroupMap[c.Config.PeerGroupName] = NewPeerGroup(c)
+	server.peerGroupMap[c.Config.PeerGroupName] = newPeerGroup(c)
 
 	return nil
 }

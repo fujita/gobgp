@@ -29,33 +29,33 @@ import (
 )
 
 const (
-	FLOP_THRESHOLD    = time.Second * 30
-	MIN_CONNECT_RETRY = 10
+	flopThreshold   = time.Second * 30
+	minConnectRetry = 10
 )
 
-type PeerGroup struct {
+type peerGroup struct {
 	Conf             *config.PeerGroup
 	members          map[string]config.Neighbor
 	dynamicNeighbors map[string]*config.DynamicNeighbor
 }
 
-func NewPeerGroup(c *config.PeerGroup) *PeerGroup {
-	return &PeerGroup{
+func newPeerGroup(c *config.PeerGroup) *peerGroup {
+	return &peerGroup{
 		Conf:             c,
 		members:          make(map[string]config.Neighbor),
 		dynamicNeighbors: make(map[string]*config.DynamicNeighbor),
 	}
 }
 
-func (pg *PeerGroup) AddMember(c config.Neighbor) {
+func (pg *peerGroup) AddMember(c config.Neighbor) {
 	pg.members[c.State.NeighborAddress] = c
 }
 
-func (pg *PeerGroup) DeleteMember(c config.Neighbor) {
+func (pg *peerGroup) DeleteMember(c config.Neighbor) {
 	delete(pg.members, c.State.NeighborAddress)
 }
 
-func (pg *PeerGroup) AddDynamicNeighbor(c *config.DynamicNeighbor) {
+func (pg *peerGroup) AddDynamicNeighbor(c *config.DynamicNeighbor) {
 	pg.dynamicNeighbors[c.Config.Prefix] = c
 }
 
