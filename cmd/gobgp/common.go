@@ -202,8 +202,7 @@ func newClient(ctx context.Context) (api.GobgpApiClient, context.CancelFunc, err
 	cc, cancel := context.WithTimeout(ctx, time.Second)
 	conn, err := grpc.DialContext(cc, target, grpcOpts...)
 	if err != nil {
-		cancel()
-		return nil, nil, err
+		return nil, cancel, err
 	}
 	return api.NewGobgpApiClient(conn), cancel, nil
 }
