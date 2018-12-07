@@ -1589,8 +1589,8 @@ func (s *BgpServer) AddBmp(ctx context.Context, r *api.AddBmpRequest) error {
 			return fmt.Errorf("invalid bmp route monitoring policy: %v", r.Type)
 		}
 		return s.bmpManager.addServer(&config.BmpServerConfig{
-			Address: r.Address,
-			Port:    r.Port,
+			Address:               r.Address,
+			Port:                  r.Port,
 			RouteMonitoringPolicy: config.IntToBmpRouteMonitoringPolicyTypeMap[int(r.Type)],
 			StatisticsTimeout:     uint16(r.StatisticsTimeout),
 		})
