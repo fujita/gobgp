@@ -111,7 +111,7 @@ func newPeer(g *config.Global, conf *config.Neighbor, loc *table.TableManager, p
 		outgoing:          channels.NewInfiniteChannel(),
 		localRib:          loc,
 		policy:            policy,
-		fsm:               newFSM(g, conf, policy),
+		fsm:               newFSM(g, conf),
 		prefixLimitWarned: make(map[bgp.RouteFamily]bool),
 	}
 	if peer.isRouteServerClient() {
