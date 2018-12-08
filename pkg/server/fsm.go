@@ -194,7 +194,6 @@ type fsm struct {
 	pConf                *config.Neighbor
 	lock                 sync.RWMutex
 	state                bgp.FSMState
-	reason               *fsmStateReason
 	conn                 net.Conn
 	connCh               chan net.Conn
 	idleHoldTime         float64
@@ -305,7 +304,7 @@ func newFSM(gConf *config.Global, pConf *config.Neighbor, policy *table.RoutingP
 	return fsm
 }
 
-func (fsm *fsm) StateChange(nextState bgp.FSMState) {
+func (fsm *fsm) StateChange(nextState bgp.FSMState, reason *fsmStateReason) {
 	fsm.lock.Lock()
 	defer fsm.lock.Unlock()
 
@@ -314,7 +313,7 @@ func (fsm *fsm) StateChange(nextState bgp.FSMState) {
 		"Key":    fsm.pConf.State.NeighborAddress,
 		"old":    fsm.state.String(),
 		"new":    nextState.String(),
-		"reason": fsm.reason,
+		"reason": reason,
 	}).Debug("state changed")
 	fsm.state = nextState
 	switch nextState {
@@ -1870,7 +1869,6 @@ func (h *fsmHandler) loop(ctx context.Context, wg *sync.WaitGroup) error {
 	}
 
 	fsm.lock.RLock()
-	fsm.reason = reason
 
 	if nextState == bgp.BGP_FSM_ESTABLISHED && oldState == bgp.BGP_FSM_OPENCONFIRM {
 		log.WithFields(log.Fields{
@@ -1883,7 +1881,6 @@ func (h *fsmHandler) loop(ctx context.Context, wg *sync.WaitGroup) error {
 	if oldState == bgp.BGP_FSM_ESTABLISHED {
 		// The main goroutine sent the notificaiton due to
 		// deconfiguration or something.
-		reason := fsm.reason
 		if fsm.h.sentNotification != nil {
 			reason.Type = fsmNotificationSent
 			reason.peerDownReason = peerDownByLocal
