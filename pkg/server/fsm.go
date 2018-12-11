@@ -276,7 +276,7 @@ func (fsm *fsm) bmpStatsUpdate(statType uint16, increment int) {
 	}
 }
 
-func newFSM(gConf *config.Global, pConf *config.Neighbor) *fsm {
+func newFSM(gConf *config.Global, pConf *config.Neighbor, state bgp.FSMState) *fsm {
 	adminState := adminStateUp
 	if pConf.Config.AdminDown {
 		adminState = adminStateDown
@@ -287,7 +287,7 @@ func newFSM(gConf *config.Global, pConf *config.Neighbor) *fsm {
 	fsm := &fsm{
 		gConf:                gConf,
 		pConf:                pConf,
-		state:                bgp.BGP_FSM_IDLE,
+		state:                state,
 		connCh:               make(chan net.Conn, 1),
 		opensentHoldTime:     float64(holdtimeOpensent),
 		adminState:           adminState,

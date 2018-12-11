@@ -88,11 +88,7 @@ func newDynamicPeer(g *config.Global, neighborAddress string, pg *config.PeerGro
 		}).Debugf("Can't set default config: %s", err)
 		return nil
 	}
-	peer := newPeer(g, &conf, loc, policy)
-	peer.fsm.lock.Lock()
-	peer.fsm.state = bgp.BGP_FSM_ACTIVE
-	peer.fsm.lock.Unlock()
-	return peer
+	return newPeer(g, &conf, bgp.BGP_FSM_ACTIVE, loc, policy)
 }
 
 type peer struct {
@@ -106,12 +102,12 @@ type peer struct {
 	llgrEndChs        []chan struct{}
 }
 
-func newPeer(g *config.Global, conf *config.Neighbor, loc *table.TableManager, policy *table.RoutingPolicy) *peer {
+func newPeer(g *config.Global, conf *config.Neighbor, fsmState bgp.FSMState, loc *table.TableManager, policy *table.RoutingPolicy) *peer {
 	peer := &peer{
 		outgoing:          channels.NewInfiniteChannel(),
 		localRib:          loc,
 		policy:            policy,
-		fsm:               newFSM(g, conf),
+		fsm:               newFSM(g, conf, fsmState),
 		prefixLimitWarned: make(map[bgp.RouteFamily]bool),
 	}
 	if peer.isRouteServerClient() {

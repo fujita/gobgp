@@ -1589,8 +1589,8 @@ func (s *BgpServer) AddBmp(ctx context.Context, r *api.AddBmpRequest) error {
 			return fmt.Errorf("invalid bmp route monitoring policy: %v", r.Type)
 		}
 		return s.bmpManager.addServer(&config.BmpServerConfig{
-			Address:               r.Address,
-			Port:                  r.Port,
+			Address: r.Address,
+			Port:    r.Port,
 			RouteMonitoringPolicy: config.IntToBmpRouteMonitoringPolicyTypeMap[int(r.Type)],
 			StatisticsTimeout:     uint16(r.StatisticsTimeout),
 		})
@@ -2638,7 +2638,7 @@ func (s *BgpServer) addNeighbor(c *config.Neighbor) error {
 	if c.RouteServer.Config.RouteServerClient {
 		rib = s.rsRib
 	}
-	peer := newPeer(&s.bgpConfig.Global, c, rib, s.policy)
+	peer := newPeer(&s.bgpConfig.Global, c, bgp.BGP_FSM_IDLE, rib, s.policy)
 	s.policy.Reset(nil, map[string]config.ApplyPolicy{peer.ID(): c.ApplyPolicy})
 	s.neighborMap[addr] = peer
 	if name := c.Config.PeerGroup; name != "" {

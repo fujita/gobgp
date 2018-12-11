@@ -310,7 +310,7 @@ func TestCheckOwnASLoop(t *testing.T) {
 
 func makePeerAndHandler() (*peer, *fsmHandler) {
 	p := &peer{
-		fsm:      newFSM(&config.Global{}, &config.Neighbor{}),
+		fsm:      newFSM(&config.Global{}, &config.Neighbor{}, bgp.BGP_FSM_IDLE),
 		outgoing: channels.NewInfiniteChannel(),
 	}
 

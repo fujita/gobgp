@@ -372,11 +372,7 @@ func newPeerandInfo(myAs, as uint32, address string, rib *table.TableManager) (*
 	config.SetDefaultNeighborConfigValues(nConf, nil, gConf)
 	policy := table.NewRoutingPolicy()
 	policy.Reset(&config.RoutingPolicy{}, nil)
-	p := newPeer(
-		&config.Global{Config: config.GlobalConfig{As: myAs}},
-		nConf,
-		rib,
-		policy)
+	p := newPeer(&config.Global{Config: config.GlobalConfig{As: myAs}}, nConf, bgp.BGP_FSM_IDLE, rib, policy)
 	for _, f := range rib.GetRFlist() {
 		p.fsm.rfMap[f] = bgp.BGP_ADD_PATH_NONE
 	}
