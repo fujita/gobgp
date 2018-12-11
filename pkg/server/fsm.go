@@ -391,6 +391,23 @@ func (fsm *fsm) sendNotification(code, subType uint8, data []byte, msg string) (
 	return fsm.sendNotificationFromErrorMsg(e.(*bgp.MessageError))
 }
 
+func (fsm *fsm) StartFSMHandler(incoming *channels.InfiniteChannel, stateCh chan *fsmMsg, outgoing *channels.InfiniteChannel) {
+	ctx, cancel := context.WithCancel(context.Background())
+	fsm.h = &fsmHandler{
+		fsm:              fsm,
+		stateReasonCh:    make(chan fsmStateReason, 2),
+		incoming:         incoming,
+		stateCh:          stateCh,
+		outgoing:         outgoing,
+		holdTimerResetCh: make(chan bool, 2),
+		wg:               &sync.WaitGroup{},
+		ctx:              ctx,
+		ctxCancel:        cancel,
+	}
+	fsm.h.wg.Add(1)
+	go fsm.h.loop(ctx, fsm.h.wg)
+}
+
 type fsmHandler struct {
 	fsm              *fsm
 	conn             net.Conn
@@ -404,24 +421,6 @@ type fsmHandler struct {
 	ctx              context.Context
 	ctxCancel        context.CancelFunc
 	wg               *sync.WaitGroup
-}
-
-func newFSMHandler(fsm *fsm, incoming *channels.InfiniteChannel, stateCh chan *fsmMsg, outgoing *channels.InfiniteChannel) *fsmHandler {
-	ctx, cancel := context.WithCancel(context.Background())
-	h := &fsmHandler{
-		fsm:              fsm,
-		stateReasonCh:    make(chan fsmStateReason, 2),
-		incoming:         incoming,
-		stateCh:          stateCh,
-		outgoing:         outgoing,
-		holdTimerResetCh: make(chan bool, 2),
-		wg:               &sync.WaitGroup{},
-		ctx:              ctx,
-		ctxCancel:        cancel,
-	}
-	h.wg.Add(1)
-	go h.loop(ctx, h.wg)
-	return h
 }
 
 func (h *fsmHandler) idle(ctx context.Context) (bgp.FSMState, *fsmStateReason) {

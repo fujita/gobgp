@@ -526,13 +526,6 @@ func (peer *peer) handleUpdate(e *fsmMsg) ([]*table.Path, []bgp.RouteFamily, *bg
 	return nil, nil, nil
 }
 
-func (peer *peer) startFSMHandler(incoming *channels.InfiniteChannel, stateCh chan *fsmMsg) {
-	handler := newFSMHandler(peer.fsm, incoming, stateCh, peer.outgoing)
-	peer.fsm.lock.Lock()
-	peer.fsm.h = handler
-	peer.fsm.lock.Unlock()
-}
-
 func (peer *peer) StaleAll(rfList []bgp.RouteFamily) []*table.Path {
 	return peer.adjRibIn.StaleAll(rfList)
 }
