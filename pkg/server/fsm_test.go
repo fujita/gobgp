@@ -172,7 +172,7 @@ func TestFSMHandlerOpensent_HoldTimerExpired(t *testing.T) {
 	p, h := makePeerAndHandler()
 
 	// push mock connection
-	p.fsm.conn = m
+	h.conn = m
 	p.fsm.h = h
 
 	// set keepalive ticker
@@ -181,7 +181,7 @@ func TestFSMHandlerOpensent_HoldTimerExpired(t *testing.T) {
 	// set holdtime
 	p.fsm.opensentHoldTime = 2
 
-	state, _ := h.opensent(context.Background())
+	state, _, _ := h.opensent(context.Background())
 
 	assert.Equal(bgp.BGP_FSM_IDLE, state)
 	lastMsg := m.sendBuf[len(m.sendBuf)-1]
@@ -198,7 +198,7 @@ func TestFSMHandlerOpenconfirm_HoldTimerExpired(t *testing.T) {
 	p, h := makePeerAndHandler()
 
 	// push mock connection
-	p.fsm.conn = m
+	h.conn = m
 	p.fsm.h = h
 
 	// set up keepalive ticker
@@ -206,7 +206,7 @@ func TestFSMHandlerOpenconfirm_HoldTimerExpired(t *testing.T) {
 
 	// set holdtime
 	p.fsm.pConf.Timers.State.NegotiatedHoldTime = 2
-	state, _ := h.openconfirm(context.Background())
+	state, _, _ := h.openconfirm(context.Background())
 
 	assert.Equal(bgp.BGP_FSM_IDLE, state)
 	lastMsg := m.sendBuf[len(m.sendBuf)-1]
@@ -223,7 +223,7 @@ func TestFSMHandlerEstablish_HoldTimerExpired(t *testing.T) {
 	p, h := makePeerAndHandler()
 
 	// push mock connection
-	p.fsm.conn = m
+	h.conn = m
 	p.fsm.h = h
 
 	// set keepalive ticker
@@ -263,7 +263,7 @@ func TestFSMHandlerOpenconfirm_HoldtimeZero(t *testing.T) {
 	p, h := makePeerAndHandler()
 
 	// push mock connection
-	p.fsm.conn = m
+	h.conn = m
 	p.fsm.h = h
 
 	// set up keepalive ticker
@@ -286,7 +286,7 @@ func TestFSMHandlerEstablished_HoldtimeZero(t *testing.T) {
 	p, h := makePeerAndHandler()
 
 	// push mock connection
-	p.fsm.conn = m
+	h.conn = m
 	p.fsm.h = h
 
 	// set holdtime

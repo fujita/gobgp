@@ -788,7 +788,7 @@ func TestGracefulRestartTimerExpired(t *testing.T) {
 	// Force TCP session disconnected in order to cause Graceful Restart at s1
 	// side.
 	for _, n := range s2.neighborMap {
-		n.fsm.conn.Close()
+		n.fsm.h.conn.Close()
 	}
 	s2.StopBgp(context.Background(), &api.StopBgpRequest{})
 

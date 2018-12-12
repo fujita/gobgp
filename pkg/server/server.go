@@ -319,7 +319,7 @@ func (s *BgpServer) Serve() {
 				peer.fsm.lock.RUnlock()
 				s.policy.Reset(nil, map[string]config.ApplyPolicy{peer.ID(): policy})
 				s.neighborMap[remoteAddr] = peer
-				peer.fsm.StartFSMHandler(s.fsmincomingCh, s.fsmStateCh, peer.outgoing)
+				peer.fsm.StartFSMHandler(s.fsmincomingCh, s.fsmStateCh, peer.outgoing, nil)
 				s.broadcastPeerState(peer, bgp.BGP_FSM_ACTIVE, nil)
 				peer.PassConn(conn)
 			} else {
@@ -1408,7 +1408,7 @@ func (s *BgpServer) handleFSMMessage(peer *peer, e *fsmMsg) {
 			peer.fsm.pConf.Timers.State = config.TimersState{}
 			peer.fsm.lock.Unlock()
 		}
-		peer.fsm.StartFSMHandler(s.fsmincomingCh, s.fsmStateCh, peer.outgoing)
+		peer.fsm.StartFSMHandler(s.fsmincomingCh, s.fsmStateCh, peer.outgoing, e.conn)
 		s.broadcastPeerState(peer, oldState, e)
 	case fsmMsgRouteRefresh:
 		peer.fsm.lock.RLock()
@@ -2644,7 +2644,7 @@ func (s *BgpServer) addNeighbor(c *config.Neighbor) error {
 	if name := c.Config.PeerGroup; name != "" {
 		s.peerGroupMap[name].AddMember(*c)
 	}
-	peer.fsm.StartFSMHandler(s.fsmincomingCh, s.fsmStateCh, peer.outgoing)
+	peer.fsm.StartFSMHandler(s.fsmincomingCh, s.fsmStateCh, peer.outgoing, nil)
 	s.broadcastPeerState(peer, bgp.BGP_FSM_IDLE, nil)
 	return nil
 }
