@@ -208,7 +208,6 @@ type fsm struct {
 	gracefulRestartTimer *time.Timer
 	twoByteAsTrans       bool
 	version              uint
-	marshallingOptions   *bgp.MarshallingOption
 }
 
 func (fsm *fsm) bgpMessageStateUpdate(MessageType uint8, isIn bool) {
@@ -413,25 +412,45 @@ func (fsm *fsm) StartFSMHandler(incoming *channels.InfiniteChannel, stateCh chan
 		ctx:              ctx,
 		ctxCancel:        cancel,
 	}
+	// remove lock once remove access to fsm from handler goroutines.
+	fsm.lock.RLock()
+	switch fsm.state {
+	case bgp.BGP_FSM_ESTABLISHED:
+		if _, y := fsm.capMap[bgp.BGP_CAP_ADD_PATH]; y {
+			m := make(map[bgp.RouteFamily]bgp.BGPAddPathMode)
+			for k, v := range fsm.rfMap {
+				m[k] = v
+			}
+			fsm.h.marshallingOptions = &bgp.MarshallingOption{
+				AddPath: m,
+			}
+		} else {
+			fsm.h.marshallingOptions = nil
+		}
+		fsm.h.useRevisedError = fsm.pConf.ErrorHandling.Config.TreatAsWithdraw
+	}
+	fsm.lock.RUnlock()
 	fsm.h.wg.Add(1)
 	go fsm.h.loop(ctx, fsm.h.wg)
 }
 
 type fsmHandler struct {
-	fsm              *fsm // TODO: remove
-	state            bgp.FSMState
-	peerAddress      string
-	conn             net.Conn
-	msgCh            *channels.InfiniteChannel
-	stateReasonCh    chan fsmStateReason
-	incoming         *channels.InfiniteChannel
-	stateCh          chan *fsmMsg
-	outgoing         *channels.InfiniteChannel
-	holdTimerResetCh chan bool
-	sentNotification *bgp.BGPMessage
-	ctx              context.Context
-	ctxCancel        context.CancelFunc
-	wg               *sync.WaitGroup
+	fsm                *fsm // TODO: remove
+	state              bgp.FSMState
+	peerAddress        string
+	conn               net.Conn
+	msgCh              *channels.InfiniteChannel
+	stateReasonCh      chan fsmStateReason
+	incoming           *channels.InfiniteChannel
+	stateCh            chan *fsmMsg
+	outgoing           *channels.InfiniteChannel
+	holdTimerResetCh   chan bool
+	sentNotification   *bgp.BGPMessage
+	marshallingOptions *bgp.MarshallingOption
+	useRevisedError    bool
+	ctx                context.Context
+	ctxCancel          context.CancelFunc
+	wg                 *sync.WaitGroup
 }
 
 func (h *fsmHandler) idle(ctx context.Context) (bgp.FSMState, *fsmStateReason) {
@@ -941,7 +960,6 @@ func (h *fsmHandler) recvMessageWithError() (*fsmMsg, error) {
 	err = hd.DecodeFromBytes(headerBuf)
 	if err != nil {
 		h.fsm.bgpMessageStateUpdate(0, true)
-		h.fsm.lock.RLock()
 		log.WithFields(log.Fields{
 			"Topic": "Peer",
 			"Key":   h.peerAddress,
@@ -950,11 +968,10 @@ func (h *fsmHandler) recvMessageWithError() (*fsmMsg, error) {
 		}).Warn("Session will be reset due to malformed BGP Header")
 		fmsg := &fsmMsg{
 			MsgType: fsmMsgBGPMessage,
-			MsgSrc:  h.fsm.pConf.State.NeighborAddress,
+			MsgSrc:  h.peerAddress,
 			MsgData: err,
 			Version: h.fsm.version,
 		}
-		h.fsm.lock.RUnlock()
 		return fmsg, err
 	}
 
@@ -967,14 +984,9 @@ func (h *fsmHandler) recvMessageWithError() (*fsmMsg, error) {
 	now := time.Now()
 	handling := bgp.ERROR_HANDLING_NONE
 
-	h.fsm.lock.RLock()
-	useRevisedError := h.fsm.pConf.ErrorHandling.Config.TreatAsWithdraw
-	options := h.fsm.marshallingOptions
-	h.fsm.lock.RUnlock()
-
-	m, err := bgp.ParseBGPBody(hd, bodyBuf, options)
+	m, err := bgp.ParseBGPBody(hd, bodyBuf, h.marshallingOptions)
 	if err != nil {
-		handling = h.handlingError(m, err, useRevisedError)
+		handling = h.handlingError(m, err, h.useRevisedError)
 		h.fsm.bgpMessageStateUpdate(0, true)
 	} else {
 		h.fsm.bgpMessageStateUpdate(m.Header.Type, true)
@@ -1023,7 +1035,7 @@ func (h *fsmHandler) recvMessageWithError() (*fsmMsg, error) {
 				h.fsm.lock.RUnlock()
 				ok, err := bgp.ValidateUpdateMsg(body, rfMap, isEBGP, isConfed)
 				if !ok {
-					handling = h.handlingError(m, err, useRevisedError)
+					handling = h.handlingError(m, err, h.useRevisedError)
 				}
 				if handling == bgp.ERROR_HANDLING_SESSION_RESET {
 					log.WithFields(log.Fields{
@@ -1281,14 +1293,6 @@ func (h *fsmHandler) opensent(ctx context.Context) (bgp.FSMState, *fsmStateReaso
 					fsm.peerInfo.AS = peerAs
 					fsm.peerInfo.ID = body.ID
 					fsm.capMap, fsm.rfMap = open2Cap(body, fsm.pConf)
-
-					if _, y := fsm.capMap[bgp.BGP_CAP_ADD_PATH]; y {
-						fsm.marshallingOptions = &bgp.MarshallingOption{
-							AddPath: fsm.rfMap,
-						}
-					} else {
-						fsm.marshallingOptions = nil
-					}
 
 					// calculate HoldTime
 					// RFC 4271 P.13
@@ -1555,7 +1559,6 @@ func (h *fsmHandler) sendMessageloop(ctx context.Context, wg *sync.WaitGroup) er
 	fsm := h.fsm
 	ticker := keepaliveTicker(fsm)
 	send := func(m *bgp.BGPMessage) error {
-		fsm.lock.RLock()
 		if fsm.twoByteAsTrans && m.Header.Type == bgp.BGP_MSG_UPDATE {
 			log.WithFields(log.Fields{
 				"Topic": "Peer",
@@ -1566,8 +1569,7 @@ func (h *fsmHandler) sendMessageloop(ctx context.Context, wg *sync.WaitGroup) er
 			table.UpdatePathAttrs2ByteAs(m.Body.(*bgp.BGPUpdate))
 			table.UpdatePathAggregator2ByteAs(m.Body.(*bgp.BGPUpdate))
 		}
-		b, err := m.Serialize(h.fsm.marshallingOptions)
-		fsm.lock.RUnlock()
+		b, err := m.Serialize(h.marshallingOptions)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"Topic": "Peer",
@@ -1655,10 +1657,7 @@ func (h *fsmHandler) sendMessageloop(ctx context.Context, wg *sync.WaitGroup) er
 		case o := <-h.outgoing.Out():
 			switch m := o.(type) {
 			case *fsmOutgoingMsg:
-				h.fsm.lock.RLock()
-				options := h.fsm.marshallingOptions
-				h.fsm.lock.RUnlock()
-				for _, msg := range table.CreateUpdateMsgFromPaths(m.Paths, options) {
+				for _, msg := range table.CreateUpdateMsgFromPaths(m.Paths, h.marshallingOptions) {
 					if err := send(msg); err != nil {
 						return nil
 					}
