@@ -441,7 +441,7 @@ func (peer *peer) updatePrefixLimitConfig(c []config.AfiSafi) error {
 			}).Warnf("update prefix limit configuration")
 			peer.prefixLimitWarned[e.State.Family] = false
 			if msg := peer.doPrefixLimit(e.State.Family, &e.PrefixLimit.Config); msg != nil {
-				sendfsmOutgoingMsg(peer, nil, msg, true)
+				peer.fsm.SendNotification(msg)
 			}
 		}
 	}

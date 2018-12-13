@@ -384,11 +384,9 @@ func (s *BgpServer) matchLongestDynamicNeighborPrefix(a string) *peerGroup {
 	return longestPG
 }
 
-func sendfsmOutgoingMsg(peer *peer, paths []*table.Path, notification *bgp.BGPMessage, stayIdle bool) {
+func sendfsmOutgoingMsg(peer *peer, paths []*table.Path) {
 	peer.outgoing.In() <- &fsmOutgoingMsg{
-		Paths:        paths,
-		Notification: notification,
-		StayIdle:     stayIdle,
+		Paths: paths,
 	}
 }
 
@@ -1038,7 +1036,7 @@ func (s *BgpServer) propagateUpdate(peer *peer, pathList []*table.Path) {
 				} else {
 					paths = s.processOutgoingPaths(peer, paths, nil)
 				}
-				sendfsmOutgoingMsg(peer, paths, nil, false)
+				sendfsmOutgoingMsg(peer, paths)
 			}
 		}
 
@@ -1145,7 +1143,7 @@ func (s *BgpServer) propagateUpdateToNeighbors(source *peer, newPath *table.Path
 			oldList = nil
 		}
 		if paths := s.processOutgoingPaths(targetPeer, bestList, oldList); len(paths) > 0 {
-			sendfsmOutgoingMsg(targetPeer, paths, nil, false)
+			sendfsmOutgoingMsg(targetPeer, paths)
 		}
 	}
 }
@@ -1195,6 +1193,14 @@ func (s *BgpServer) handleFSMMessage(peer *peer, e *fsmMsg) {
 			}
 			peer.fsm.pConf.Timers.State.Downtime = time.Now().Unix()
 			peer.fsm.lock.Unlock()
+
+			if e.StateReason.BGPNotification != nil {
+				m := e.StateReason.BGPNotification.Body.(*bgp.BGPNotification)
+				switch m.ErrorSubcode {
+				case bgp.BGP_ERROR_SUB_MAXIMUM_NUMBER_OF_PREFIXES_REACHED:
+					peer.fsm.h.changeadminState(adminStatePfxCt)
+				}
+			}
 
 			if peer.isDynamicNeighbor() {
 				peer.stopPeerRestarting()
@@ -1333,7 +1339,7 @@ func (s *BgpServer) handleFSMMessage(peer *peer, e *fsmMsg) {
 				}
 
 				if len(pathList) > 0 {
-					sendfsmOutgoingMsg(peer, pathList, nil, false)
+					sendfsmOutgoingMsg(peer, pathList)
 				}
 			} else {
 				// RFC 4724 4.1
@@ -1362,7 +1368,7 @@ func (s *BgpServer) handleFSMMessage(peer *peer, e *fsmMsg) {
 						}
 						paths, _ := s.getBestFromLocal(p, p.configuredRFlist())
 						if len(paths) > 0 {
-							sendfsmOutgoingMsg(p, paths, nil, false)
+							sendfsmOutgoingMsg(p, paths)
 						}
 					}
 					log.WithFields(log.Fields{
@@ -1422,13 +1428,13 @@ func (s *BgpServer) handleFSMMessage(peer *peer, e *fsmMsg) {
 			return
 		}
 		if paths := s.handleRouteRefresh(peer, e); len(paths) > 0 {
-			sendfsmOutgoingMsg(peer, paths, nil, false)
+			sendfsmOutgoingMsg(peer, paths)
 			return
 		}
 	case fsmMsgBGPMessage:
 		switch m := e.MsgData.(type) {
 		case *bgp.MessageError:
-			sendfsmOutgoingMsg(peer, nil, bgp.NewBGPNotificationMessage(m.TypeCode, m.SubTypeCode, m.Data), false)
+			peer.fsm.SendNotification(bgp.NewBGPNotificationMessage(m.TypeCode, m.SubTypeCode, m.Data))
 			return
 		case *bgp.BGPMessage:
 			s.notifyRecvMessageWatcher(peer, e.timestamp, m)
@@ -1441,7 +1447,7 @@ func (s *BgpServer) handleFSMMessage(peer *peer, e *fsmMsg) {
 			}
 			pathList, eor, notification := peer.handleUpdate(e)
 			if notification != nil {
-				sendfsmOutgoingMsg(peer, nil, notification, true)
+				peer.fsm.SendNotification(notification)
 				return
 			}
 			if m.Header.Type == bgp.BGP_MSG_UPDATE {
@@ -1500,7 +1506,7 @@ func (s *BgpServer) handleFSMMessage(peer *peer, e *fsmMsg) {
 							}
 							paths, _ := s.getBestFromLocal(p, p.negotiatedRFList())
 							if len(paths) > 0 {
-								sendfsmOutgoingMsg(p, paths, nil, false)
+								sendfsmOutgoingMsg(p, paths)
 							}
 						}
 						log.WithFields(log.Fields{
@@ -1549,7 +1555,7 @@ func (s *BgpServer) handleFSMMessage(peer *peer, e *fsmMsg) {
 						}
 					}
 					if paths, _ := s.getBestFromLocal(peer, families); len(paths) > 0 {
-						sendfsmOutgoingMsg(peer, paths, nil, false)
+						sendfsmOutgoingMsg(peer, paths)
 					}
 				}
 			}
@@ -2197,7 +2203,7 @@ func (s *BgpServer) softResetOut(addr string, family bgp.RouteFamily, deferral b
 					return l
 				}()
 			}
-			sendfsmOutgoingMsg(peer, pathList, nil, false)
+			sendfsmOutgoingMsg(peer, pathList)
 		}
 	}
 	return nil
@@ -2733,7 +2739,7 @@ func (s *BgpServer) deleteNeighbor(c *config.Neighbor, code, subcode uint8) erro
 		"Topic": "Peer",
 	}).Infof("Delete a peer configuration for:%s", addr)
 
-	n.fsm.sendNotification(code, subcode, nil, "")
+	n.fsm.SendNotification(bgp.NewBGPNotificationMessage(code, subcode, nil))
 	n.stopPeerRestarting()
 
 	go n.stopFSM()
@@ -2922,7 +2928,7 @@ func (s *BgpServer) addrToPeers(addr string) (l []*peer, err error) {
 	return []*peer{p}, nil
 }
 
-func (s *BgpServer) sendNotification(op, addr string, subcode uint8, data []byte) error {
+func (s *BgpServer) sendNotificationToPeers(op, addr string, m *bgp.BGPMessage) error {
 	log.WithFields(log.Fields{
 		"Topic": "Operation",
 		"Key":   addr,
@@ -2930,9 +2936,8 @@ func (s *BgpServer) sendNotification(op, addr string, subcode uint8, data []byte
 
 	peers, err := s.addrToPeers(addr)
 	if err == nil {
-		m := bgp.NewBGPNotificationMessage(bgp.BGP_ERROR_CEASE, subcode, data)
 		for _, peer := range peers {
-			sendfsmOutgoingMsg(peer, nil, m, false)
+			peer.fsm.SendNotification(m)
 		}
 	}
 	return err
@@ -2940,7 +2945,8 @@ func (s *BgpServer) sendNotification(op, addr string, subcode uint8, data []byte
 
 func (s *BgpServer) ShutdownPeer(ctx context.Context, r *api.ShutdownPeerRequest) error {
 	return s.mgmtOperation(func() error {
-		return s.sendNotification("Neighbor shutdown", r.Address, bgp.BGP_ERROR_SUB_ADMINISTRATIVE_SHUTDOWN, newAdministrativeCommunication(r.Communication))
+		return s.sendNotificationToPeers("Neighbor shutdown", r.Address,
+			bgp.NewBGPNotificationMessage(bgp.BGP_ERROR_CEASE, bgp.BGP_ERROR_SUB_ADMINISTRATIVE_SHUTDOWN, newAdministrativeCommunication(r.Communication)))
 	}, true)
 }
 
@@ -2967,7 +2973,8 @@ func (s *BgpServer) ResetPeer(ctx context.Context, r *api.ResetPeerRequest) erro
 			return err
 		}
 
-		err := s.sendNotification("Neighbor reset", addr, bgp.BGP_ERROR_SUB_ADMINISTRATIVE_RESET, newAdministrativeCommunication(comm))
+		err := s.sendNotificationToPeers("Neighbor reset", addr,
+			bgp.NewBGPNotificationMessage(bgp.BGP_ERROR_CEASE, bgp.BGP_ERROR_SUB_ADMINISTRATIVE_RESET, newAdministrativeCommunication(comm)))
 		if err != nil {
 			return err
 		}
