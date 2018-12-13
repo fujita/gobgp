@@ -29,9 +29,10 @@ import (
 )
 
 const (
-	flopThreshold   = time.Second * 30
-	minConnectRetry = 10
+	flopThreshold = time.Second * 30
 )
+
+var minConnectRetry = 10
 
 type peerGroup struct {
 	Conf             *config.PeerGroup
@@ -87,11 +88,7 @@ func newDynamicPeer(g *config.Global, neighborAddress string, pg *config.PeerGro
 		}).Debugf("Can't set default config: %s", err)
 		return nil
 	}
-	peer := newPeer(g, &conf, loc, policy)
-	peer.fsm.lock.Lock()
-	peer.fsm.state = bgp.BGP_FSM_ACTIVE
-	peer.fsm.lock.Unlock()
-	return peer
+	return newPeer(g, &conf, bgp.BGP_FSM_ACTIVE, loc, policy)
 }
 
 type peer struct {
@@ -105,12 +102,12 @@ type peer struct {
 	llgrEndChs        []chan struct{}
 }
 
-func newPeer(g *config.Global, conf *config.Neighbor, loc *table.TableManager, policy *table.RoutingPolicy) *peer {
+func newPeer(g *config.Global, conf *config.Neighbor, fsmState bgp.FSMState, loc *table.TableManager, policy *table.RoutingPolicy) *peer {
 	peer := &peer{
 		outgoing:          channels.NewInfiniteChannel(),
 		localRib:          loc,
 		policy:            policy,
-		fsm:               newFSM(g, conf, policy),
+		fsm:               newFSM(g, conf, fsmState),
 		prefixLimitWarned: make(map[bgp.RouteFamily]bool),
 	}
 	if peer.isRouteServerClient() {
@@ -444,7 +441,7 @@ func (peer *peer) updatePrefixLimitConfig(c []config.AfiSafi) error {
 			}).Warnf("update prefix limit configuration")
 			peer.prefixLimitWarned[e.State.Family] = false
 			if msg := peer.doPrefixLimit(e.State.Family, &e.PrefixLimit.Config); msg != nil {
-				sendfsmOutgoingMsg(peer, nil, msg, true)
+				peer.fsm.SendNotification(msg)
 			}
 		}
 	}
@@ -529,13 +526,6 @@ func (peer *peer) handleUpdate(e *fsmMsg) ([]*table.Path, []bgp.RouteFamily, *bg
 	return nil, nil, nil
 }
 
-func (peer *peer) startFSMHandler(incoming *channels.InfiniteChannel, stateCh chan *fsmMsg) {
-	handler := newFSMHandler(peer.fsm, incoming, stateCh, peer.outgoing)
-	peer.fsm.lock.Lock()
-	peer.fsm.h = handler
-	peer.fsm.lock.Unlock()
-}
-
 func (peer *peer) StaleAll(rfList []bgp.RouteFamily) []*table.Path {
 	return peer.adjRibIn.StaleAll(rfList)
 }
@@ -560,6 +550,7 @@ func (peer *peer) stopFSM() error {
 	failed := false
 	peer.fsm.lock.RLock()
 	addr := peer.fsm.pConf.State.NeighborAddress
+	state := peer.fsm.state
 	peer.fsm.lock.RUnlock()
 	t1 := time.AfterFunc(time.Minute*5, func() {
 		log.WithFields(log.Fields{
@@ -567,33 +558,16 @@ func (peer *peer) stopFSM() error {
 		}).Warnf("Failed to free the fsm.h.t for %s", addr)
 		failed = true
 	})
-
-	peer.fsm.h.t.Kill(nil)
-	peer.fsm.h.t.Wait()
+	peer.fsm.h.ctxCancel()
+	peer.fsm.h.wg.Wait()
 	t1.Stop()
 	if !failed {
 		log.WithFields(log.Fields{
 			"Topic": "Peer",
 			"Key":   addr,
+			"State": state,
 		}).Debug("freed fsm.h.t")
 		cleanInfiniteChannel(peer.outgoing)
-	}
-	failed = false
-	t2 := time.AfterFunc(time.Minute*5, func() {
-		log.WithFields(log.Fields{
-			"Topic": "Peer",
-		}).Warnf("Failed to free the fsm.t for %s", addr)
-		failed = true
-	})
-	peer.fsm.t.Kill(nil)
-	peer.fsm.t.Wait()
-	t2.Stop()
-	if !failed {
-		log.WithFields(log.Fields{
-			"Topic": "Peer",
-			"Key":   addr,
-		}).Debug("freed fsm.t")
-		return nil
 	}
 	return fmt.Errorf("Failed to free FSM for %s", addr)
 }

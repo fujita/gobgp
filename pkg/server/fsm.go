@@ -16,12 +16,14 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"math/rand"
 	"net"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/eapache/channels"
@@ -31,7 +33,6 @@ import (
 	"github.com/osrg/gobgp/pkg/packet/bmp"
 
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/tomb.v2"
 )
 
 type peerDownReason int
@@ -147,17 +148,16 @@ type fsmMsg struct {
 	timestamp   time.Time
 	payload     []byte
 	Version     uint
+	conn        net.Conn
 }
 
 type fsmOutgoingMsg struct {
-	Paths        []*table.Path
-	Notification *bgp.BGPMessage
-	StayIdle     bool
+	Paths []*table.Path
 }
 
-const (
+var (
 	holdtimeOpensent = 240
-	holdtimeIdle     = 5
+	holdtimeIdle     = float64(5)
 )
 
 type adminState int
@@ -189,29 +189,20 @@ type adminStateOperation struct {
 var fsmVersion uint
 
 type fsm struct {
-	t                    tomb.Tomb
 	gConf                *config.Global
 	pConf                *config.Neighbor
 	lock                 sync.RWMutex
 	state                bgp.FSMState
-	reason               *fsmStateReason
-	conn                 net.Conn
 	connCh               chan net.Conn
-	idleHoldTime         float64
-	opensentHoldTime     float64
 	adminState           adminState
 	adminStateCh         chan adminStateOperation
-	getActiveCh          chan struct{}
 	h                    *fsmHandler
 	rfMap                map[bgp.RouteFamily]bgp.BGPAddPathMode
 	capMap               map[bgp.BGPCapabilityCode][]bgp.ParameterCapabilityInterface
 	recvOpen             *bgp.BGPMessage
 	peerInfo             *table.PeerInfo
-	policy               *table.RoutingPolicy
 	gracefulRestartTimer *time.Timer
-	twoByteAsTrans       bool
 	version              uint
-	marshallingOptions   *bgp.MarshallingOption
 }
 
 func (fsm *fsm) bgpMessageStateUpdate(MessageType uint8, isIn bool) {
@@ -279,7 +270,7 @@ func (fsm *fsm) bmpStatsUpdate(statType uint16, increment int) {
 	}
 }
 
-func newFSM(gConf *config.Global, pConf *config.Neighbor, policy *table.RoutingPolicy) *fsm {
+func newFSM(gConf *config.Global, pConf *config.Neighbor, state bgp.FSMState) *fsm {
 	adminState := adminStateUp
 	if pConf.Config.AdminDown {
 		adminState = adminStateDown
@@ -290,66 +281,18 @@ func newFSM(gConf *config.Global, pConf *config.Neighbor, policy *table.RoutingP
 	fsm := &fsm{
 		gConf:                gConf,
 		pConf:                pConf,
-		state:                bgp.BGP_FSM_IDLE,
+		state:                state,
 		connCh:               make(chan net.Conn, 1),
-		opensentHoldTime:     float64(holdtimeOpensent),
 		adminState:           adminState,
 		adminStateCh:         make(chan adminStateOperation, 1),
-		getActiveCh:          make(chan struct{}),
 		rfMap:                make(map[bgp.RouteFamily]bgp.BGPAddPathMode),
 		capMap:               make(map[bgp.BGPCapabilityCode][]bgp.ParameterCapabilityInterface),
 		peerInfo:             table.NewPeerInfo(gConf, pConf),
-		policy:               policy,
 		gracefulRestartTimer: time.NewTimer(time.Hour),
 		version:              fsmVersion,
 	}
 	fsm.gracefulRestartTimer.Stop()
-	fsm.t.Go(fsm.connectLoop)
 	return fsm
-}
-
-func (fsm *fsm) StateChange(nextState bgp.FSMState) {
-	fsm.lock.Lock()
-	defer fsm.lock.Unlock()
-
-	log.WithFields(log.Fields{
-		"Topic":  "Peer",
-		"Key":    fsm.pConf.State.NeighborAddress,
-		"old":    fsm.state.String(),
-		"new":    nextState.String(),
-		"reason": fsm.reason,
-	}).Debug("state changed")
-	fsm.state = nextState
-	switch nextState {
-	case bgp.BGP_FSM_ESTABLISHED:
-		fsm.pConf.Timers.State.Uptime = time.Now().Unix()
-		fsm.pConf.State.EstablishedCount++
-		// reset the state set by the previous session
-		fsm.twoByteAsTrans = false
-		if _, y := fsm.capMap[bgp.BGP_CAP_FOUR_OCTET_AS_NUMBER]; !y {
-			fsm.twoByteAsTrans = true
-			break
-		}
-		y := func() bool {
-			for _, c := range capabilitiesFromConfig(fsm.pConf) {
-				switch c.(type) {
-				case *bgp.CapFourOctetASNumber:
-					return true
-				}
-			}
-			return false
-		}()
-		if !y {
-			fsm.twoByteAsTrans = true
-		}
-	case bgp.BGP_FSM_ACTIVE:
-		if !fsm.pConf.Transport.Config.PassiveMode {
-			fsm.getActiveCh <- struct{}{}
-		}
-		fallthrough
-	default:
-		fsm.pConf.Timers.State.Downtime = time.Now().Unix()
-	}
 }
 
 func hostport(addr net.Addr) (string, uint16) {
@@ -365,187 +308,137 @@ func hostport(addr net.Addr) (string, uint16) {
 }
 
 func (fsm *fsm) RemoteHostPort() (string, uint16) {
-	return hostport(fsm.conn.RemoteAddr())
+	if fsm.h.conn == nil {
+		return "", 0
+	}
+	return hostport(fsm.h.conn.RemoteAddr())
 
 }
 
 func (fsm *fsm) LocalHostPort() (string, uint16) {
-	return hostport(fsm.conn.LocalAddr())
+	if fsm.h.conn == nil {
+		return "", 0
+	}
+	return hostport(fsm.h.conn.LocalAddr())
 }
 
-func (fsm *fsm) sendNotificationFromErrorMsg(e *bgp.MessageError) (*bgp.BGPMessage, error) {
-	fsm.lock.RLock()
-	established := fsm.h != nil && fsm.h.conn != nil
-	fsm.lock.RUnlock()
+func (fsm *fsm) SendNotification(m *bgp.BGPMessage) {
+	select {
+	case fsm.h.notificationCh <- m:
+	default:
+		// already other notification was queued.
+	}
+}
 
-	if established {
-		m := bgp.NewBGPNotificationMessage(e.TypeCode, e.SubTypeCode, e.Data)
-		b, _ := m.Serialize()
-		_, err := fsm.h.conn.Write(b)
-		if err == nil {
-			fsm.bgpMessageStateUpdate(m.Header.Type, false)
-			fsm.h.sentNotification = m
-		}
-		fsm.h.conn.Close()
+func (fsm *fsm) sendNotification(m *bgp.BGPMessage) {
+	b, _ := m.Serialize()
+	_, err := fsm.h.conn.Write(b)
+	if err == nil {
+		fsm.bgpMessageStateUpdate(m.Header.Type, false)
 		log.WithFields(log.Fields{
 			"Topic": "Peer",
 			"Key":   fsm.pConf.State.NeighborAddress,
-			"Data":  e,
+			"Data":  m,
 		}).Warn("sent notification")
-		return m, nil
 	}
-	return nil, fmt.Errorf("can't send notification to %s since TCP connection is not established", fsm.pConf.State.NeighborAddress)
+	fsm.h.conn.Close()
 }
 
-func (fsm *fsm) sendNotification(code, subType uint8, data []byte, msg string) (*bgp.BGPMessage, error) {
-	e := bgp.NewMessageError(code, subType, data, msg)
-	return fsm.sendNotificationFromErrorMsg(e.(*bgp.MessageError))
-}
-
-func (fsm *fsm) connectLoop() error {
-	fsm.lock.RLock()
-	tick := int(fsm.pConf.Timers.Config.ConnectRetry)
-	fsm.lock.RUnlock()
-	if tick < minConnectRetry {
-		tick = minConnectRetry
-	}
-
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	timer := time.NewTimer(time.Duration(tick) * time.Second)
-	timer.Stop()
-
-	connect := func() {
-		fsm.lock.RLock()
-		defer fsm.lock.RUnlock()
-
-		addr := fsm.pConf.State.NeighborAddress
-		port := int(bgp.BGP_PORT)
-		if fsm.pConf.Transport.Config.RemotePort != 0 {
-			port = int(fsm.pConf.Transport.Config.RemotePort)
-		}
-		laddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort(fsm.pConf.Transport.Config.LocalAddress, "0"))
-		if err != nil {
-			log.WithFields(log.Fields{
-				"Topic": "Peer",
-				"Key":   fsm.pConf.State.NeighborAddress,
-			}).Warnf("failed to resolve local address: %s", err)
-			return
-		}
-		var conn net.Conn
-		d := tcpDialer{
-			Dialer: net.Dialer{
-				LocalAddr: laddr,
-				Timeout:   time.Duration(minConnectRetry-1) * time.Second,
-			},
-			AuthPassword: fsm.pConf.Config.AuthPassword,
-		}
-		if fsm.pConf.TtlSecurity.Config.Enabled {
-			d.TTL = 255
-			d.TTLMin = fsm.pConf.TtlSecurity.Config.TtlMin
-		} else if fsm.pConf.Config.PeerAs != 0 && fsm.pConf.Config.PeerType == config.PEER_TYPE_EXTERNAL {
-			d.TTL = 1
-			if fsm.pConf.EbgpMultihop.Config.Enabled {
-				d.TTL = fsm.pConf.EbgpMultihop.Config.MultihopTtl
-			}
-		}
-		conn, err = d.DialTCP(addr, port)
-		if err == nil {
-			select {
-			case fsm.connCh <- conn:
-				return
-			default:
-				conn.Close()
-				log.WithFields(log.Fields{
-					"Topic": "Peer",
-					"Key":   fsm.pConf.State.NeighborAddress,
-				}).Warn("active conn is closed to avoid being blocked")
-			}
-		} else {
-			log.WithFields(log.Fields{
-				"Topic": "Peer",
-				"Key":   fsm.pConf.State.NeighborAddress,
-			}).Debugf("failed to connect: %s", err)
-		}
-
-		if fsm.state == bgp.BGP_FSM_ACTIVE {
-			timer.Reset(time.Duration(tick) * time.Second)
-		}
-	}
-
-	for {
-		select {
-		case <-fsm.t.Dying():
-			fsm.lock.RLock()
-			log.WithFields(log.Fields{
-				"Topic": "Peer",
-				"Key":   fsm.pConf.State.NeighborAddress,
-			}).Debug("stop connect loop")
-			fsm.lock.RUnlock()
-			return nil
-		case <-timer.C:
-			fsm.lock.RLock()
-			ready := fsm.state == bgp.BGP_FSM_ACTIVE
-			fsm.lock.RUnlock()
-			if ready {
-				go connect()
-			}
-		case <-fsm.getActiveCh:
-			timer.Reset(time.Duration(r.Intn(minConnectRetry)+minConnectRetry) * time.Second)
-		}
-	}
-}
-
-type fsmHandler struct {
-	t                tomb.Tomb
-	fsm              *fsm
-	conn             net.Conn
-	msgCh            *channels.InfiniteChannel
-	stateReasonCh    chan fsmStateReason
-	incoming         *channels.InfiniteChannel
-	stateCh          chan *fsmMsg
-	outgoing         *channels.InfiniteChannel
-	holdTimerResetCh chan bool
-	sentNotification *bgp.BGPMessage
-}
-
-func newFSMHandler(fsm *fsm, incoming *channels.InfiniteChannel, stateCh chan *fsmMsg, outgoing *channels.InfiniteChannel) *fsmHandler {
-	h := &fsmHandler{
+func (fsm *fsm) StartFSMHandler(incoming *channels.InfiniteChannel, stateCh chan *fsmMsg, outgoing *channels.InfiniteChannel, conn net.Conn, idleHoldtime float64, restarting bool) {
+	ctx, cancel := context.WithCancel(context.Background())
+	fsm.h = &fsmHandler{
 		fsm:              fsm,
+		state:            fsm.state,
+		conn:             conn,
+		peerAddress:      fsm.pConf.State.NeighborAddress,
 		stateReasonCh:    make(chan fsmStateReason, 2),
 		incoming:         incoming,
 		stateCh:          stateCh,
 		outgoing:         outgoing,
+		notificationCh:   make(chan *bgp.BGPMessage, 1),
 		holdTimerResetCh: make(chan bool, 2),
+		idleHoldtime:     idleHoldtime,
+		restarting:       restarting,
+		wg:               &sync.WaitGroup{},
+		ctx:              ctx,
+		ctxCancel:        cancel,
 	}
-	fsm.t.Go(h.loop)
-	return h
+	// remove lock once remove access to fsm from handler goroutines.
+	fsm.lock.Lock()
+	switch fsm.state {
+	case bgp.BGP_FSM_ESTABLISHED:
+		fsm.h.twoByteAsTrans = false
+		if _, y := fsm.capMap[bgp.BGP_CAP_FOUR_OCTET_AS_NUMBER]; !y {
+			fsm.h.twoByteAsTrans = true
+			break
+		}
+		y := func() bool {
+			for _, c := range capabilitiesFromConfig(fsm.pConf) {
+				switch c.(type) {
+				case *bgp.CapFourOctetASNumber:
+					return true
+				}
+			}
+			return false
+		}()
+		if !y {
+			fsm.h.twoByteAsTrans = true
+		}
+		if _, y := fsm.capMap[bgp.BGP_CAP_ADD_PATH]; y {
+			m := make(map[bgp.RouteFamily]bgp.BGPAddPathMode)
+			for k, v := range fsm.rfMap {
+				m[k] = v
+			}
+			fsm.h.marshallingOptions = &bgp.MarshallingOption{
+				AddPath: m,
+			}
+		} else {
+			fsm.h.marshallingOptions = nil
+		}
+		fsm.h.useRevisedError = fsm.pConf.ErrorHandling.Config.TreatAsWithdraw
+	}
+	fsm.lock.Unlock()
+	fsm.h.wg.Add(1)
+	go fsm.h.loop(ctx, fsm.h.wg)
 }
 
-func (h *fsmHandler) idle() (bgp.FSMState, *fsmStateReason) {
+type fsmHandler struct {
+	fsm                *fsm // TODO: remove
+	state              bgp.FSMState
+	peerAddress        string
+	conn               net.Conn
+	msgCh              *channels.InfiniteChannel
+	stateReasonCh      chan fsmStateReason
+	incoming           *channels.InfiniteChannel
+	stateCh            chan *fsmMsg
+	outgoing           *channels.InfiniteChannel
+	notificationCh     chan *bgp.BGPMessage
+	holdTimerResetCh   chan bool
+	idleHoldtime       float64
+	marshallingOptions *bgp.MarshallingOption
+	twoByteAsTrans     bool
+	useRevisedError    bool
+	restarting         bool
+	ctx                context.Context
+	ctxCancel          context.CancelFunc
+	wg                 *sync.WaitGroup
+}
+
+func (h *fsmHandler) idle(ctx context.Context) (bgp.FSMState, *fsmStateReason) {
 	fsm := h.fsm
 
-	fsm.lock.RLock()
-	idleHoldTimer := time.NewTimer(time.Second * time.Duration(fsm.idleHoldTime))
-	fsm.lock.RUnlock()
-
+	idleHoldTimer := time.NewTimer(time.Second * time.Duration(h.idleHoldtime))
 	for {
 		select {
-		case <-h.t.Dying():
+		case <-ctx.Done():
 			return -1, newfsmStateReason(fsmDying, nil, nil)
 		case <-fsm.gracefulRestartTimer.C:
-			fsm.lock.RLock()
-			restarting := fsm.pConf.GracefulRestart.State.PeerRestarting
-			fsm.lock.RUnlock()
-
-			if restarting {
-				fsm.lock.RLock()
+			if h.restarting {
 				log.WithFields(log.Fields{
 					"Topic": "Peer",
-					"Key":   fsm.pConf.State.NeighborAddress,
-					"State": fsm.state.String(),
+					"Key":   h.peerAddress,
+					"State": h.state.String(),
 				}).Warn("graceful restart timer expired")
-				fsm.lock.RUnlock()
 				return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmRestartTimerExpired, nil, nil)
 			}
 		case conn, ok := <-fsm.connCh:
@@ -553,34 +446,25 @@ func (h *fsmHandler) idle() (bgp.FSMState, *fsmStateReason) {
 				break
 			}
 			conn.Close()
-			fsm.lock.RLock()
 			log.WithFields(log.Fields{
 				"Topic": "Peer",
-				"Key":   fsm.pConf.State.NeighborAddress,
-				"State": fsm.state.String(),
+				"Key":   h.peerAddress,
+				"State": h.state.String(),
 			}).Warn("Closed an accepted connection")
-			fsm.lock.RUnlock()
-
 		case <-idleHoldTimer.C:
 			fsm.lock.RLock()
 			adminStateUp := fsm.adminState == adminStateUp
 			fsm.lock.RUnlock()
 
 			if adminStateUp {
-				fsm.lock.Lock()
 				log.WithFields(log.Fields{
 					"Topic":    "Peer",
-					"Key":      fsm.pConf.State.NeighborAddress,
-					"Duration": fsm.idleHoldTime,
+					"Key":      h.peerAddress,
+					"Duration": h.idleHoldtime,
 				}).Debug("IdleHoldTimer expired")
-				fsm.idleHoldTime = holdtimeIdle
-				fsm.lock.Unlock()
 				return bgp.BGP_FSM_ACTIVE, newfsmStateReason(fsmIdleTimerExpired, nil, nil)
-
-			} else {
-				log.WithFields(log.Fields{"Topic": "Peer"}).Debug("IdleHoldTimer expired, but stay at idle because the admin state is DOWN")
 			}
-
+			log.WithFields(log.Fields{"Topic": "Peer"}).Debug("IdleHoldTimer expired, but stay at idle because the admin state is DOWN")
 		case stateOp := <-fsm.adminStateCh:
 			err := h.changeadminState(stateOp.State)
 			if err == nil {
@@ -588,31 +472,137 @@ func (h *fsmHandler) idle() (bgp.FSMState, *fsmStateReason) {
 				case adminStateDown:
 					// stop idle hold timer
 					idleHoldTimer.Stop()
-
 				case adminStateUp:
 					// restart idle hold timer
-					fsm.lock.RLock()
-					idleHoldTimer.Reset(time.Second * time.Duration(fsm.idleHoldTime))
-					fsm.lock.RUnlock()
+					idleHoldTimer.Reset(time.Second * time.Duration(h.idleHoldtime))
 				}
 			}
 		}
 	}
 }
 
-func (h *fsmHandler) active() (bgp.FSMState, *fsmStateReason) {
+func (h *fsmHandler) connectLoop(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+	fsm := h.fsm
+
+	tick, addr, port, password, ttl, ttlMin, localAddress := func() (int, string, int, string, uint8, uint8, string) {
+		fsm.lock.RLock()
+		defer fsm.lock.RUnlock()
+
+		tick := int(fsm.pConf.Timers.Config.ConnectRetry)
+		if tick < minConnectRetry {
+			tick = minConnectRetry
+		}
+
+		addr := h.peerAddress
+		port := int(bgp.BGP_PORT)
+		if fsm.pConf.Transport.Config.RemotePort != 0 {
+			port = int(fsm.pConf.Transport.Config.RemotePort)
+		}
+		password := fsm.pConf.Config.AuthPassword
+		ttl := uint8(0)
+		ttlMin := uint8(0)
+
+		if fsm.pConf.TtlSecurity.Config.Enabled {
+			ttl = 255
+			ttlMin = fsm.pConf.TtlSecurity.Config.TtlMin
+		} else if fsm.pConf.Config.PeerAs != 0 && fsm.pConf.Config.PeerType == config.PEER_TYPE_EXTERNAL {
+			ttl = 1
+			if fsm.pConf.EbgpMultihop.Config.Enabled {
+				ttl = fsm.pConf.EbgpMultihop.Config.MultihopTtl
+			}
+		}
+		return tick, addr, port, password, ttl, ttlMin, fsm.pConf.Transport.Config.LocalAddress
+	}()
+
+	for {
+		r := rand.New(rand.NewSource(time.Now().UnixNano()))
+		timer := time.NewTimer(time.Duration(r.Intn(tick)+tick) * time.Second)
+		select {
+		case <-ctx.Done():
+			log.WithFields(log.Fields{
+				"Topic": "Peer",
+				"Key":   addr,
+			}).Debug("stop connect loop")
+			timer.Stop()
+			return
+		case <-timer.C:
+			log.WithFields(log.Fields{
+				"Topic": "Peer",
+				"Key":   addr,
+			}).Debug("try to connect")
+		}
+
+		laddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort(localAddress, "0"))
+		if err != nil {
+			log.WithFields(log.Fields{
+				"Topic": "Peer",
+				"Key":   addr,
+			}).Warnf("failed to resolve local address: %s", err)
+		}
+
+		if err == nil {
+			d := net.Dialer{
+				LocalAddr: laddr,
+				Timeout:   time.Duration(tick-1) * time.Second,
+				Control: func(network, address string, c syscall.RawConn) error {
+					return dialerControl(network, address, c, ttl, ttlMin, password)
+				},
+			}
+
+			conn, err := d.DialContext(ctx, "tcp", net.JoinHostPort(addr, fmt.Sprintf("%d", port)))
+			select {
+			case <-ctx.Done():
+				log.WithFields(log.Fields{
+					"Topic": "Peer",
+					"Key":   addr,
+				}).Debug("stop connect loop")
+				return
+			default:
+			}
+
+			if err == nil {
+				select {
+				case fsm.connCh <- conn:
+					return
+				default:
+					conn.Close()
+					log.WithFields(log.Fields{
+						"Topic": "Peer",
+						"Key":   addr,
+					}).Warn("active conn is closed to avoid being blocked")
+				}
+			} else {
+				log.WithFields(log.Fields{
+					"Topic": "Peer",
+					"Key":   addr,
+				}).Debugf("failed to connect: %s", err)
+			}
+		}
+	}
+}
+
+func (h *fsmHandler) active(ctx context.Context) (bgp.FSMState, *fsmStateReason, net.Conn) {
+	c, cancel := context.WithCancel(ctx)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go h.connectLoop(c, &wg)
+
+	defer func() {
+		cancel()
+		wg.Wait()
+	}()
+
 	fsm := h.fsm
 	for {
 		select {
-		case <-h.t.Dying():
-			return -1, newfsmStateReason(fsmDying, nil, nil)
+		case <-ctx.Done():
+			return -1, newfsmStateReason(fsmDying, nil, nil), nil
 		case conn, ok := <-fsm.connCh:
 			if !ok {
 				break
 			}
-			fsm.lock.Lock()
-			fsm.conn = conn
-			fsm.lock.Unlock()
 			ttl := 0
 			ttlMin := 0
 
@@ -635,8 +625,8 @@ func (h *fsmHandler) active() (bgp.FSMState, *fsmStateReason) {
 				if err := setTCPTTLSockopt(conn.(*net.TCPConn), ttl); err != nil {
 					log.WithFields(log.Fields{
 						"Topic": "Peer",
-						"Key":   fsm.pConf.Config.NeighborAddress,
-						"State": fsm.state.String(),
+						"Key":   h.peerAddress,
+						"State": h.state.String(),
 					}).Warnf("cannot set TTL(=%d) for peer: %s", ttl, err)
 				}
 			}
@@ -644,42 +634,37 @@ func (h *fsmHandler) active() (bgp.FSMState, *fsmStateReason) {
 				if err := setTCPMinTTLSockopt(conn.(*net.TCPConn), ttlMin); err != nil {
 					log.WithFields(log.Fields{
 						"Topic": "Peer",
-						"Key":   fsm.pConf.Config.NeighborAddress,
-						"State": fsm.state.String(),
+						"Key":   h.peerAddress,
+						"State": h.state.String(),
 					}).Warnf("cannot set minimal TTL(=%d) for peer: %s", ttl, err)
 				}
 			}
 			fsm.lock.RUnlock()
 			// we don't implement delayed open timer so move to opensent right
 			// away.
-			return bgp.BGP_FSM_OPENSENT, newfsmStateReason(fsmNewConnection, nil, nil)
+			return bgp.BGP_FSM_OPENSENT, newfsmStateReason(fsmNewConnection, nil, nil), conn
 		case <-fsm.gracefulRestartTimer.C:
-			fsm.lock.RLock()
-			restarting := fsm.pConf.GracefulRestart.State.PeerRestarting
-			fsm.lock.RUnlock()
-			if restarting {
-				fsm.lock.RLock()
+			if h.restarting {
 				log.WithFields(log.Fields{
 					"Topic": "Peer",
-					"Key":   fsm.pConf.State.NeighborAddress,
-					"State": fsm.state.String(),
+					"Key":   h.peerAddress,
+					"State": h.state.String(),
 				}).Warn("graceful restart timer expired")
-				fsm.lock.RUnlock()
-				return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmRestartTimerExpired, nil, nil)
+				return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmRestartTimerExpired, nil, nil), nil
 			}
 		case err := <-h.stateReasonCh:
-			return bgp.BGP_FSM_IDLE, &err
+			return bgp.BGP_FSM_IDLE, &err, nil
 		case stateOp := <-fsm.adminStateCh:
 			err := h.changeadminState(stateOp.State)
 			if err == nil {
 				switch stateOp.State {
 				case adminStateDown:
-					return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmAdminDown, nil, nil)
+					return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmAdminDown, nil, nil), nil
 				case adminStateUp:
 					log.WithFields(log.Fields{
 						"Topic":      "Peer",
-						"Key":        fsm.pConf.State.NeighborAddress,
-						"State":      fsm.state.String(),
+						"Key":        h.peerAddress,
+						"State":      h.state.String(),
 						"adminState": stateOp.State.String(),
 					}).Panic("code logic bug")
 				}
@@ -870,44 +855,36 @@ func (h *fsmHandler) handlingError(m *bgp.BGPMessage, e error, useRevisedError b
 		handling = factor.ErrorHandling
 		switch handling {
 		case bgp.ERROR_HANDLING_ATTRIBUTE_DISCARD:
-			h.fsm.lock.RLock()
 			log.WithFields(log.Fields{
 				"Topic": "Peer",
-				"Key":   h.fsm.pConf.State.NeighborAddress,
-				"State": h.fsm.state.String(),
+				"Key":   h.peerAddress,
+				"State": h.state.String(),
 				"error": e,
 			}).Warn("Some attributes were discarded")
-			h.fsm.lock.RUnlock()
 		case bgp.ERROR_HANDLING_TREAT_AS_WITHDRAW:
 			m.Body = bgp.TreatAsWithdraw(m.Body.(*bgp.BGPUpdate))
-			h.fsm.lock.RLock()
 			log.WithFields(log.Fields{
 				"Topic": "Peer",
-				"Key":   h.fsm.pConf.State.NeighborAddress,
-				"State": h.fsm.state.String(),
+				"Key":   h.peerAddress,
+				"State": h.state.String(),
 				"error": e,
 			}).Warn("the received Update message was treated as withdraw")
-			h.fsm.lock.RUnlock()
 		case bgp.ERROR_HANDLING_AFISAFI_DISABLE:
 			rf := extractRouteFamily(factor.ErrorAttribute)
 			if rf == nil {
-				h.fsm.lock.RLock()
 				log.WithFields(log.Fields{
 					"Topic": "Peer",
-					"Key":   h.fsm.pConf.State.NeighborAddress,
-					"State": h.fsm.state.String(),
+					"Key":   h.peerAddress,
+					"State": h.state.String(),
 				}).Warn("Error occurred during AFI/SAFI disabling")
-				h.fsm.lock.RUnlock()
 			} else {
 				n := h.afiSafiDisable(*rf)
-				h.fsm.lock.RLock()
 				log.WithFields(log.Fields{
 					"Topic": "Peer",
-					"Key":   h.fsm.pConf.State.NeighborAddress,
-					"State": h.fsm.state.String(),
+					"Key":   h.peerAddress,
+					"State": h.state.String(),
 					"error": e,
 				}).Warnf("Capability %s was disabled", n)
-				h.fsm.lock.RUnlock()
 			}
 		}
 	} else {
@@ -935,20 +912,18 @@ func (h *fsmHandler) recvMessageWithError() (*fsmMsg, error) {
 	err = hd.DecodeFromBytes(headerBuf)
 	if err != nil {
 		h.fsm.bgpMessageStateUpdate(0, true)
-		h.fsm.lock.RLock()
 		log.WithFields(log.Fields{
 			"Topic": "Peer",
-			"Key":   h.fsm.pConf.State.NeighborAddress,
-			"State": h.fsm.state.String(),
+			"Key":   h.peerAddress,
+			"State": h.state.String(),
 			"error": err,
 		}).Warn("Session will be reset due to malformed BGP Header")
 		fmsg := &fsmMsg{
 			MsgType: fsmMsgBGPMessage,
-			MsgSrc:  h.fsm.pConf.State.NeighborAddress,
+			MsgSrc:  h.peerAddress,
 			MsgData: err,
 			Version: h.fsm.version,
 		}
-		h.fsm.lock.RUnlock()
 		return fmsg, err
 	}
 
@@ -961,49 +936,38 @@ func (h *fsmHandler) recvMessageWithError() (*fsmMsg, error) {
 	now := time.Now()
 	handling := bgp.ERROR_HANDLING_NONE
 
-	h.fsm.lock.RLock()
-	useRevisedError := h.fsm.pConf.ErrorHandling.Config.TreatAsWithdraw
-	options := h.fsm.marshallingOptions
-	h.fsm.lock.RUnlock()
-
-	m, err := bgp.ParseBGPBody(hd, bodyBuf, options)
+	m, err := bgp.ParseBGPBody(hd, bodyBuf, h.marshallingOptions)
 	if err != nil {
-		handling = h.handlingError(m, err, useRevisedError)
+		handling = h.handlingError(m, err, h.useRevisedError)
 		h.fsm.bgpMessageStateUpdate(0, true)
 	} else {
 		h.fsm.bgpMessageStateUpdate(m.Header.Type, true)
 		err = bgp.ValidateBGPMessage(m)
 	}
-	h.fsm.lock.RLock()
 	fmsg := &fsmMsg{
 		MsgType:   fsmMsgBGPMessage,
-		MsgSrc:    h.fsm.pConf.State.NeighborAddress,
+		MsgSrc:    h.peerAddress,
 		timestamp: now,
 		Version:   h.fsm.version,
 	}
-	h.fsm.lock.RUnlock()
 
 	switch handling {
 	case bgp.ERROR_HANDLING_AFISAFI_DISABLE:
 		fmsg.MsgData = m
 		return fmsg, nil
 	case bgp.ERROR_HANDLING_SESSION_RESET:
-		h.fsm.lock.RLock()
 		log.WithFields(log.Fields{
 			"Topic": "Peer",
-			"Key":   h.fsm.pConf.State.NeighborAddress,
-			"State": h.fsm.state.String(),
+			"Key":   h.peerAddress,
+			"State": h.state.String(),
 			"error": err,
 		}).Warn("Session will be reset due to malformed BGP message")
-		h.fsm.lock.RUnlock()
 		fmsg.MsgData = err
 		return fmsg, err
 	default:
 		fmsg.MsgData = m
 
-		h.fsm.lock.RLock()
-		establishedState := h.fsm.state == bgp.BGP_FSM_ESTABLISHED
-		h.fsm.lock.RUnlock()
+		establishedState := h.state == bgp.BGP_FSM_ESTABLISHED
 
 		if establishedState {
 			switch m.Header.Type {
@@ -1023,17 +987,15 @@ func (h *fsmHandler) recvMessageWithError() (*fsmMsg, error) {
 				h.fsm.lock.RUnlock()
 				ok, err := bgp.ValidateUpdateMsg(body, rfMap, isEBGP, isConfed)
 				if !ok {
-					handling = h.handlingError(m, err, useRevisedError)
+					handling = h.handlingError(m, err, h.useRevisedError)
 				}
 				if handling == bgp.ERROR_HANDLING_SESSION_RESET {
-					h.fsm.lock.RLock()
 					log.WithFields(log.Fields{
 						"Topic": "Peer",
-						"Key":   h.fsm.pConf.State.NeighborAddress,
-						"State": h.fsm.state.String(),
+						"Key":   h.peerAddress,
+						"State": h.state.String(),
 						"error": err,
 					}).Warn("Session will be reset due to malformed BGP update message")
-					h.fsm.lock.RUnlock()
 					fmsg.MsgData = err
 					return fmsg, err
 				}
@@ -1075,26 +1037,22 @@ func (h *fsmHandler) recvMessageWithError() (*fsmMsg, error) {
 				body := m.Body.(*bgp.BGPNotification)
 				if body.ErrorCode == bgp.BGP_ERROR_CEASE && (body.ErrorSubcode == bgp.BGP_ERROR_SUB_ADMINISTRATIVE_SHUTDOWN || body.ErrorSubcode == bgp.BGP_ERROR_SUB_ADMINISTRATIVE_RESET) {
 					communication, rest := decodeAdministrativeCommunication(body.Data)
-					h.fsm.lock.RLock()
 					log.WithFields(log.Fields{
 						"Topic":               "Peer",
-						"Key":                 h.fsm.pConf.State.NeighborAddress,
+						"Key":                 h.peerAddress,
 						"Code":                body.ErrorCode,
 						"Subcode":             body.ErrorSubcode,
 						"Communicated-Reason": communication,
 						"Data":                rest,
 					}).Warn("received notification")
-					h.fsm.lock.RUnlock()
 				} else {
-					h.fsm.lock.RLock()
 					log.WithFields(log.Fields{
 						"Topic":   "Peer",
-						"Key":     h.fsm.pConf.State.NeighborAddress,
+						"Key":     h.peerAddress,
 						"Code":    body.ErrorCode,
 						"Subcode": body.ErrorSubcode,
 						"Data":    body.Data,
 					}).Warn("received notification")
-					h.fsm.lock.RUnlock()
 				}
 
 				h.fsm.lock.RLock()
@@ -1113,8 +1071,11 @@ func (h *fsmHandler) recvMessageWithError() (*fsmMsg, error) {
 	return fmsg, nil
 }
 
-func (h *fsmHandler) recvMessage() error {
-	defer h.msgCh.Close()
+func (h *fsmHandler) recvMessage(ctx context.Context, wg *sync.WaitGroup) error {
+	defer func() {
+		h.msgCh.Close()
+		wg.Done()
+	}()
 	fmsg, _ := h.recvMessageWithError()
 	if fmsg != nil {
 		h.msgCh.In() <- fmsg
@@ -1179,7 +1140,7 @@ func open2Cap(open *bgp.BGPOpen, n *config.Neighbor) (map[bgp.BGPCapabilityCode]
 	return capMap, negotiated
 }
 
-func (h *fsmHandler) opensent() (bgp.FSMState, *fsmStateReason) {
+func (h *fsmHandler) opensent(ctx context.Context) (bgp.FSMState, *fsmStateReason, net.Conn) {
 	fsm := h.fsm
 
 	fsm.lock.RLock()
@@ -1187,56 +1148,45 @@ func (h *fsmHandler) opensent() (bgp.FSMState, *fsmStateReason) {
 	fsm.lock.RUnlock()
 
 	b, _ := m.Serialize()
-	fsm.conn.Write(b)
+	h.conn.Write(b)
 	fsm.bgpMessageStateUpdate(m.Header.Type, false)
 
 	h.msgCh = channels.NewInfiniteChannel()
 
-	fsm.lock.RLock()
-	h.conn = fsm.conn
-	fsm.lock.RUnlock()
-
-	h.t.Go(h.recvMessage)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	defer wg.Wait()
+	go h.recvMessage(ctx, &wg)
 
 	// RFC 4271 P.60
 	// sets its HoldTimer to a large value
 	// A HoldTimer value of 4 minutes is suggested as a "large value"
 	// for the HoldTimer
-	fsm.lock.RLock()
-	holdTimer := time.NewTimer(time.Second * time.Duration(fsm.opensentHoldTime))
-	fsm.lock.RUnlock()
-
+	holdTimer := time.NewTimer(time.Second * time.Duration(holdtimeOpensent))
 	for {
 		select {
-		case <-h.t.Dying():
+		case <-ctx.Done():
 			h.conn.Close()
-			return -1, newfsmStateReason(fsmDying, nil, nil)
+			return -1, newfsmStateReason(fsmDying, nil, nil), nil
 		case conn, ok := <-fsm.connCh:
 			if !ok {
 				break
 			}
 			conn.Close()
-			fsm.lock.RLock()
 			log.WithFields(log.Fields{
 				"Topic": "Peer",
-				"Key":   fsm.pConf.State.NeighborAddress,
-				"State": fsm.state.String(),
+				"Key":   h.peerAddress,
+				"State": h.state.String(),
 			}).Warn("Closed an accepted connection")
-			fsm.lock.RUnlock()
 		case <-fsm.gracefulRestartTimer.C:
-			fsm.lock.RLock()
-			restarting := fsm.pConf.GracefulRestart.State.PeerRestarting
-			fsm.lock.RUnlock()
-			if restarting {
-				fsm.lock.RLock()
+			if h.restarting {
 				log.WithFields(log.Fields{
 					"Topic": "Peer",
-					"Key":   fsm.pConf.State.NeighborAddress,
-					"State": fsm.state.String(),
+					"Key":   h.peerAddress,
+					"State": h.state.String(),
 				}).Warn("graceful restart timer expired")
-				fsm.lock.RUnlock()
 				h.conn.Close()
-				return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmRestartTimerExpired, nil, nil)
+				return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmRestartTimerExpired, nil, nil), nil
 			}
 		case i, ok := <-h.msgCh.Out():
 			if !ok {
@@ -1258,8 +1208,10 @@ func (h *fsmHandler) opensent() (bgp.FSMState, *fsmStateReason) {
 					fsm.lock.RUnlock()
 					peerAs, err := bgp.ValidateOpenMsg(body, fsmPeerAS)
 					if err != nil {
-						m, _ := fsm.sendNotificationFromErrorMsg(err.(*bgp.MessageError))
-						return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmInvalidMsg, m, nil)
+						e := err.(*bgp.MessageError)
+						m := bgp.NewBGPNotificationMessage(e.TypeCode, e.SubTypeCode, e.Data)
+						fsm.sendNotification(m)
+						return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmInvalidMsg, m, nil), nil
 					}
 
 					// ASN negotiation was skipped
@@ -1273,12 +1225,12 @@ func (h *fsmHandler) opensent() (bgp.FSMState, *fsmStateReason) {
 							typ = config.PEER_TYPE_INTERNAL
 						}
 						fsm.pConf.State.PeerType = typ
+						fsm.lock.Unlock()
 						log.WithFields(log.Fields{
 							"Topic": "Peer",
-							"Key":   fsm.pConf.State.NeighborAddress,
-							"State": fsm.state.String(),
+							"Key":   h.peerAddress,
+							"State": h.state.String(),
 						}).Infof("skipped asn negotiation: peer-as: %d, peer-type: %s", peerAs, typ)
-						fsm.lock.Unlock()
 					} else {
 						fsm.lock.Lock()
 						fsm.pConf.State.PeerType = fsm.pConf.Config.PeerType
@@ -1289,14 +1241,6 @@ func (h *fsmHandler) opensent() (bgp.FSMState, *fsmStateReason) {
 					fsm.peerInfo.AS = peerAs
 					fsm.peerInfo.ID = body.ID
 					fsm.capMap, fsm.rfMap = open2Cap(body, fsm.pConf)
-
-					if _, y := fsm.capMap[bgp.BGP_CAP_ADD_PATH]; y {
-						fsm.marshallingOptions = &bgp.MarshallingOption{
-							AddPath: fsm.rfMap,
-						}
-					} else {
-						fsm.marshallingOptions = nil
-					}
 
 					// calculate HoldTime
 					// RFC 4271 P.13
@@ -1339,16 +1283,16 @@ func (h *fsmHandler) opensent() (bgp.FSMState, *fsmStateReason) {
 						// To re-establish the session with its peer, the Restarting Speaker
 						// MUST set the "Restart State" bit in the Graceful Restart Capability
 						// of the OPEN message.
-						if fsm.pConf.GracefulRestart.State.PeerRestarting && cap.Flags&0x08 == 0 {
+						if h.restarting && cap.Flags&0x08 == 0 {
 							log.WithFields(log.Fields{
 								"Topic": "Peer",
-								"Key":   fsm.pConf.State.NeighborAddress,
-								"State": fsm.state.String(),
+								"Key":   h.peerAddress,
+								"State": h.state.String(),
 							}).Warn("restart flag is not set")
 							// send notification?
 							h.conn.Close()
 							fsm.lock.Unlock()
-							return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmInvalidMsg, nil, nil)
+							return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmInvalidMsg, nil, nil), nil
 						}
 
 						// RFC 4724 3
@@ -1360,8 +1304,8 @@ func (h *fsmHandler) opensent() (bgp.FSMState, *fsmStateReason) {
 						if fsm.pConf.GracefulRestart.State.LocalRestarting && cap.Flags&0x08 != 0 {
 							log.WithFields(log.Fields{
 								"Topic": "Peer",
-								"Key":   fsm.pConf.State.NeighborAddress,
-								"State": fsm.state.String(),
+								"Key":   h.peerAddress,
+								"State": h.state.String(),
 							}).Debug("peer has restarted, skipping wait for EOR")
 							for i := range fsm.pConf.AfiSafis {
 								fsm.pConf.AfiSafis[i].MpGracefulRestart.State.EndOfRibReceived = true
@@ -1391,44 +1335,49 @@ func (h *fsmHandler) opensent() (bgp.FSMState, *fsmStateReason) {
 					fsm.lock.Unlock()
 					msg := bgp.NewBGPKeepAliveMessage()
 					b, _ := msg.Serialize()
-					fsm.conn.Write(b)
+					h.conn.Write(b)
 					fsm.bgpMessageStateUpdate(msg.Header.Type, false)
-					return bgp.BGP_FSM_OPENCONFIRM, newfsmStateReason(fsmOpenMsgReceived, nil, nil)
+					return bgp.BGP_FSM_OPENCONFIRM, newfsmStateReason(fsmOpenMsgReceived, nil, nil), h.conn
 				} else {
 					// send notification?
 					h.conn.Close()
-					return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmInvalidMsg, nil, nil)
+					return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmInvalidMsg, nil, nil), nil
 				}
 			case *bgp.MessageError:
-				m, _ := fsm.sendNotificationFromErrorMsg(e.MsgData.(*bgp.MessageError))
-				return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmInvalidMsg, m, nil)
+				e := e.MsgData.(*bgp.MessageError)
+				m := bgp.NewBGPNotificationMessage(e.TypeCode, e.SubTypeCode, e.Data)
+				fsm.sendNotification(m)
+				return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmInvalidMsg, m, nil), nil
 			default:
 				log.WithFields(log.Fields{
 					"Topic": "Peer",
-					"Key":   fsm.pConf.State.NeighborAddress,
-					"State": fsm.state.String(),
+					"Key":   h.peerAddress,
+					"State": h.state.String(),
 					"Data":  e.MsgData,
 				}).Panic("unknown msg type")
 			}
 		case err := <-h.stateReasonCh:
 			h.conn.Close()
-			return bgp.BGP_FSM_IDLE, &err
+			return bgp.BGP_FSM_IDLE, &err, nil
 		case <-holdTimer.C:
-			m, _ := fsm.sendNotification(bgp.BGP_ERROR_HOLD_TIMER_EXPIRED, 0, nil, "hold timer expired")
-			h.t.Kill(nil)
-			return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmHoldTimerExpired, m, nil)
+			m := bgp.NewBGPNotificationMessage(bgp.BGP_ERROR_HOLD_TIMER_EXPIRED, 0, nil)
+			fsm.sendNotification(m)
+			return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmHoldTimerExpired, m, nil), nil
+		case m := <-h.notificationCh:
+			fsm.sendNotification(m)
+			return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmNotificationSent, m, nil), nil
 		case stateOp := <-fsm.adminStateCh:
 			err := h.changeadminState(stateOp.State)
 			if err == nil {
 				switch stateOp.State {
 				case adminStateDown:
 					h.conn.Close()
-					return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmAdminDown, m, nil)
+					return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmAdminDown, m, nil), nil
 				case adminStateUp:
 					log.WithFields(log.Fields{
 						"Topic":      "Peer",
-						"Key":        fsm.pConf.State.NeighborAddress,
-						"State":      fsm.state.String(),
+						"Key":        h.peerAddress,
+						"State":      h.state.String(),
 						"adminState": stateOp.State.String(),
 					}).Panic("code logic bug")
 				}
@@ -1452,16 +1401,18 @@ func keepaliveTicker(fsm *fsm) *time.Ticker {
 	return time.NewTicker(sec)
 }
 
-func (h *fsmHandler) openconfirm() (bgp.FSMState, *fsmStateReason) {
+func (h *fsmHandler) openconfirm(ctx context.Context) (bgp.FSMState, *fsmStateReason, net.Conn) {
 	fsm := h.fsm
 	ticker := keepaliveTicker(fsm)
 	h.msgCh = channels.NewInfiniteChannel()
-	fsm.lock.RLock()
-	h.conn = fsm.conn
 
-	h.t.Go(h.recvMessage)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	wg.Add(1)
+	go h.recvMessage(ctx, &wg)
 
 	var holdTimer *time.Timer
+	fsm.lock.RLock()
 	if fsm.pConf.Timers.State.NegotiatedHoldTime == 0 {
 		holdTimer = &time.Timer{}
 	} else {
@@ -1473,41 +1424,34 @@ func (h *fsmHandler) openconfirm() (bgp.FSMState, *fsmStateReason) {
 
 	for {
 		select {
-		case <-h.t.Dying():
+		case <-ctx.Done():
 			h.conn.Close()
-			return -1, newfsmStateReason(fsmDying, nil, nil)
+			return -1, newfsmStateReason(fsmDying, nil, nil), nil
 		case conn, ok := <-fsm.connCh:
 			if !ok {
 				break
 			}
 			conn.Close()
-			fsm.lock.RLock()
 			log.WithFields(log.Fields{
 				"Topic": "Peer",
-				"Key":   fsm.pConf.State.NeighborAddress,
-				"State": fsm.state.String(),
+				"Key":   h.peerAddress,
+				"State": h.state.String(),
 			}).Warn("Closed an accepted connection")
-			fsm.lock.RUnlock()
 		case <-fsm.gracefulRestartTimer.C:
-			fsm.lock.RLock()
-			restarting := fsm.pConf.GracefulRestart.State.PeerRestarting
-			fsm.lock.RUnlock()
-			if restarting {
-				fsm.lock.RLock()
+			if h.restarting {
 				log.WithFields(log.Fields{
 					"Topic": "Peer",
-					"Key":   fsm.pConf.State.NeighborAddress,
-					"State": fsm.state.String(),
+					"Key":   h.peerAddress,
+					"State": h.state.String(),
 				}).Warn("graceful restart timer expired")
-				fsm.lock.RUnlock()
 				h.conn.Close()
-				return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmRestartTimerExpired, nil, nil)
+				return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmRestartTimerExpired, nil, nil), nil
 			}
 		case <-ticker.C:
 			m := bgp.NewBGPKeepAliveMessage()
 			b, _ := m.Serialize()
 			// TODO: check error
-			fsm.conn.Write(b)
+			h.conn.Write(b)
 			fsm.bgpMessageStateUpdate(m.Header.Type, false)
 		case i, ok := <-h.msgCh.Out():
 			if !ok {
@@ -1518,41 +1462,46 @@ func (h *fsmHandler) openconfirm() (bgp.FSMState, *fsmStateReason) {
 			case *bgp.BGPMessage:
 				m := e.MsgData.(*bgp.BGPMessage)
 				if m.Header.Type == bgp.BGP_MSG_KEEPALIVE {
-					return bgp.BGP_FSM_ESTABLISHED, newfsmStateReason(fsmOpenMsgNegotiated, nil, nil)
+					return bgp.BGP_FSM_ESTABLISHED, newfsmStateReason(fsmOpenMsgNegotiated, nil, nil), h.conn
 				}
 				// send notification ?
 				h.conn.Close()
-				return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmInvalidMsg, nil, nil)
+				return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmInvalidMsg, nil, nil), nil
 			case *bgp.MessageError:
-				m, _ := fsm.sendNotificationFromErrorMsg(e.MsgData.(*bgp.MessageError))
-				return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmInvalidMsg, m, nil)
+				e := e.MsgData.(*bgp.MessageError)
+				m := bgp.NewBGPNotificationMessage(e.TypeCode, e.SubTypeCode, e.Data)
+				fsm.sendNotification(m)
+				return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmInvalidMsg, m, nil), nil
 			default:
 				log.WithFields(log.Fields{
 					"Topic": "Peer",
-					"Key":   fsm.pConf.State.NeighborAddress,
-					"State": fsm.state.String(),
+					"Key":   h.peerAddress,
+					"State": h.state.String(),
 					"Data":  e.MsgData,
 				}).Panic("unknown msg type")
 			}
 		case err := <-h.stateReasonCh:
 			h.conn.Close()
-			return bgp.BGP_FSM_IDLE, &err
+			return bgp.BGP_FSM_IDLE, &err, nil
 		case <-holdTimer.C:
-			m, _ := fsm.sendNotification(bgp.BGP_ERROR_HOLD_TIMER_EXPIRED, 0, nil, "hold timer expired")
-			h.t.Kill(nil)
-			return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmHoldTimerExpired, m, nil)
+			m := bgp.NewBGPNotificationMessage(bgp.BGP_ERROR_HOLD_TIMER_EXPIRED, 0, nil)
+			fsm.sendNotification(m)
+			return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmHoldTimerExpired, m, nil), nil
+		case m := <-h.notificationCh:
+			fsm.sendNotification(m)
+			return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmNotificationSent, m, nil), nil
 		case stateOp := <-fsm.adminStateCh:
 			err := h.changeadminState(stateOp.State)
 			if err == nil {
 				switch stateOp.State {
 				case adminStateDown:
 					h.conn.Close()
-					return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmAdminDown, nil, nil)
+					return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmAdminDown, nil, nil), nil
 				case adminStateUp:
 					log.WithFields(log.Fields{
 						"Topic":      "Peer",
-						"Key":        fsm.pConf.State.NeighborAddress,
-						"State":      fsm.state.String(),
+						"Key":        h.peerAddress,
+						"State":      h.state.String(),
 						"adminState": stateOp.State.String(),
 					}).Panic("code logic bug")
 				}
@@ -1561,33 +1510,30 @@ func (h *fsmHandler) openconfirm() (bgp.FSMState, *fsmStateReason) {
 	}
 }
 
-func (h *fsmHandler) sendMessageloop() error {
+func (h *fsmHandler) sendMessageloop(ctx context.Context, wg *sync.WaitGroup, ch chan *bgp.BGPMessage) error {
+	defer wg.Done()
 	conn := h.conn
 	fsm := h.fsm
 	ticker := keepaliveTicker(fsm)
 	send := func(m *bgp.BGPMessage) error {
-		fsm.lock.RLock()
-		if fsm.twoByteAsTrans && m.Header.Type == bgp.BGP_MSG_UPDATE {
+		if h.twoByteAsTrans && m.Header.Type == bgp.BGP_MSG_UPDATE {
 			log.WithFields(log.Fields{
 				"Topic": "Peer",
-				"Key":   fsm.pConf.State.NeighborAddress,
-				"State": fsm.state.String(),
+				"Key":   h.peerAddress,
+				"State": h.state.String(),
 				"Data":  m,
 			}).Debug("update for 2byte AS peer")
 			table.UpdatePathAttrs2ByteAs(m.Body.(*bgp.BGPUpdate))
 			table.UpdatePathAggregator2ByteAs(m.Body.(*bgp.BGPUpdate))
 		}
-		b, err := m.Serialize(h.fsm.marshallingOptions)
-		fsm.lock.RUnlock()
+		b, err := m.Serialize(h.marshallingOptions)
 		if err != nil {
-			fsm.lock.RLock()
 			log.WithFields(log.Fields{
 				"Topic": "Peer",
-				"Key":   fsm.pConf.State.NeighborAddress,
-				"State": fsm.state.String(),
+				"Key":   h.peerAddress,
+				"State": h.state.String(),
 				"Data":  err,
 			}).Warn("failed to serialize")
-			fsm.lock.RUnlock()
 			fsm.bgpMessageStateUpdate(0, false)
 			return nil
 		}
@@ -1601,14 +1547,12 @@ func (h *fsmHandler) sendMessageloop() error {
 		}
 		_, err = conn.Write(b)
 		if err != nil {
-			fsm.lock.RLock()
 			log.WithFields(log.Fields{
 				"Topic": "Peer",
-				"Key":   fsm.pConf.State.NeighborAddress,
-				"State": fsm.state.String(),
+				"Key":   h.peerAddress,
+				"State": h.state.String(),
 				"Data":  err,
 			}).Warn("failed to send")
-			fsm.lock.RUnlock()
 			h.stateReasonCh <- *newfsmStateReason(fsmWriteFailed, nil, nil)
 			conn.Close()
 			return fmt.Errorf("closed")
@@ -1620,81 +1564,72 @@ func (h *fsmHandler) sendMessageloop() error {
 			body := m.Body.(*bgp.BGPNotification)
 			if body.ErrorCode == bgp.BGP_ERROR_CEASE && (body.ErrorSubcode == bgp.BGP_ERROR_SUB_ADMINISTRATIVE_SHUTDOWN || body.ErrorSubcode == bgp.BGP_ERROR_SUB_ADMINISTRATIVE_RESET) {
 				communication, rest := decodeAdministrativeCommunication(body.Data)
-				fsm.lock.RLock()
 				log.WithFields(log.Fields{
 					"Topic":               "Peer",
-					"Key":                 fsm.pConf.State.NeighborAddress,
-					"State":               fsm.state.String(),
+					"Key":                 h.peerAddress,
+					"State":               h.state.String(),
 					"Code":                body.ErrorCode,
 					"Subcode":             body.ErrorSubcode,
 					"Communicated-Reason": communication,
 					"Data":                rest,
 				}).Warn("sent notification")
-				fsm.lock.RUnlock()
 			} else {
-				fsm.lock.RLock()
 				log.WithFields(log.Fields{
 					"Topic":   "Peer",
-					"Key":     fsm.pConf.State.NeighborAddress,
-					"State":   fsm.state.String(),
+					"Key":     h.peerAddress,
+					"State":   h.state.String(),
 					"Code":    body.ErrorCode,
 					"Subcode": body.ErrorSubcode,
 					"Data":    body.Data,
 				}).Warn("sent notification")
-				fsm.lock.RUnlock()
 			}
 			h.stateReasonCh <- *newfsmStateReason(fsmNotificationSent, m, nil)
 			conn.Close()
 			return fmt.Errorf("closed")
 		case bgp.BGP_MSG_UPDATE:
 			update := m.Body.(*bgp.BGPUpdate)
-			fsm.lock.RLock()
 			log.WithFields(log.Fields{
 				"Topic":       "Peer",
-				"Key":         fsm.pConf.State.NeighborAddress,
-				"State":       fsm.state.String(),
+				"Key":         h.peerAddress,
+				"State":       h.state.String(),
 				"nlri":        update.NLRI,
 				"withdrawals": update.WithdrawnRoutes,
 				"attributes":  update.PathAttributes,
 			}).Debug("sent update")
-			fsm.lock.RUnlock()
 		default:
-			fsm.lock.RLock()
 			log.WithFields(log.Fields{
 				"Topic": "Peer",
-				"Key":   fsm.pConf.State.NeighborAddress,
-				"State": fsm.state.String(),
+				"Key":   h.peerAddress,
+				"State": h.state.String(),
 				"data":  m,
 			}).Debug("sent")
-			fsm.lock.RUnlock()
 		}
 		return nil
 	}
 
 	for {
 		select {
-		case <-h.t.Dying():
+		case <-ctx.Done():
 			return nil
 		case o := <-h.outgoing.Out():
-			m := o.(*fsmOutgoingMsg)
-			h.fsm.lock.RLock()
-			options := h.fsm.marshallingOptions
-			h.fsm.lock.RUnlock()
-			for _, msg := range table.CreateUpdateMsgFromPaths(m.Paths, options) {
-				if err := send(msg); err != nil {
-					return nil
+			switch m := o.(type) {
+			case *fsmOutgoingMsg:
+				for _, msg := range table.CreateUpdateMsgFromPaths(m.Paths, h.marshallingOptions) {
+					select {
+					case m := <-ch:
+						send(m)
+						return nil
+					default:
+					}
+					if err := send(msg); err != nil {
+						return nil
+					}
 				}
+			default:
+				return nil
 			}
-			if m.Notification != nil {
-				if m.StayIdle {
-					// current user is only prefix-limit
-					// fix me if this is not the case
-					h.changeadminState(adminStatePfxCt)
-				}
-				if err := send(m.Notification); err != nil {
-					return nil
-				}
-			}
+		case m := <-ch:
+			send(m)
 		case <-ticker.C:
 			if err := send(bgp.NewBGPKeepAliveMessage()); err != nil {
 				return nil
@@ -1703,7 +1638,8 @@ func (h *fsmHandler) sendMessageloop() error {
 	}
 }
 
-func (h *fsmHandler) recvMessageloop() error {
+func (h *fsmHandler) recvMessageloop(ctx context.Context, wg *sync.WaitGroup) error {
+	defer wg.Done()
 	for {
 		fmsg, err := h.recvMessageWithError()
 		if fmsg != nil {
@@ -1715,14 +1651,24 @@ func (h *fsmHandler) recvMessageloop() error {
 	}
 }
 
-func (h *fsmHandler) established() (bgp.FSMState, *fsmStateReason) {
+func (h *fsmHandler) established(ctx context.Context) (bgp.FSMState, *fsmStateReason) {
+	var wg sync.WaitGroup
 	fsm := h.fsm
-	fsm.lock.Lock()
-	h.conn = fsm.conn
-	fsm.lock.Unlock()
-	h.t.Go(h.sendMessageloop)
+
+	defer wg.Wait()
+	wg.Add(2)
+
+	notificationCh := make(chan *bgp.BGPMessage, 1)
+	sendNotification := func(m *bgp.BGPMessage) {
+		select {
+		case notificationCh <- m:
+		default:
+		}
+	}
+
+	go h.sendMessageloop(ctx, &wg, notificationCh)
 	h.msgCh = h.incoming
-	h.t.Go(h.recvMessageloop)
+	go h.recvMessageloop(ctx, &wg)
 
 	var holdTimer *time.Timer
 	if fsm.pConf.Timers.State.NegotiatedHoldTime == 0 {
@@ -1737,23 +1683,27 @@ func (h *fsmHandler) established() (bgp.FSMState, *fsmStateReason) {
 
 	for {
 		select {
-		case <-h.t.Dying():
+		case <-ctx.Done():
+			h.conn.Close()
 			return -1, newfsmStateReason(fsmDying, nil, nil)
 		case conn, ok := <-fsm.connCh:
 			if !ok {
 				break
 			}
 			conn.Close()
-			fsm.lock.RLock()
 			log.WithFields(log.Fields{
 				"Topic": "Peer",
-				"Key":   fsm.pConf.State.NeighborAddress,
-				"State": fsm.state.String(),
+				"Key":   h.peerAddress,
+				"State": h.state.String(),
 			}).Warn("Closed an accepted connection")
-			fsm.lock.RUnlock()
 		case err := <-h.stateReasonCh:
 			h.conn.Close()
-			h.t.Kill(nil)
+			// if recv goroutine hit an error and sent to
+			// stateReasonCh, then tx goroutine might take
+			// long until it exits because it waits for
+			// ctx.Done() or keepalive timer. So let kill
+			// it now.
+			h.outgoing.In() <- err
 			fsm.lock.RLock()
 			if s := fsm.pConf.GracefulRestart.State; s.Enabled &&
 				(s.NotificationEnabled && err.Type == fsmNotificationRecv ||
@@ -1762,24 +1712,23 @@ func (h *fsmHandler) established() (bgp.FSMState, *fsmStateReason) {
 				err = *newfsmStateReason(fsmGracefulRestart, nil, nil)
 				log.WithFields(log.Fields{
 					"Topic": "Peer",
-					"Key":   fsm.pConf.State.NeighborAddress,
-					"State": fsm.state.String(),
+					"Key":   h.peerAddress,
+					"State": h.state.String(),
 				}).Info("peer graceful restart")
 				fsm.gracefulRestartTimer.Reset(time.Duration(fsm.pConf.GracefulRestart.State.PeerRestartTime) * time.Second)
 			}
 			fsm.lock.RUnlock()
 			return bgp.BGP_FSM_IDLE, &err
 		case <-holdTimer.C:
-			fsm.lock.RLock()
 			log.WithFields(log.Fields{
 				"Topic": "Peer",
-				"Key":   fsm.pConf.State.NeighborAddress,
-				"State": fsm.state.String(),
+				"Key":   h.peerAddress,
+				"State": h.state.String(),
 			}).Warn("hold timer expired")
-			fsm.lock.RUnlock()
 			m := bgp.NewBGPNotificationMessage(bgp.BGP_ERROR_HOLD_TIMER_EXPIRED, 0, nil)
-			h.outgoing.In() <- &fsmOutgoingMsg{Notification: m}
-			return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmHoldTimerExpired, m, nil)
+			sendNotification(m)
+		case m := <-h.notificationCh:
+			sendNotification(m)
 		case <-h.holdTimerResetCh:
 			fsm.lock.RLock()
 			if fsm.pConf.Timers.State.NegotiatedHoldTime != 0 {
@@ -1792,93 +1741,61 @@ func (h *fsmHandler) established() (bgp.FSMState, *fsmStateReason) {
 				switch stateOp.State {
 				case adminStateDown:
 					m := bgp.NewBGPNotificationMessage(bgp.BGP_ERROR_CEASE, bgp.BGP_ERROR_SUB_ADMINISTRATIVE_SHUTDOWN, stateOp.Communication)
-					h.outgoing.In() <- &fsmOutgoingMsg{Notification: m}
+					sendNotification(m)
 				}
 			}
 		}
 	}
 }
 
-func (h *fsmHandler) loop() error {
-	fsm := h.fsm
-	ch := make(chan bgp.FSMState)
-	fsm.lock.RLock()
-	oldState := fsm.state
-	fsm.lock.RUnlock()
+func (h *fsmHandler) loop(ctx context.Context, wg *sync.WaitGroup) error {
+	defer wg.Done()
 
 	var reason *fsmStateReason
-	f := func() error {
-		nextState := bgp.FSMState(-1)
-		fsm.lock.RLock()
-		fsmState := fsm.state
-		fsm.lock.RUnlock()
-		switch fsmState {
-		case bgp.BGP_FSM_IDLE:
-			nextState, reason = h.idle()
-			// case bgp.BGP_FSM_CONNECT:
-			// 	nextState = h.connect()
-		case bgp.BGP_FSM_ACTIVE:
-			nextState, reason = h.active()
-		case bgp.BGP_FSM_OPENSENT:
-			nextState, reason = h.opensent()
-		case bgp.BGP_FSM_OPENCONFIRM:
-			nextState, reason = h.openconfirm()
-		case bgp.BGP_FSM_ESTABLISHED:
-			nextState, reason = h.established()
-		}
-		fsm.reason = reason
-		ch <- nextState
-		return nil
+	nextState := bgp.FSMState(-1)
+	var conn net.Conn
+	switch h.state {
+	case bgp.BGP_FSM_IDLE:
+		nextState, reason = h.idle(ctx)
+		// case bgp.BGP_FSM_CONNECT:
+		// 	nextState = h.connect()
+	case bgp.BGP_FSM_ACTIVE:
+		nextState, reason, conn = h.active(ctx)
+	case bgp.BGP_FSM_OPENSENT:
+		nextState, reason, conn = h.opensent(ctx)
+	case bgp.BGP_FSM_OPENCONFIRM:
+		nextState, reason, conn = h.openconfirm(ctx)
+	case bgp.BGP_FSM_ESTABLISHED:
+		nextState, reason = h.established(ctx)
 	}
 
-	h.t.Go(f)
-
-	nextState := <-ch
-
-	fsm.lock.RLock()
-	if nextState == bgp.BGP_FSM_ESTABLISHED && oldState == bgp.BGP_FSM_OPENCONFIRM {
+	if nextState == bgp.BGP_FSM_ESTABLISHED && h.state == bgp.BGP_FSM_OPENCONFIRM {
 		log.WithFields(log.Fields{
 			"Topic": "Peer",
-			"Key":   fsm.pConf.State.NeighborAddress,
-			"State": fsm.state.String(),
+			"Key":   h.peerAddress,
+			"State": nextState.String(),
 		}).Info("Peer Up")
 	}
 
-	if oldState == bgp.BGP_FSM_ESTABLISHED {
-		// The main goroutine sent the notificaiton due to
-		// deconfiguration or something.
-		reason := fsm.reason
-		if fsm.h.sentNotification != nil {
-			reason.Type = fsmNotificationSent
-			reason.peerDownReason = peerDownByLocal
-			reason.BGPNotification = fsm.h.sentNotification
-		}
+	if h.state == bgp.BGP_FSM_ESTABLISHED {
 		log.WithFields(log.Fields{
 			"Topic":  "Peer",
-			"Key":    fsm.pConf.State.NeighborAddress,
-			"State":  fsm.state.String(),
+			"Key":    h.peerAddress,
+			"State":  nextState.String(),
 			"Reason": reason.String(),
 		}).Info("Peer Down")
 	}
-	fsm.lock.RUnlock()
 
-	e := time.AfterFunc(time.Second*120, func() {
-		log.WithFields(log.Fields{"Topic": "Peer"}).Fatalf("failed to free the fsm.h.t for %s %s %s", fsm.pConf.State.NeighborAddress, oldState, nextState)
-	})
-	h.t.Wait()
-	e.Stop()
-
-	// under zero means that tomb.Dying()
+	// under zero means that the context was canceled.
 	if nextState >= bgp.BGP_FSM_IDLE {
-		fsm.lock.RLock()
 		h.stateCh <- &fsmMsg{
 			MsgType:     fsmMsgStateChange,
-			MsgSrc:      fsm.pConf.State.NeighborAddress,
+			MsgSrc:      h.peerAddress,
 			MsgData:     nextState,
 			StateReason: reason,
+			conn:        conn,
 			Version:     h.fsm.version,
 		}
-		fsm.lock.RUnlock()
 	}
 	return nil
 }
@@ -1891,8 +1808,8 @@ func (h *fsmHandler) changeadminState(s adminState) error {
 	if fsm.adminState != s {
 		log.WithFields(log.Fields{
 			"Topic":      "Peer",
-			"Key":        fsm.pConf.State.NeighborAddress,
-			"State":      fsm.state.String(),
+			"Key":        h.peerAddress,
+			"State":      h.state.String(),
 			"adminState": s.String(),
 		}).Debug("admin state changed")
 
@@ -1903,28 +1820,28 @@ func (h *fsmHandler) changeadminState(s adminState) error {
 		case adminStateUp:
 			log.WithFields(log.Fields{
 				"Topic": "Peer",
-				"Key":   fsm.pConf.State.NeighborAddress,
-				"State": fsm.state.String(),
+				"Key":   h.peerAddress,
+				"State": h.state.String(),
 			}).Info("Administrative start")
 		case adminStateDown:
 			log.WithFields(log.Fields{
 				"Topic": "Peer",
-				"Key":   fsm.pConf.State.NeighborAddress,
-				"State": fsm.state.String(),
+				"Key":   h.peerAddress,
+				"State": h.state.String(),
 			}).Info("Administrative shutdown")
 		case adminStatePfxCt:
 			log.WithFields(log.Fields{
 				"Topic": "Peer",
-				"Key":   fsm.pConf.State.NeighborAddress,
-				"State": fsm.state.String(),
+				"Key":   h.peerAddress,
+				"State": h.state.String(),
 			}).Info("Administrative shutdown(Prefix limit reached)")
 		}
 
 	} else {
 		log.WithFields(log.Fields{
 			"Topic": "Peer",
-			"Key":   fsm.pConf.State.NeighborAddress,
-			"State": fsm.state.String(),
+			"Key":   h.peerAddress,
+			"State": h.state.String(),
 		}).Warn("cannot change to the same state")
 
 		return fmt.Errorf("cannot change to the same state.")

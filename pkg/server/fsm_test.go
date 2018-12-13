@@ -16,6 +16,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"net"
 	"strconv"
@@ -25,7 +26,6 @@ import (
 
 	"github.com/eapache/channels"
 	"github.com/osrg/gobgp/internal/pkg/config"
-	"github.com/osrg/gobgp/internal/pkg/table"
 	"github.com/osrg/gobgp/pkg/packet/bgp"
 
 	log "github.com/sirupsen/logrus"
@@ -166,22 +166,21 @@ func TestReadAll(t *testing.T) {
 }
 
 func TestFSMHandlerOpensent_HoldTimerExpired(t *testing.T) {
+	// set holdtime
+	holdtimeOpensent = 2
+
 	assert := assert.New(t)
 	m := NewMockConnection(t)
 
 	p, h := makePeerAndHandler()
 
 	// push mock connection
-	p.fsm.conn = m
+	h.conn = m
 	p.fsm.h = h
 
 	// set keepalive ticker
 	p.fsm.pConf.Timers.State.NegotiatedHoldTime = 3
-
-	// set holdtime
-	p.fsm.opensentHoldTime = 2
-
-	state, _ := h.opensent()
+	state, _, _ := h.opensent(context.Background())
 
 	assert.Equal(bgp.BGP_FSM_IDLE, state)
 	lastMsg := m.sendBuf[len(m.sendBuf)-1]
@@ -198,7 +197,7 @@ func TestFSMHandlerOpenconfirm_HoldTimerExpired(t *testing.T) {
 	p, h := makePeerAndHandler()
 
 	// push mock connection
-	p.fsm.conn = m
+	h.conn = m
 	p.fsm.h = h
 
 	// set up keepalive ticker
@@ -206,7 +205,7 @@ func TestFSMHandlerOpenconfirm_HoldTimerExpired(t *testing.T) {
 
 	// set holdtime
 	p.fsm.pConf.Timers.State.NegotiatedHoldTime = 2
-	state, _ := h.openconfirm()
+	state, _, _ := h.openconfirm(context.Background())
 
 	assert.Equal(bgp.BGP_FSM_IDLE, state)
 	lastMsg := m.sendBuf[len(m.sendBuf)-1]
@@ -223,7 +222,7 @@ func TestFSMHandlerEstablish_HoldTimerExpired(t *testing.T) {
 	p, h := makePeerAndHandler()
 
 	// push mock connection
-	p.fsm.conn = m
+	h.conn = m
 	p.fsm.h = h
 
 	// set keepalive ticker
@@ -244,7 +243,7 @@ func TestFSMHandlerEstablish_HoldTimerExpired(t *testing.T) {
 	p.fsm.pConf.Timers.State.NegotiatedHoldTime = 2
 
 	go pushPackets()
-	state, _ := h.established()
+	state, _ := h.established(context.Background())
 	time.Sleep(time.Second * 1)
 	assert.Equal(bgp.BGP_FSM_IDLE, state)
 	m.mtx.Lock()
@@ -263,14 +262,14 @@ func TestFSMHandlerOpenconfirm_HoldtimeZero(t *testing.T) {
 	p, h := makePeerAndHandler()
 
 	// push mock connection
-	p.fsm.conn = m
+	h.conn = m
 	p.fsm.h = h
 
 	// set up keepalive ticker
 	p.fsm.pConf.Timers.Config.KeepaliveInterval = 1
 	// set holdtime
 	p.fsm.pConf.Timers.State.NegotiatedHoldTime = 0
-	go h.openconfirm()
+	go h.openconfirm(context.Background())
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -286,13 +285,13 @@ func TestFSMHandlerEstablished_HoldtimeZero(t *testing.T) {
 	p, h := makePeerAndHandler()
 
 	// push mock connection
-	p.fsm.conn = m
+	h.conn = m
 	p.fsm.h = h
 
 	// set holdtime
 	p.fsm.pConf.Timers.State.NegotiatedHoldTime = 0
 
-	go h.established()
+	go h.established(context.Background())
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -310,7 +309,7 @@ func TestCheckOwnASLoop(t *testing.T) {
 
 func makePeerAndHandler() (*peer, *fsmHandler) {
 	p := &peer{
-		fsm:      newFSM(&config.Global{}, &config.Neighbor{}, table.NewRoutingPolicy()),
+		fsm:      newFSM(&config.Global{}, &config.Neighbor{}, bgp.BGP_FSM_IDLE),
 		outgoing: channels.NewInfiniteChannel(),
 	}
 
