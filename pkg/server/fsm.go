@@ -344,7 +344,7 @@ func (fsm *fsm) sendNotification(m *bgp.BGPMessage) {
 	fsm.h.conn.Close()
 }
 
-func (fsm *fsm) StartFSMHandler(incoming *channels.InfiniteChannel, stateCh chan *fsmMsg, outgoing *channels.InfiniteChannel, conn net.Conn, idleHoldtime float64) {
+func (fsm *fsm) StartFSMHandler(incoming *channels.InfiniteChannel, stateCh chan *fsmMsg, outgoing *channels.InfiniteChannel, conn net.Conn, idleHoldtime float64, restarting bool) {
 	ctx, cancel := context.WithCancel(context.Background())
 	fsm.h = &fsmHandler{
 		fsm:              fsm,
@@ -358,6 +358,7 @@ func (fsm *fsm) StartFSMHandler(incoming *channels.InfiniteChannel, stateCh chan
 		notificationCh:   make(chan *bgp.BGPMessage, 1),
 		holdTimerResetCh: make(chan bool, 2),
 		idleHoldtime:     idleHoldtime,
+		restarting:       restarting,
 		wg:               &sync.WaitGroup{},
 		ctx:              ctx,
 		ctxCancel:        cancel,
@@ -417,6 +418,7 @@ type fsmHandler struct {
 	marshallingOptions *bgp.MarshallingOption
 	twoByteAsTrans     bool
 	useRevisedError    bool
+	restarting         bool
 	ctx                context.Context
 	ctxCancel          context.CancelFunc
 	wg                 *sync.WaitGroup
@@ -431,11 +433,7 @@ func (h *fsmHandler) idle(ctx context.Context) (bgp.FSMState, *fsmStateReason) {
 		case <-ctx.Done():
 			return -1, newfsmStateReason(fsmDying, nil, nil)
 		case <-fsm.gracefulRestartTimer.C:
-			fsm.lock.RLock()
-			restarting := fsm.pConf.GracefulRestart.State.PeerRestarting
-			fsm.lock.RUnlock()
-
-			if restarting {
+			if h.restarting {
 				log.WithFields(log.Fields{
 					"Topic": "Peer",
 					"Key":   h.peerAddress,
@@ -465,11 +463,8 @@ func (h *fsmHandler) idle(ctx context.Context) (bgp.FSMState, *fsmStateReason) {
 					"Duration": h.idleHoldtime,
 				}).Debug("IdleHoldTimer expired")
 				return bgp.BGP_FSM_ACTIVE, newfsmStateReason(fsmIdleTimerExpired, nil, nil)
-
-			} else {
-				log.WithFields(log.Fields{"Topic": "Peer"}).Debug("IdleHoldTimer expired, but stay at idle because the admin state is DOWN")
 			}
-
+			log.WithFields(log.Fields{"Topic": "Peer"}).Debug("IdleHoldTimer expired, but stay at idle because the admin state is DOWN")
 		case stateOp := <-fsm.adminStateCh:
 			err := h.changeadminState(stateOp.State)
 			if err == nil {
@@ -649,10 +644,7 @@ func (h *fsmHandler) active(ctx context.Context) (bgp.FSMState, *fsmStateReason,
 			// away.
 			return bgp.BGP_FSM_OPENSENT, newfsmStateReason(fsmNewConnection, nil, nil), conn
 		case <-fsm.gracefulRestartTimer.C:
-			fsm.lock.RLock()
-			restarting := fsm.pConf.GracefulRestart.State.PeerRestarting
-			fsm.lock.RUnlock()
-			if restarting {
+			if h.restarting {
 				log.WithFields(log.Fields{
 					"Topic": "Peer",
 					"Key":   h.peerAddress,
@@ -1187,10 +1179,7 @@ func (h *fsmHandler) opensent(ctx context.Context) (bgp.FSMState, *fsmStateReaso
 				"State": h.state.String(),
 			}).Warn("Closed an accepted connection")
 		case <-fsm.gracefulRestartTimer.C:
-			fsm.lock.RLock()
-			restarting := fsm.pConf.GracefulRestart.State.PeerRestarting
-			fsm.lock.RUnlock()
-			if restarting {
+			if h.restarting {
 				log.WithFields(log.Fields{
 					"Topic": "Peer",
 					"Key":   h.peerAddress,
@@ -1294,7 +1283,7 @@ func (h *fsmHandler) opensent(ctx context.Context) (bgp.FSMState, *fsmStateReaso
 						// To re-establish the session with its peer, the Restarting Speaker
 						// MUST set the "Restart State" bit in the Graceful Restart Capability
 						// of the OPEN message.
-						if fsm.pConf.GracefulRestart.State.PeerRestarting && cap.Flags&0x08 == 0 {
+						if h.restarting && cap.Flags&0x08 == 0 {
 							log.WithFields(log.Fields{
 								"Topic": "Peer",
 								"Key":   h.peerAddress,
@@ -1449,10 +1438,7 @@ func (h *fsmHandler) openconfirm(ctx context.Context) (bgp.FSMState, *fsmStateRe
 				"State": h.state.String(),
 			}).Warn("Closed an accepted connection")
 		case <-fsm.gracefulRestartTimer.C:
-			fsm.lock.RLock()
-			restarting := fsm.pConf.GracefulRestart.State.PeerRestarting
-			fsm.lock.RUnlock()
-			if restarting {
+			if h.restarting {
 				log.WithFields(log.Fields{
 					"Topic": "Peer",
 					"Key":   h.peerAddress,
