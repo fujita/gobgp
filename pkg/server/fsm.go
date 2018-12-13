@@ -206,7 +206,6 @@ type fsm struct {
 	recvOpen             *bgp.BGPMessage
 	peerInfo             *table.PeerInfo
 	gracefulRestartTimer *time.Timer
-	twoByteAsTrans       bool
 	version              uint
 }
 
@@ -301,45 +300,6 @@ func newFSM(gConf *config.Global, pConf *config.Neighbor, state bgp.FSMState) *f
 	return fsm
 }
 
-func (fsm *fsm) StateChange(nextState bgp.FSMState, reason *fsmStateReason) {
-	fsm.lock.Lock()
-	defer fsm.lock.Unlock()
-
-	log.WithFields(log.Fields{
-		"Topic":  "Peer",
-		"Key":    fsm.pConf.State.NeighborAddress,
-		"old":    fsm.state.String(),
-		"new":    nextState.String(),
-		"reason": reason,
-	}).Debug("state changed")
-	fsm.state = nextState
-	switch nextState {
-	case bgp.BGP_FSM_ESTABLISHED:
-		fsm.pConf.Timers.State.Uptime = time.Now().Unix()
-		fsm.pConf.State.EstablishedCount++
-		// reset the state set by the previous session
-		fsm.twoByteAsTrans = false
-		if _, y := fsm.capMap[bgp.BGP_CAP_FOUR_OCTET_AS_NUMBER]; !y {
-			fsm.twoByteAsTrans = true
-			break
-		}
-		y := func() bool {
-			for _, c := range capabilitiesFromConfig(fsm.pConf) {
-				switch c.(type) {
-				case *bgp.CapFourOctetASNumber:
-					return true
-				}
-			}
-			return false
-		}()
-		if !y {
-			fsm.twoByteAsTrans = true
-		}
-	default:
-		fsm.pConf.Timers.State.Downtime = time.Now().Unix()
-	}
-}
-
 func hostport(addr net.Addr) (string, uint16) {
 	if addr != nil {
 		host, port, err := net.SplitHostPort(addr.String())
@@ -413,9 +373,26 @@ func (fsm *fsm) StartFSMHandler(incoming *channels.InfiniteChannel, stateCh chan
 		ctxCancel:        cancel,
 	}
 	// remove lock once remove access to fsm from handler goroutines.
-	fsm.lock.RLock()
+	fsm.lock.Lock()
 	switch fsm.state {
 	case bgp.BGP_FSM_ESTABLISHED:
+		fsm.h.twoByteAsTrans = false
+		if _, y := fsm.capMap[bgp.BGP_CAP_FOUR_OCTET_AS_NUMBER]; !y {
+			fsm.h.twoByteAsTrans = true
+			break
+		}
+		y := func() bool {
+			for _, c := range capabilitiesFromConfig(fsm.pConf) {
+				switch c.(type) {
+				case *bgp.CapFourOctetASNumber:
+					return true
+				}
+			}
+			return false
+		}()
+		if !y {
+			fsm.h.twoByteAsTrans = true
+		}
 		if _, y := fsm.capMap[bgp.BGP_CAP_ADD_PATH]; y {
 			m := make(map[bgp.RouteFamily]bgp.BGPAddPathMode)
 			for k, v := range fsm.rfMap {
@@ -429,7 +406,7 @@ func (fsm *fsm) StartFSMHandler(incoming *channels.InfiniteChannel, stateCh chan
 		}
 		fsm.h.useRevisedError = fsm.pConf.ErrorHandling.Config.TreatAsWithdraw
 	}
-	fsm.lock.RUnlock()
+	fsm.lock.Unlock()
 	fsm.h.wg.Add(1)
 	go fsm.h.loop(ctx, fsm.h.wg)
 }
@@ -447,6 +424,7 @@ type fsmHandler struct {
 	holdTimerResetCh   chan bool
 	sentNotification   *bgp.BGPMessage
 	marshallingOptions *bgp.MarshallingOption
+	twoByteAsTrans     bool
 	useRevisedError    bool
 	ctx                context.Context
 	ctxCancel          context.CancelFunc
@@ -1559,7 +1537,7 @@ func (h *fsmHandler) sendMessageloop(ctx context.Context, wg *sync.WaitGroup) er
 	fsm := h.fsm
 	ticker := keepaliveTicker(fsm)
 	send := func(m *bgp.BGPMessage) error {
-		if fsm.twoByteAsTrans && m.Header.Type == bgp.BGP_MSG_UPDATE {
+		if h.twoByteAsTrans && m.Header.Type == bgp.BGP_MSG_UPDATE {
 			log.WithFields(log.Fields{
 				"Topic": "Peer",
 				"Key":   h.peerAddress,

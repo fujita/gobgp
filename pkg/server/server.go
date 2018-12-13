@@ -1157,9 +1157,8 @@ func (s *BgpServer) handleFSMMessage(peer *peer, e *fsmMsg) {
 		peer.fsm.lock.Lock()
 		oldState := bgp.FSMState(peer.fsm.pConf.State.SessionState.ToInt())
 		peer.fsm.pConf.State.SessionState = config.IntToSessionStateMap[int(nextState)]
+		peer.fsm.state = nextState
 		peer.fsm.lock.Unlock()
-
-		peer.fsm.StateChange(nextState, e.StateReason)
 
 		peer.fsm.lock.RLock()
 		nextStateIdle := peer.fsm.pConf.GracefulRestart.State.PeerRestarting && nextState == bgp.BGP_FSM_IDLE
@@ -1194,6 +1193,7 @@ func (s *BgpServer) handleFSMMessage(peer *peer, e *fsmMsg) {
 				peer.fsm.pConf.State.PeerAs = 0
 				peer.fsm.peerInfo.AS = 0
 			}
+			peer.fsm.pConf.Timers.State.Downtime = time.Now().Unix()
 			peer.fsm.lock.Unlock()
 
 			if peer.isDynamicNeighbor() {
@@ -1284,6 +1284,9 @@ func (s *BgpServer) handleFSMMessage(peer *peer, e *fsmMsg) {
 			laddr, _ := peer.fsm.LocalHostPort()
 			// may include zone info
 			peer.fsm.lock.Lock()
+			peer.fsm.pConf.Timers.State.Uptime = time.Now().Unix()
+			peer.fsm.pConf.State.EstablishedCount++
+
 			peer.fsm.pConf.Transport.State.LocalAddress = laddr
 			// exclude zone info
 			ipaddr, _ := net.ResolveIPAddr("ip", laddr)
