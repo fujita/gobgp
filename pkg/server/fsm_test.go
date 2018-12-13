@@ -166,6 +166,9 @@ func TestReadAll(t *testing.T) {
 }
 
 func TestFSMHandlerOpensent_HoldTimerExpired(t *testing.T) {
+	// set holdtime
+	holdtimeOpensent = 2
+
 	assert := assert.New(t)
 	m := NewMockConnection(t)
 
@@ -177,10 +180,6 @@ func TestFSMHandlerOpensent_HoldTimerExpired(t *testing.T) {
 
 	// set keepalive ticker
 	p.fsm.pConf.Timers.State.NegotiatedHoldTime = 3
-
-	// set holdtime
-	p.fsm.opensentHoldTime = 2
-
 	state, _, _ := h.opensent(context.Background())
 
 	assert.Equal(bgp.BGP_FSM_IDLE, state)

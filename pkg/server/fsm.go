@@ -157,9 +157,9 @@ type fsmOutgoingMsg struct {
 	StayIdle     bool
 }
 
-const (
+var (
 	holdtimeOpensent = 240
-	holdtimeIdle     = 5
+	holdtimeIdle     = float64(5)
 )
 
 type adminState int
@@ -197,7 +197,6 @@ type fsm struct {
 	state                bgp.FSMState
 	connCh               chan net.Conn
 	idleHoldTime         float64
-	opensentHoldTime     float64
 	adminState           adminState
 	adminStateCh         chan adminStateOperation
 	h                    *fsmHandler
@@ -287,7 +286,6 @@ func newFSM(gConf *config.Global, pConf *config.Neighbor, state bgp.FSMState) *f
 		pConf:                pConf,
 		state:                state,
 		connCh:               make(chan net.Conn, 1),
-		opensentHoldTime:     float64(holdtimeOpensent),
 		adminState:           adminState,
 		adminStateCh:         make(chan adminStateOperation, 1),
 		rfMap:                make(map[bgp.RouteFamily]bgp.BGPAddPathMode),
@@ -1188,10 +1186,7 @@ func (h *fsmHandler) opensent(ctx context.Context) (bgp.FSMState, *fsmStateReaso
 	// sets its HoldTimer to a large value
 	// A HoldTimer value of 4 minutes is suggested as a "large value"
 	// for the HoldTimer
-	fsm.lock.RLock()
-	holdTimer := time.NewTimer(time.Second * time.Duration(fsm.opensentHoldTime))
-	fsm.lock.RUnlock()
-
+	holdTimer := time.NewTimer(time.Second * time.Duration(holdtimeOpensent))
 	for {
 		select {
 		case <-ctx.Done():
