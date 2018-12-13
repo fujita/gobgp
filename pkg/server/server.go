@@ -319,7 +319,7 @@ func (s *BgpServer) Serve() {
 				peer.fsm.lock.RUnlock()
 				s.policy.Reset(nil, map[string]config.ApplyPolicy{peer.ID(): policy})
 				s.neighborMap[remoteAddr] = peer
-				peer.fsm.StartFSMHandler(s.fsmincomingCh, s.fsmStateCh, peer.outgoing, nil)
+				peer.fsm.StartFSMHandler(s.fsmincomingCh, s.fsmStateCh, peer.outgoing, nil, 0)
 				s.broadcastPeerState(peer, bgp.BGP_FSM_ACTIVE, nil)
 				peer.PassConn(conn)
 			} else {
@@ -1161,6 +1161,7 @@ func (s *BgpServer) handleFSMMessage(peer *peer, e *fsmMsg) {
 		peer.fsm.lock.RLock()
 		nextStateIdle := peer.fsm.pConf.GracefulRestart.State.PeerRestarting && nextState == bgp.BGP_FSM_IDLE
 		peer.fsm.lock.RUnlock()
+		idleHoldtime := float64(holdtimeIdle)
 
 		// PeerDown
 		if oldState == bgp.BGP_FSM_ESTABLISHED {
@@ -1199,6 +1200,10 @@ func (s *BgpServer) handleFSMMessage(peer *peer, e *fsmMsg) {
 				switch m.ErrorSubcode {
 				case bgp.BGP_ERROR_SUB_MAXIMUM_NUMBER_OF_PREFIXES_REACHED:
 					peer.fsm.h.changeadminState(adminStatePfxCt)
+				case bgp.BGP_ERROR_SUB_ADMINISTRATIVE_RESET:
+					peer.fsm.lock.RLock()
+					idleHoldtime = peer.fsm.pConf.Timers.Config.IdleHoldTimeAfterReset
+					peer.fsm.lock.RUnlock()
 				}
 			}
 
@@ -1417,7 +1422,7 @@ func (s *BgpServer) handleFSMMessage(peer *peer, e *fsmMsg) {
 			peer.fsm.pConf.Timers.State = config.TimersState{}
 			peer.fsm.lock.Unlock()
 		}
-		peer.fsm.StartFSMHandler(s.fsmincomingCh, s.fsmStateCh, peer.outgoing, e.conn)
+		peer.fsm.StartFSMHandler(s.fsmincomingCh, s.fsmStateCh, peer.outgoing, e.conn, idleHoldtime)
 		s.broadcastPeerState(peer, oldState, e)
 	case fsmMsgRouteRefresh:
 		peer.fsm.lock.RLock()
@@ -2653,7 +2658,7 @@ func (s *BgpServer) addNeighbor(c *config.Neighbor) error {
 	if name := c.Config.PeerGroup; name != "" {
 		s.peerGroupMap[name].AddMember(*c)
 	}
-	peer.fsm.StartFSMHandler(s.fsmincomingCh, s.fsmStateCh, peer.outgoing, nil)
+	peer.fsm.StartFSMHandler(s.fsmincomingCh, s.fsmStateCh, peer.outgoing, nil, 0)
 	s.broadcastPeerState(peer, bgp.BGP_FSM_IDLE, nil)
 	return nil
 }
@@ -2975,16 +2980,7 @@ func (s *BgpServer) ResetPeer(ctx context.Context, r *api.ResetPeerRequest) erro
 
 		err := s.sendNotificationToPeers("Neighbor reset", addr,
 			bgp.NewBGPNotificationMessage(bgp.BGP_ERROR_CEASE, bgp.BGP_ERROR_SUB_ADMINISTRATIVE_RESET, newAdministrativeCommunication(comm)))
-		if err != nil {
-			return err
-		}
-		peers, _ := s.addrToPeers(addr)
-		for _, peer := range peers {
-			peer.fsm.lock.Lock()
-			peer.fsm.idleHoldTime = peer.fsm.pConf.Timers.Config.IdleHoldTimeAfterReset
-			peer.fsm.lock.Unlock()
-		}
-		return nil
+		return err
 	}, true)
 }
 

@@ -194,7 +194,6 @@ type fsm struct {
 	lock                 sync.RWMutex
 	state                bgp.FSMState
 	connCh               chan net.Conn
-	idleHoldTime         float64
 	adminState           adminState
 	adminStateCh         chan adminStateOperation
 	h                    *fsmHandler
@@ -345,7 +344,7 @@ func (fsm *fsm) sendNotification(m *bgp.BGPMessage) {
 	fsm.h.conn.Close()
 }
 
-func (fsm *fsm) StartFSMHandler(incoming *channels.InfiniteChannel, stateCh chan *fsmMsg, outgoing *channels.InfiniteChannel, conn net.Conn) {
+func (fsm *fsm) StartFSMHandler(incoming *channels.InfiniteChannel, stateCh chan *fsmMsg, outgoing *channels.InfiniteChannel, conn net.Conn, idleHoldtime float64) {
 	ctx, cancel := context.WithCancel(context.Background())
 	fsm.h = &fsmHandler{
 		fsm:              fsm,
@@ -358,6 +357,7 @@ func (fsm *fsm) StartFSMHandler(incoming *channels.InfiniteChannel, stateCh chan
 		outgoing:         outgoing,
 		notificationCh:   make(chan *bgp.BGPMessage, 1),
 		holdTimerResetCh: make(chan bool, 2),
+		idleHoldtime:     idleHoldtime,
 		wg:               &sync.WaitGroup{},
 		ctx:              ctx,
 		ctxCancel:        cancel,
@@ -413,6 +413,7 @@ type fsmHandler struct {
 	outgoing           *channels.InfiniteChannel
 	notificationCh     chan *bgp.BGPMessage
 	holdTimerResetCh   chan bool
+	idleHoldtime       float64
 	marshallingOptions *bgp.MarshallingOption
 	twoByteAsTrans     bool
 	useRevisedError    bool
@@ -424,10 +425,7 @@ type fsmHandler struct {
 func (h *fsmHandler) idle(ctx context.Context) (bgp.FSMState, *fsmStateReason) {
 	fsm := h.fsm
 
-	fsm.lock.RLock()
-	idleHoldTimer := time.NewTimer(time.Second * time.Duration(fsm.idleHoldTime))
-	fsm.lock.RUnlock()
-
+	idleHoldTimer := time.NewTimer(time.Second * time.Duration(h.idleHoldtime))
 	for {
 		select {
 		case <-ctx.Done():
@@ -461,14 +459,11 @@ func (h *fsmHandler) idle(ctx context.Context) (bgp.FSMState, *fsmStateReason) {
 			fsm.lock.RUnlock()
 
 			if adminStateUp {
-				fsm.lock.Lock()
 				log.WithFields(log.Fields{
 					"Topic":    "Peer",
 					"Key":      h.peerAddress,
-					"Duration": fsm.idleHoldTime,
+					"Duration": h.idleHoldtime,
 				}).Debug("IdleHoldTimer expired")
-				fsm.idleHoldTime = holdtimeIdle
-				fsm.lock.Unlock()
 				return bgp.BGP_FSM_ACTIVE, newfsmStateReason(fsmIdleTimerExpired, nil, nil)
 
 			} else {
@@ -482,12 +477,9 @@ func (h *fsmHandler) idle(ctx context.Context) (bgp.FSMState, *fsmStateReason) {
 				case adminStateDown:
 					// stop idle hold timer
 					idleHoldTimer.Stop()
-
 				case adminStateUp:
 					// restart idle hold timer
-					fsm.lock.RLock()
-					idleHoldTimer.Reset(time.Second * time.Duration(fsm.idleHoldTime))
-					fsm.lock.RUnlock()
+					idleHoldTimer.Reset(time.Second * time.Duration(h.idleHoldtime))
 				}
 			}
 		}
