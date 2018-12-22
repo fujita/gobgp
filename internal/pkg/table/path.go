@@ -146,7 +146,12 @@ type Path struct {
 	IsWithdraw       bool
 }
 
+var localSource = &PeerInfo{}
+
 func NewPath(source *PeerInfo, nlri bgp.AddrPrefixInterface, isWithdraw bool, pattrs []bgp.PathAttributeInterface, timestamp time.Time, noImplicitWithdraw bool) *Path {
+	if source == nil {
+		source = localSource
+	}
 	if !isWithdraw && pattrs == nil {
 		log.WithFields(log.Fields{
 			"Topic": "Table",
@@ -380,9 +385,6 @@ func (path *Path) GetRouteFamily() bgp.RouteFamily {
 	return bgp.AfiSafiToRouteFamily(path.OriginInfo().nlri.AFI(), path.OriginInfo().nlri.SAFI())
 }
 
-func (path *Path) SetSource(source *PeerInfo) {
-	path.OriginInfo().source = source
-}
 func (path *Path) GetSource() *PeerInfo {
 	return path.OriginInfo().source
 }
