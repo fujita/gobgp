@@ -931,13 +931,13 @@ func (s *BgpServer) getBestFromLocal(peer *peer, rfList []bgp.RouteFamily) ([]*t
 	return pathList, filtered
 }
 
-func (s *BgpServer) processOutgoingPaths(peer *peer, paths, olds []*table.Path) []*table.Path {
+func needToAdvertise(peer *peer) bool {
 	peer.fsm.lock.RLock()
 	notEstablished := peer.fsm.state != bgp.BGP_FSM_ESTABLISHED
 	localRestarting := peer.fsm.pConf.GracefulRestart.State.LocalRestarting
 	peer.fsm.lock.RUnlock()
 	if notEstablished {
-		return nil
+		return false
 	}
 	if localRestarting {
 		peer.fsm.lock.RLock()
@@ -946,6 +946,13 @@ func (s *BgpServer) processOutgoingPaths(peer *peer, paths, olds []*table.Path) 
 			"Key":   peer.fsm.pConf.State.NeighborAddress,
 		}).Debug("now syncing, suppress sending updates")
 		peer.fsm.lock.RUnlock()
+		return false
+	}
+	return true
+}
+
+func (s *BgpServer) processOutgoingPaths(peer *peer, paths, olds []*table.Path) []*table.Path {
+	if !needToAdvertise(peer) {
 		return nil
 	}
 
