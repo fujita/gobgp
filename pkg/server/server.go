@@ -557,7 +557,7 @@ func filterpath(peer *peer, path, old *table.Path) *table.Path {
 	return path
 }
 
-func (s *BgpServer) filterpath(peer *peer, path, old *table.Path) *table.Path {
+func (s *BgpServer) prePolicyFilterpath(peer *peer, path, old *table.Path) (*table.Path, *table.PolicyOptions, bool) {
 	// Special handling for RTM NLRI.
 	if path != nil && path.GetRouteFamily() == bgp.RF_RTC_UC && !path.IsWithdraw {
 		// If the given "path" is locally generated and the same with "old", we
@@ -571,7 +571,7 @@ func (s *BgpServer) filterpath(peer *peer, path, old *table.Path) *table.Path {
 				"Path":  path,
 			}).Debug("given rtm nlri is already sent, skipping to advertise")
 			peer.fsm.lock.RUnlock()
-			return nil
+			return nil, nil, true
 		}
 
 		if old != nil && old.IsLocal() {
@@ -611,13 +611,13 @@ func (s *BgpServer) filterpath(peer *peer, path, old *table.Path) *table.Path {
 	peer.fsm.lock.RUnlock()
 	if path != nil && peerVrf != "" {
 		if f := path.GetRouteFamily(); f != bgp.RF_IPv4_VPN && f != bgp.RF_IPv6_VPN {
-			return nil
+			return nil, nil, true
 		}
 		vrf := peer.localRib.Vrfs[peerVrf]
 		if table.CanImportToVrf(vrf, path) {
 			path = path.ToLocal()
 		} else {
-			return nil
+			return nil, nil, true
 		}
 	}
 
@@ -629,7 +629,7 @@ func (s *BgpServer) filterpath(peer *peer, path, old *table.Path) *table.Path {
 	peer.fsm.lock.RUnlock()
 
 	if path = filterpath(peer, path, old); path == nil {
-		return nil
+		return nil, nil, true
 	}
 
 	peer.fsm.lock.RLock()
@@ -644,6 +644,14 @@ func (s *BgpServer) filterpath(peer *peer, path, old *table.Path) *table.Path {
 	}
 	peer.fsm.lock.RUnlock()
 
+	return path, options, false
+}
+
+func (s *BgpServer) filterpath(peer *peer, path, old *table.Path) *table.Path {
+	path, options, stop := s.prePolicyFilterpath(peer, path, old)
+	if stop {
+		return path
+	}
 	path = peer.policy.ApplyPolicy(peer.TableID(), table.POLICY_DIRECTION_EXPORT, path, options)
 	// When 'path' is filtered (path == nil), check 'old' has been sent to this peer.
 	// If it has, send withdrawal to the peer.
