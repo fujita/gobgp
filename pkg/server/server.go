@@ -908,6 +908,11 @@ func (s *BgpServer) notifyRecvMessageWatcher(peer *peer, timestamp time.Time, ms
 func (s *BgpServer) getBestFromLocal(peer *peer, rfList []bgp.RouteFamily) ([]*table.Path, []*table.Path) {
 	pathList := []*table.Path{}
 	filtered := []*table.Path{}
+
+	if peer.isSecondaryRouteEnabled() {
+
+	}
+
 	for _, family := range peer.toGlobalFamilies(rfList) {
 		pl := func() []*table.Path {
 			if peer.isAddPathSendEnabled(family) {
@@ -955,16 +960,10 @@ func (s *BgpServer) sendSecondaryRoutes(peer *peer, newPath *table.Path, dsts []
 	if !needToAdvertise(peer) {
 		return nil
 	}
-	peer.fsm.lock.RLock()
-	options := &table.PolicyOptions{
-		Info:       peer.fsm.peerInfo,
-		OldNextHop: newPath.GetNexthop(),
-	}
-	peer.fsm.lock.RUnlock()
 	pl := make([]*table.Path, 0, len(dsts))
 
 	f := func(path, old *table.Path) *table.Path {
-		path, _, stop := s.prePolicyFilterpath(peer, path, old)
+		path, options, stop := s.prePolicyFilterpath(peer, path, old)
 		if stop {
 			return nil
 		}
