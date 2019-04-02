@@ -951,6 +951,58 @@ func needToAdvertise(peer *peer) bool {
 	return true
 }
 
+func (s *BgpServer) sendSecondaryRoutes(peer *peer, newPath *table.Path, dsts []*table.Update) []*table.Path {
+	if !needToAdvertise(peer) {
+		return nil
+	}
+	peer.fsm.lock.RLock()
+	options := &table.PolicyOptions{
+		Info:       peer.fsm.peerInfo,
+		OldNextHop: newPath.GetNexthop(),
+	}
+	peer.fsm.lock.RUnlock()
+	pl := make([]*table.Path, 0, len(dsts))
+
+	f := func(path, old *table.Path) *table.Path {
+		path, _, stop := s.prePolicyFilterpath(peer, path, old)
+		if stop {
+			return nil
+		}
+		path = peer.policy.ApplyPolicy(peer.TableID(), table.POLICY_DIRECTION_EXPORT, path, options)
+		if path != nil {
+			return s.postFilterpath(peer, path)
+		}
+		return nil
+	}
+
+	for _, dst := range dsts {
+		old := func() *table.Path {
+			for _, old := range dst.OldKnownPathList {
+				o := f(old, nil)
+				if o != nil {
+					return o
+				}
+			}
+			return nil
+		}()
+		path := func() *table.Path {
+			for _, known := range dst.KnownPathList {
+				path := f(known, old)
+				if path != nil {
+					return path
+				}
+			}
+			return nil
+		}()
+		if path != nil {
+			pl = append(pl, path)
+		} else if old != nil {
+			pl = append(pl, old.Clone(true))
+		}
+	}
+	return pl
+}
+
 func (s *BgpServer) processOutgoingPaths(peer *peer, paths, olds []*table.Path) []*table.Path {
 	if !needToAdvertise(peer) {
 		return nil
@@ -1204,6 +1256,12 @@ func (s *BgpServer) propagateUpdateToNeighbors(source *peer, newPath *table.Path
 			}
 			oldList = nil
 		} else if targetPeer.isRouteServerClient() {
+			if targetPeer.isSecondaryRouteEnabled() {
+				if paths := s.sendSecondaryRoutes(targetPeer, newPath, dsts); len(paths) > 0 {
+					sendfsmOutgoingMsg(targetPeer, paths, nil, false)
+				}
+				continue
+			}
 			bestList, oldList, _ = dstsToPaths(targetPeer.TableID(), targetPeer.AS(), dsts)
 		} else {
 			bestList = gBestList
