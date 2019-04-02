@@ -910,7 +910,21 @@ func (s *BgpServer) getBestFromLocal(peer *peer, rfList []bgp.RouteFamily) ([]*t
 	filtered := []*table.Path{}
 
 	if peer.isSecondaryRouteEnabled() {
-
+		for _, family := range peer.toGlobalFamilies(rfList) {
+			dsts := s.rsRib.Tables[family].GetDestinations()
+			dl := make([]*table.Update, 0, len(dsts))
+			for _, d := range dsts {
+				l := d.GetAllKnownPathList()
+				pl := make([]*table.Path, len(l))
+				copy(pl, l)
+				u := &table.Update{
+					KnownPathList: pl,
+				}
+				dl = append(dl, u)
+			}
+			pathList = append(pathList, s.sendSecondaryRoutes(peer, nil, dl)...)
+		}
+		return pathList, filtered
 	}
 
 	for _, family := range peer.toGlobalFamilies(rfList) {
