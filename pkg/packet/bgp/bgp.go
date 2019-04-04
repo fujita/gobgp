@@ -1069,6 +1069,7 @@ func (msg *BGPOpen) Serialize(options ...*MarshallingOption) ([]byte, error) {
 }
 
 func NewBGPOpenMessage(myas uint16, holdtime uint16, id string, optparams []OptionParameterInterface) *BGPMessage {
+	fmt.Println(a)
 	return &BGPMessage{
 		Header: BGPHeader{Type: BGP_MSG_OPEN},
 		Body:   &BGPOpen{4, myas, holdtime, net.ParseIP(id).To4(), 0, optparams},
