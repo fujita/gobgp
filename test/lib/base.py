@@ -166,7 +166,7 @@ def make_gobgp_ctn(tag='gobgp', local_gobgp_path='', from_image='osrg/quagga'):
     c << 'FROM {0}'.format(from_image)
     c << 'ENV GO111MODULE on'
     c << 'ADD gobgp /tmp/gobgp'
-    c << 'RUN cd /tmp/gobgp && dep ensure && go install ./cmd/gobgpd ./cmd/gobgp'
+    c << 'RUN cd /tmp/gobgp && go install ./cmd/gobgpd ./cmd/gobgp'
 
     rindex = local_gobgp_path.rindex('gobgp')
     if rindex < 0:
