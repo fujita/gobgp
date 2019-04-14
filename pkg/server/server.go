@@ -905,6 +905,13 @@ func (s *BgpServer) notifyRecvMessageWatcher(peer *peer, timestamp time.Time, ms
 	s.notifyMessageWatcher(peer, timestamp, msg, false)
 }
 
+func (s *BgpServer) getPossibleBest(peer *peer, family bgp.RouteFamily) []*table.Path {
+	if peer.isAddPathSendEnabled(family) {
+		return peer.localRib.GetPathList(peer.TableID(), peer.AS(), []bgp.RouteFamily{family})
+	}
+	return peer.localRib.GetBestPathList(peer.TableID(), peer.AS(), []bgp.RouteFamily{family})
+}
+
 func (s *BgpServer) getBestFromLocal(peer *peer, rfList []bgp.RouteFamily) ([]*table.Path, []*table.Path) {
 	pathList := []*table.Path{}
 	filtered := []*table.Path{}
@@ -928,13 +935,7 @@ func (s *BgpServer) getBestFromLocal(peer *peer, rfList []bgp.RouteFamily) ([]*t
 	}
 
 	for _, family := range peer.toGlobalFamilies(rfList) {
-		pl := func() []*table.Path {
-			if peer.isAddPathSendEnabled(family) {
-				return peer.localRib.GetPathList(peer.TableID(), peer.AS(), []bgp.RouteFamily{family})
-			}
-			return peer.localRib.GetBestPathList(peer.TableID(), peer.AS(), []bgp.RouteFamily{family})
-		}()
-		for _, path := range pl {
+		for _, path := range s.getPossibleBest(peer, family) {
 			if p := s.filterpath(peer, path, nil); p != nil {
 				pathList = append(pathList, p)
 			} else {
@@ -2437,7 +2438,7 @@ func (s *BgpServer) getVrfRib(name string, family bgp.RouteFamily, prefixes []*t
 	return
 }
 
-func (s *BgpServer) getAdjRib(addr string, family bgp.RouteFamily, in bool, prefixes []*table.LookupPrefix) (rib *table.Table, v []*table.Validation, err error) {
+func (s *BgpServer) getAdjRib(addr string, family bgp.RouteFamily, in bool, enableFiltered bool, prefixes []*table.LookupPrefix) (rib *table.Table, filtered []*table.Path, v []*table.Validation, err error) {
 	err = s.mgmtOperation(func() error {
 		peer, ok := s.neighborMap[addr]
 		if !ok {
@@ -2448,11 +2449,37 @@ func (s *BgpServer) getAdjRib(addr string, family bgp.RouteFamily, in bool, pref
 
 		var adjRib *table.AdjRib
 		if in {
-			adjRib = peer.adjRibIn
+			if enableFiltered {
+				adjRib = table.NewAdjRib(peer.configuredRFlist())
+				for _, path := range peer.adjRibIn.PathList([]bgp.RouteFamily{family}, true) {
+					if s.policy.ApplyPolicy(peer.TableID(), table.POLICY_DIRECTION_IMPORT, path, &table.PolicyOptions{}) == nil {
+						filtered = append(filtered, path)
+					} else {
+						adjRib.Update([]*table.Path{path})
+					}
+				}
+			} else {
+				adjRib = peer.adjRibIn
+			}
 		} else {
-			adjRib = table.NewAdjRib(peer.configuredRFlist())
-			accepted, _ := s.getBestFromLocal(peer, peer.configuredRFlist())
-			adjRib.Update(accepted)
+			if enableFiltered {
+				adjRib = table.NewAdjRib(peer.configuredRFlist())
+				for _, path := range s.getPossibleBest(peer, family) {
+					path, options, stop := s.prePolicyFilterpath(peer, path, nil)
+					if stop {
+						continue
+					}
+					path = peer.policy.ApplyPolicy(peer.TableID(), table.POLICY_DIRECTION_EXPORT, path, options)
+					if path == nil {
+						filtered = append(filtered, path)
+					} else {
+						adjRib.Update([]*table.Path{path})
+					}
+				}
+			} else {
+				accepted, _ := s.getBestFromLocal(peer, peer.configuredRFlist())
+				adjRib.Update(accepted)
+			}
 		}
 		rib, err = adjRib.Select(family, false, table.TableSelectOption{ID: id, AS: as, LookupPrefixes: prefixes})
 		v = s.validateTable(rib)
@@ -2464,6 +2491,7 @@ func (s *BgpServer) getAdjRib(addr string, family bgp.RouteFamily, in bool, pref
 func (s *BgpServer) ListPath(ctx context.Context, r *api.ListPathRequest, fn func(*api.Destination)) error {
 	var tbl *table.Table
 	var v []*table.Validation
+	fm := make(map[string]*table.Path)
 
 	f := func() []*table.LookupPrefix {
 		l := make([]*table.LookupPrefix, 0, len(r.Prefixes))
@@ -2481,6 +2509,7 @@ func (s *BgpServer) ListPath(ctx context.Context, r *api.ListPathRequest, fn fun
 	if r.Family != nil {
 		family = bgp.AfiSafiToRouteFamily(uint16(r.Family.Afi), uint8(r.Family.Safi))
 	}
+	var filtered []*table.Path
 	var err error
 	switch r.TableType {
 	case api.TableType_LOCAL, api.TableType_GLOBAL:
@@ -2489,7 +2518,10 @@ func (s *BgpServer) ListPath(ctx context.Context, r *api.ListPathRequest, fn fun
 		in = true
 		fallthrough
 	case api.TableType_ADJ_OUT:
-		tbl, v, err = s.getAdjRib(r.Name, family, in, f())
+		tbl, filtered, v, err = s.getAdjRib(r.Name, family, in, r.EnableFiltered, f())
+		for _, path := range filtered {
+			fm[path.GetNlri().String()] = path
+		}
 	case api.TableType_VRF:
 		tbl, err = s.getVrfRib(r.Name, family, []*table.LookupPrefix{})
 	default:
@@ -2521,6 +2553,11 @@ func (s *BgpServer) ListPath(ctx context.Context, r *api.ListPathRequest, fn fun
 						p.Best = true
 					}
 				}
+				d.Paths = append(d.Paths, p)
+			}
+			filtered, found := fm[d.Prefix]
+			if found {
+				p := toPathApi(filtered, nil)
 				d.Paths = append(d.Paths, p)
 			}
 			select {
