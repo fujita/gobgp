@@ -2462,8 +2462,8 @@ func (s *BgpServer) getAdjRib(addr string, family bgp.RouteFamily, in bool, enab
 				adjRib = peer.adjRibIn
 			}
 		} else {
+			adjRib = table.NewAdjRib(peer.configuredRFlist())
 			if enableFiltered {
-				adjRib = table.NewAdjRib(peer.configuredRFlist())
 				for _, path := range s.getPossibleBest(peer, family) {
 					path, options, stop := s.prePolicyFilterpath(peer, path, nil)
 					if stop {
