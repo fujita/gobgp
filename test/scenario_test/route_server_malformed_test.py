@@ -510,7 +510,7 @@ class MalformedOriginType(object):
         lookup_scenario("MalformedOriginType").check(env)
 
 
-class TestGoBGPBase(unittest.TestCase):
+class TestGoBGPBase():
 
     wait_per_retry = 5
     retry_limit = 10
@@ -526,20 +526,20 @@ class TestGoBGPBase(unittest.TestCase):
             for _, v in _SCENARIOS.items():
                 for k, m in inspect.getmembers(v, inspect.isfunction):
                     if k == 'executor':
-                        cls.executor = m
-                cls.executors.append(cls.executor)
+                    cls.executors.append(v)
         elif idx not in _SCENARIOS:
             print 'invalid test-index. # of scenarios: {0}'.format(len(_SCENARIOS))
             sys.exit(1)
         else:
             for k, m in inspect.getmembers(_SCENARIOS[idx], inspect.isfunction):
                 if k == 'executor':
-                    cls.executor = m
-            cls.executors.append(cls.executor)
+                  cls.executors.append(v)
 
     def test(self):
-        for e in self.executors:
-            yield e
+        for v in self.executors:
+            def f():
+                v.executor(self)
+            yield f
 
 
 if __name__ == '__main__':
