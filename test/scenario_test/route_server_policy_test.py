@@ -3166,20 +3166,22 @@ class TestGoBGPBase():
             for _, v in _SCENARIOS.items():
                 for k, m in inspect.getmembers(v, inspect.isfunction):
                     if k == 'executor':
-                        cls.executor = m
-                cls.executors.append(cls.executor)
+                        cls.executors.append(v)
+                        break
         elif idx not in _SCENARIOS:
             print 'invalid test-index. # of scenarios: {0}'.format(len(_SCENARIOS))
             sys.exit(1)
         else:
             for k, m in inspect.getmembers(_SCENARIOS[idx], inspect.isfunction):
                 if k == 'executor':
-                    cls.executor = m
-            cls.executors.append(cls.executor)
+                    cls.executors.append(v)
+                    break
 
     def test(self):
         for e in self.executors:
-            yield e
+            def f():
+                e.executor(self)
+            yield f
 
 
 if __name__ == '__main__':
