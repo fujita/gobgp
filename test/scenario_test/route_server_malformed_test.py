@@ -526,7 +526,7 @@ class TestGoBGPBase():
             for _, v in _SCENARIOS.items():
                 for k, m in inspect.getmembers(v, inspect.isfunction):
                     if k == 'executor':
-                    cls.executors.append(v)
+                        cls.executors.append(v)
         elif idx not in _SCENARIOS:
             print 'invalid test-index. # of scenarios: {0}'.format(len(_SCENARIOS))
             sys.exit(1)
