@@ -533,7 +533,7 @@ class TestGoBGPBase():
         else:
             for k, m in inspect.getmembers(_SCENARIOS[idx], inspect.isfunction):
                 if k == 'executor':
-                  cls.executors.append(v)
+                    cls.executors.append(v)
 
     def test(self):
         for v in self.executors:
