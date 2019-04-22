@@ -456,6 +456,7 @@ class BGPContainer(Container):
         raise Exception('implement enable_peer() method')
 
     def log(self):
+        local('chmod 644 {0}/*.log'.format(self.config_dir))
         return local('cat {0}/*.log'.format(self.config_dir), capture=True)
 
     def _extract_routes(self, families):
