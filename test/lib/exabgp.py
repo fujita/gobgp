@@ -64,6 +64,10 @@ class ExaBGPContainer(BGPContainer):
         # self._start_exabgp()
         return self.WAIT_FOR_BOOT
 
+    def log(self):
+        self.local('chmod 644 {0}/*.log'.format(self.SHARED_VOLUME))
+        return super(ExaBGPContainer, self).log()
+
     def create_config(self):
         # Manpage of exabgp.conf(5):
         # https://github.com/Exa-Networks/exabgp/blob/master/doc/man/exabgp.conf.5
