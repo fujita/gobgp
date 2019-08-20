@@ -20,6 +20,7 @@ for FUNC in ${FUNCS[@]}
 do
     for GO_PKG in $(go list $PKG_BASE/... | grep -v '/vendor/')
     do
+	echo ${GO_PKG} ${PKG_BASE}
         grep ${FUNC} -r ${GO_PKG#$PKG_BASE/}
         if [ $? -ne 1 ]
         then
