@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bash -x
 
 # List of functions which should not be used with remarkable reasons
 FUNCS=(
@@ -10,6 +10,7 @@ FUNCS=(
 
 SCRIPT_DIR=`dirname $0`
 cd "${SCRIPT_DIR}/.."
+echo "$SCRIPT_DIR"
 
 RESULT=0
 
