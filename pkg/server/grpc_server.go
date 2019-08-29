@@ -201,7 +201,19 @@ func (s *server) MonitorPeer(arg *api.MonitorPeerRequest, stream api.GobgpApi_Mo
 		if err = stream.Send(&api.MonitorPeerResponse{
 			Peer: p,
 		}); err != nil {
-			fmt.Println("try to cancel")
+			cancel()
+			return
+		}
+	})
+	<-ctx.Done()
+	return err
+}
+
+func (s *server) MonitorEvent(arg *api.MonitorEventRequest, stream api.GobgpApi_MonitorEventServer) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	var err error
+	err = s.bgpServer.MonitorEvent(ctx, arg, func(r *api.MonitorEventResponse) {
+		if err = stream.Send(r); err != nil {
 			cancel()
 			return
 		}

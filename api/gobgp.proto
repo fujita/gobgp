@@ -95,6 +95,8 @@ service GobgpApi {
 
   rpc AddBmp(AddBmpRequest) returns (google.protobuf.Empty);
   rpc DeleteBmp(DeleteBmpRequest) returns (google.protobuf.Empty);
+
+  rpc MonitorEvent(MonitorEventRequest) returns (stream MonitorEventResponse);
 }
 
 message StartBgpRequest {
@@ -1190,4 +1192,21 @@ message RPKIState {
 message Rpki {
   RPKIConf conf = 1;
   RPKIState state = 2;
+}
+
+enum MonitorEventType {
+  // peer state
+  PEER = 0;
+  // update message
+  PATH = 1;
+}
+
+message MonitorEventRequest {
+  repeated MonitorEventType event_type = 1;
+}
+
+message MonitorEventResponse {
+  MonitorEventType event_type = 1;
+  Peer peer = 2;
+  Path path = 3;
 }

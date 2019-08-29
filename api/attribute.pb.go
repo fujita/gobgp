@@ -257,6 +257,8 @@ It has these top-level messages:
 	RPKIConf
 	RPKIState
 	Rpki
+	MonitorEventRequest
+	MonitorEventResponse
 */
 package gobgpapi
 

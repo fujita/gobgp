@@ -840,11 +840,15 @@ func (s *BgpServer) notifyPostPolicyUpdateWatcher(peer *peer, pathList []*table.
 	s.notifyWatcher(watchEventTypePostUpdate, ev)
 }
 
-func newWatchEventPeerState(peer *peer, m *fsmMsg) *watchEventPeerState {
-	_, rport := peer.fsm.RemoteHostPort()
-	laddr, lport := peer.fsm.LocalHostPort()
-	sentOpen := buildopen(peer.fsm.gConf, peer.fsm.pConf)
+func newWatchEventPeerState(peer *peer, m *fsmMsg, oldState bgp.FSMState) *watchEventPeerState {
+	var rport, lport uint16
+	var laddr string
 	peer.fsm.lock.RLock()
+	if peer.fsm.conn != nil {
+		_, rport = peer.fsm.RemoteHostPort()
+		laddr, lport = peer.fsm.LocalHostPort()
+	}
+	sentOpen := buildopen(peer.fsm.gConf, peer.fsm.pConf)
 	recvOpen := peer.fsm.recvOpen
 	e := &watchEventPeerState{
 		PeerAS:        peer.fsm.peerInfo.AS,
@@ -857,6 +861,7 @@ func newWatchEventPeerState(peer *peer, m *fsmMsg) *watchEventPeerState {
 		SentOpen:      sentOpen,
 		RecvOpen:      recvOpen,
 		State:         peer.fsm.state,
+		OldState:      oldState,
 		AdminState:    peer.fsm.adminState,
 		Timestamp:     time.Now(),
 		PeerInterface: peer.fsm.pConf.Config.NeighborInterface,
@@ -870,12 +875,7 @@ func newWatchEventPeerState(peer *peer, m *fsmMsg) *watchEventPeerState {
 }
 
 func (s *BgpServer) broadcastPeerState(peer *peer, oldState bgp.FSMState, e *fsmMsg) {
-	peer.fsm.lock.RLock()
-	newState := peer.fsm.state
-	peer.fsm.lock.RUnlock()
-	if oldState == bgp.BGP_FSM_ESTABLISHED || newState == bgp.BGP_FSM_ESTABLISHED {
-		s.notifyWatcher(watchEventTypePeerState, newWatchEventPeerState(peer, e))
-	}
+	s.notifyWatcher(watchEventTypePeerState, newWatchEventPeerState(peer, e, oldState))
 }
 
 func (s *BgpServer) notifyMessageWatcher(peer *peer, timestamp time.Time, msg *bgp.BGPMessage, isSent bool) {
@@ -3711,13 +3711,37 @@ func (s *BgpServer) MonitorTable(ctx context.Context, r *api.MonitorTableRequest
 	return nil
 }
 
+func toPeerEventApi(msg *watchEventPeerState) *api.Peer {
+	return &api.Peer{
+		Conf: &api.PeerConf{
+			PeerAs:            msg.PeerAS,
+			LocalAs:           msg.LocalAS,
+			NeighborAddress:   msg.PeerAddress.String(),
+			NeighborInterface: msg.PeerInterface,
+		},
+		State: &api.PeerState{
+			PeerAs:          msg.PeerAS,
+			LocalAs:         msg.LocalAS,
+			NeighborAddress: msg.PeerAddress.String(),
+			SessionState:    api.PeerState_SessionState(int(msg.State) + 1),
+			AdminState:      api.PeerState_AdminState(msg.AdminState),
+			RouterId:        msg.PeerID.String(),
+		},
+		Transport: &api.Transport{
+			LocalAddress: msg.LocalAddress.String(),
+			LocalPort:    uint32(msg.LocalPort),
+			RemotePort:   uint32(msg.PeerPort),
+		},
+	}
+}
+
 func (s *BgpServer) MonitorPeer(ctx context.Context, r *api.MonitorPeerRequest, fn func(*api.Peer)) error {
 	if r == nil {
 		return fmt.Errorf("nil request")
 	}
 
 	go func() {
-		w := s.watch(watchPeerState(r.Current))
+		w := s.watch(watchPeerState(r.Current, false))
 		defer func() {
 			w.Stop()
 		}()
@@ -3728,28 +3752,54 @@ func (s *BgpServer) MonitorPeer(ctx context.Context, r *api.MonitorPeerRequest, 
 				if len(r.Address) > 0 && r.Address != msg.PeerAddress.String() && r.Address != msg.PeerInterface {
 					break
 				}
-				p := &api.Peer{
-					Conf: &api.PeerConf{
-						PeerAs:            msg.PeerAS,
-						LocalAs:           msg.LocalAS,
-						NeighborAddress:   msg.PeerAddress.String(),
-						NeighborInterface: msg.PeerInterface,
-					},
-					State: &api.PeerState{
-						PeerAs:          msg.PeerAS,
-						LocalAs:         msg.LocalAS,
-						NeighborAddress: msg.PeerAddress.String(),
-						SessionState:    api.PeerState_SessionState(int(msg.State) + 1),
-						AdminState:      api.PeerState_AdminState(msg.AdminState),
-						RouterId:        msg.PeerID.String(),
-					},
-					Transport: &api.Transport{
-						LocalAddress: msg.LocalAddress.String(),
-						LocalPort:    uint32(msg.LocalPort),
-						RemotePort:   uint32(msg.PeerPort),
-					},
+				fn(toPeerEventApi(msg))
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return nil
+}
+
+func (s *BgpServer) MonitorEvent(ctx context.Context, r *api.MonitorEventRequest, fn func(*api.MonitorEventResponse)) error {
+	go func() {
+		o := []watchOption{}
+		for _, v := range r.EventType {
+			switch v {
+			case api.MonitorEventType_PEER:
+				o = append(o, watchPeerState(true, true))
+			case api.MonitorEventType_PATH:
+				o = append(o, watchUpdate(false))
+			}
+		}
+		w := s.watch(o...)
+		defer w.Stop()
+
+		for {
+			select {
+			case m := <-w.Event():
+				switch r := m.(type) {
+				case *watchEventPeerState:
+					fn(&api.MonitorEventResponse{
+						EventType: api.MonitorEventType_PEER,
+						Peer:      toPeerEventApi(r),
+					})
+				case *watchEventUpdate:
+					for _, path := range r.PathList {
+						if path == nil {
+							continue
+						}
+						select {
+						case <-ctx.Done():
+							return
+						default:
+							fn(&api.MonitorEventResponse{
+								EventType: api.MonitorEventType_PATH,
+								Path:      toPathApi(path, nil),
+							})
+						}
+					}
 				}
-				fn(p)
 			case <-ctx.Done():
 				return
 			}
@@ -3799,6 +3849,7 @@ type watchEventPeerState struct {
 	SentOpen      *bgp.BGPMessage
 	RecvOpen      *bgp.BGPMessage
 	State         bgp.FSMState
+	OldState      bgp.FSMState
 	StateReason   *fsmStateReason
 	AdminState    adminState
 	Timestamp     time.Time
@@ -3844,6 +3895,7 @@ type watchOptions struct {
 	initPeerState  bool
 	tableName      string
 	recvMessage    bool
+	allPeerState   bool
 }
 
 type watchOption func(*watchOptions)
@@ -3875,11 +3927,14 @@ func watchPostUpdate(current bool) watchOption {
 	}
 }
 
-func watchPeerState(current bool) watchOption {
+func watchPeerState(current, all bool) watchOption {
 	return func(o *watchOptions) {
 		o.peerState = true
 		if current {
 			o.initPeerState = true
+		}
+		if all {
+			o.allPeerState = true
 		}
 	}
 }
@@ -4000,6 +4055,13 @@ func (s *BgpServer) isWatched(typ watchEventType) bool {
 
 func (s *BgpServer) notifyWatcher(typ watchEventType, ev watchEvent) {
 	for _, w := range s.watcherMap[typ] {
+		// hacky; removing this when MonitorPeer API is deleted.
+		if typ == watchEventTypePeerState && !w.opts.allPeerState {
+			msg := ev.(*watchEventPeerState)
+			if msg.State != bgp.BGP_FSM_ESTABLISHED && msg.OldState != bgp.BGP_FSM_ESTABLISHED {
+				continue
+			}
+		}
 		w.notify(ev)
 	}
 }
@@ -4035,12 +4097,13 @@ func (s *BgpServer) watch(opts ...watchOption) (w *watcher) {
 		if w.opts.initPeerState {
 			for _, peer := range s.neighborMap {
 				peer.fsm.lock.RLock()
-				notEstablished := peer.fsm.state != bgp.BGP_FSM_ESTABLISHED
+				state := peer.fsm.state
+				notEstablished := state != bgp.BGP_FSM_ESTABLISHED
 				peer.fsm.lock.RUnlock()
-				if notEstablished {
+				if !w.opts.allPeerState && notEstablished {
 					continue
 				}
-				w.notify(newWatchEventPeerState(peer, nil))
+				w.notify(newWatchEventPeerState(peer, nil, state))
 			}
 		}
 		if w.opts.initBest && s.active() == nil {

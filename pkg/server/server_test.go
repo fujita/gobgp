@@ -468,6 +468,19 @@ func TestMonitor(test *testing.T) {
 	assert.Nil(err)
 	defer s.StopBgp(context.Background(), &api.StopBgpRequest{})
 
+	ch1 := make(chan struct{})
+	events := []*api.MonitorEventResponse{}
+	ctx, cancel := context.WithCancel(context.Background())
+	go s.MonitorEvent(ctx, &api.MonitorEventRequest{
+		EventType: []api.MonitorEventType{api.MonitorEventType_PEER, api.MonitorEventType_PATH}}, func(rsp *api.MonitorEventResponse) {
+		if rsp.EventType == api.MonitorEventType_PATH {
+			cancel()
+			close(ch1)
+			return
+		}
+		events = append(events, rsp)
+	})
+
 	p1 := &api.Peer{
 		Conf: &api.PeerConf{
 			NeighborAddress: "127.0.0.1",
@@ -503,6 +516,7 @@ func TestMonitor(test *testing.T) {
 	}
 	ch := make(chan struct{})
 	go t.MonitorPeer(context.Background(), &api.MonitorPeerRequest{}, func(peer *api.Peer) {
+		assert.Equal(peer.State.SessionState, api.PeerState_ESTABLISHED)
 		if peer.State.SessionState == api.PeerState_ESTABLISHED {
 			close(ch)
 		}
@@ -529,6 +543,10 @@ func TestMonitor(test *testing.T) {
 	assert.Equal(1, len(b.PathList))
 	assert.Equal("10.0.0.0/24", b.PathList[0].GetNlri().String())
 	assert.False(b.PathList[0].IsWithdraw)
+
+	<-ch1
+	// idle, active, opensent, openconfirm, established.
+	assert.Equal(5, len(events))
 
 	// Withdraws the previous route.
 	// NOTE: Withdow should not require any path attribute.
