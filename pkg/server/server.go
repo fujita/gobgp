@@ -3795,7 +3795,7 @@ func (s *BgpServer) MonitorEvent(ctx context.Context, r *api.MonitorEventRequest
 						default:
 							fn(&api.MonitorEventResponse{
 								EventType: api.MonitorEventType_PATH,
-								Path:      toPathApi(path, nil),
+								Path:      []*api.Path{toPathApi(path, nil)},
 							})
 						}
 					}

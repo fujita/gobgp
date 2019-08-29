@@ -1208,5 +1208,5 @@ message MonitorEventRequest {
 message MonitorEventResponse {
   MonitorEventType event_type = 1;
   Peer peer = 2;
-  Path path = 3;
+  repeated Path path = 3;
 }
