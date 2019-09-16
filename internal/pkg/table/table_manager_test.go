@@ -1954,8 +1954,7 @@ func TestProcessBGPUpdate_multiple_nlri_ipv4(t *testing.T) {
 
 	// check table
 	table := tm.Tables[bgp.RF_IPv4_UC]
-	assert.Equal(t, 13, len(table.GetDestinations()))
-
+	assert.Equal(t, 13, table.Count())
 }
 
 // check multiple paths
@@ -2098,8 +2097,7 @@ func TestProcessBGPUpdate_multiple_nlri_ipv6(t *testing.T) {
 
 	// check table
 	table := tm.Tables[bgp.RF_IPv6_UC]
-	assert.Equal(t, 13, len(table.GetDestinations()))
-
+	assert.Equal(t, 13, table.Count())
 }
 
 func TestProcessBGPUpdate_Timestamp(t *testing.T) {

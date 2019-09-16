@@ -16,7 +16,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -916,31 +915,6 @@ func showNeighborRib(r string, name string, args []string) error {
 		// show RIB
 		var dsts []*api.Destination
 		switch rf {
-		case bgp.RF_IPv4_UC, bgp.RF_IPv6_UC:
-			type d struct {
-				prefix net.IP
-				dst    *api.Destination
-			}
-			l := make([]*d, 0, len(rib))
-			for _, dst := range rib {
-				prefix := dst.Prefix
-				if t == api.TableType_VRF {
-					// extract prefix from original which is RD(AS:VRF):IPv4 or IPv6 address
-					s := strings.SplitN(prefix, ":", 3)
-					prefix = s[len(s)-1]
-				}
-				_, p, _ := net.ParseCIDR(prefix)
-				l = append(l, &d{prefix: p.IP, dst: dst})
-			}
-
-			sort.Slice(l, func(i, j int) bool {
-				return bytes.Compare(l[i].prefix, l[j].prefix) < 0
-			})
-
-			dsts = make([]*api.Destination, 0, len(rib))
-			for _, s := range l {
-				dsts = append(dsts, s.dst)
-			}
 		default:
 			dsts = append(dsts, rib...)
 		}

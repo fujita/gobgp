@@ -586,7 +586,7 @@ func (s *BgpServer) prePolicyFilterpath(peer *peer, path, old *table.Path) (*tab
 		} else {
 			// We send a path even if it is not the best path. See comments in
 			// (*Destination) GetChanges().
-			dst := peer.localRib.GetDestination(path)
+			dst := peer.localRib.Tables[bgp.RF_RTC_UC].Get(path.GetNlri())
 			path = nil
 			for _, p := range dst.GetKnownPathList(peer.TableID(), peer.AS()) {
 				srcPeer := p.GetSource()
@@ -917,9 +917,8 @@ func (s *BgpServer) getBestFromLocal(peer *peer, rfList []bgp.RouteFamily) ([]*t
 
 	if peer.isSecondaryRouteEnabled() {
 		for _, family := range peer.toGlobalFamilies(rfList) {
-			dsts := s.rsRib.Tables[family].GetDestinations()
-			dl := make([]*table.Update, 0, len(dsts))
-			for _, d := range dsts {
+			dl := make([]*table.Update, 0, s.rsRib.Tables[family].Count())
+			s.rsRib.Tables[family].Walk(func(d *table.Destination) bool {
 				l := d.GetAllKnownPathList()
 				pl := make([]*table.Path, len(l))
 				copy(pl, l)
@@ -927,7 +926,8 @@ func (s *BgpServer) getBestFromLocal(peer *peer, rfList []bgp.RouteFamily) ([]*t
 					KnownPathList: pl,
 				}
 				dl = append(dl, u)
-			}
+				return false
+			})
 			pathList = append(pathList, s.sendSecondaryRoutes(peer, nil, dl)...)
 		}
 		return pathList, filtered
@@ -2363,14 +2363,15 @@ func (s *BgpServer) sReset(addr string, family bgp.RouteFamily) error {
 	return s.softResetOut(addr, family, false)
 }
 
-func (s *BgpServer) validateTable(r *table.Table) (v []*table.Validation) {
+func (s *BgpServer) validateTable(t *table.Table) (v []*table.Validation) {
 	if s.roaManager.enabled() {
-		v = make([]*table.Validation, 0, len(r.GetDestinations()))
-		for _, d := range r.GetDestinations() {
+		v = make([]*table.Validation, 0, t.Count())
+		t.Walk(func(d *table.Destination) bool {
 			for _, p := range d.GetAllKnownPathList() {
 				v = append(v, s.roaManager.validate(p))
 			}
-		}
+			return false
+		})
 	}
 	return
 }
@@ -2526,7 +2527,7 @@ func (s *BgpServer) ListPath(ctx context.Context, r *api.ListPathRequest, fn fun
 
 	idx := 0
 	err = func() error {
-		for _, dst := range tbl.GetDestinations() {
+		tbl.Walk(func(dst *table.Destination) bool {
 			d := api.Destination{
 				Prefix: dst.GetNlri().String(),
 				Paths:  make([]*api.Path, 0, len(dst.GetAllKnownPathList())),
@@ -2555,11 +2556,12 @@ func (s *BgpServer) ListPath(ctx context.Context, r *api.ListPathRequest, fn fun
 
 			select {
 			case <-ctx.Done():
-				return nil
+				return true
 			default:
 				fn(&d)
 			}
-		}
+			return false
+		})
 		return nil
 	}()
 	return err
@@ -3951,11 +3953,12 @@ func (w *watcher) Generate(t watchEventType) error {
 			pathList := func() map[string][]*table.Path {
 				pathList := make(map[string][]*table.Path)
 				for _, t := range rib.Tables {
-					for _, dst := range t.GetDestinations() {
+					t.Walk(func(dst *table.Destination) bool {
 						if paths := dst.GetKnownPathList(id, as); len(paths) > 0 {
 							pathList[dst.GetNlri().String()] = clonePathList(paths)
 						}
-					}
+						return false
+					})
 				}
 				return pathList
 			}()
@@ -4109,7 +4112,7 @@ func (s *BgpServer) watch(opts ...watchOption) (w *watcher) {
 		}
 		if w.opts.initPostUpdate && s.active() == nil {
 			for _, rf := range s.globalRib.GetRFlist() {
-				if len(s.globalRib.Tables[rf].GetDestinations()) == 0 {
+				if s.globalRib.Tables[rf].Count() == 0 {
 					continue
 				}
 				pathsByPeer := make(map[*table.PeerInfo][]*table.Path)

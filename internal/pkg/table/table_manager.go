@@ -182,7 +182,7 @@ func (manager *TableManager) DeleteVrf(name string) ([]*Path, error) {
 func (tm *TableManager) update(newPath *Path) *Update {
 	t := tm.Tables[newPath.GetRouteFamily()]
 	t.validatePath(newPath)
-	dst := t.getOrCreateDest(newPath.GetNlri())
+	dst := t.getOrCreateDest(newPath.GetNlri(), 64)
 	u := dst.Calculate(newPath)
 	if len(dst.knownPathList) == 0 {
 		t.deleteDest(dst)
@@ -277,7 +277,7 @@ func (manager *TableManager) tables(list ...bgp.RouteFamily) []*Table {
 func (manager *TableManager) getDestinationCount(rfList []bgp.RouteFamily) int {
 	count := 0
 	for _, t := range manager.tables(rfList...) {
-		count += len(t.GetDestinations())
+		count += t.entry.count()
 	}
 	return count
 }
@@ -341,18 +341,6 @@ func (manager *TableManager) GetPathListWithSource(id string, rfList []bgp.Route
 		}
 	}
 	return paths
-}
-
-func (manager *TableManager) GetDestination(path *Path) *Destination {
-	if path == nil {
-		return nil
-	}
-	family := path.GetRouteFamily()
-	t, ok := manager.Tables[family]
-	if !ok {
-		return nil
-	}
-	return t.GetDestination(path.GetNlri())
 }
 
 func (manager *TableManager) TableInfo(id string, as uint32, family bgp.RouteFamily) (*TableInfo, error) {
