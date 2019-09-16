@@ -34,8 +34,8 @@ github.com/magiconair/properties v1.7.3 h1:6AOjgCKyZFMG/1yfReDPDz3CJZPxnYk7DGmj2
 github.com/magiconair/properties v1.7.3/go.mod h1:PppfXfuXeibc/6YijjN8zIbojt8czPbwD3XqdrwzmxQ=
 github.com/mitchellh/mapstructure v0.0.0-20170523030023-d0303fe80992 h1:W7VHAEVflA5/eTyRvQ53Lz5j8bhRd1myHZlI/IZFvbU=
 github.com/mitchellh/mapstructure v0.0.0-20170523030023-d0303fe80992/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
-github.com/osrg/critbitgo v1.2.0 h1:Jj0z+liCtcYDuXKAVWYbx+XcLXzIe9XRIz0MNZIR8a0=
-github.com/osrg/critbitgo v1.2.0/go.mod h1:Ozv5cjyW6vDcx1j28rLBOdlrLn/2+6Ksp3ZyHSUCX0c=
+github.com/osrg/critbitgo v1.2.1-0.20190916065649-282eee430cfb h1:F0Nq1Srs9f8q7lpvfU3TtVXZ6FVXrliPKke843nvsh4=
+github.com/osrg/critbitgo v1.2.1-0.20190916065649-282eee430cfb/go.mod h1:Ozv5cjyW6vDcx1j28rLBOdlrLn/2+6Ksp3ZyHSUCX0c=
 github.com/pelletier/go-buffruneio v0.2.0 h1:U4t4R6YkofJ5xHm3dJzuRpPZ0mr5MMCoAWooScCR7aA=
 github.com/pelletier/go-buffruneio v0.2.0/go.mod h1:JkE26KsDizTr40EUHkXVtNPvgGtbSNq5BcowyYOWdKo=
 github.com/pelletier/go-toml v1.0.0 h1:QFDlmAXZrfPXEF6c9+15fMqhQIS3O0pxszhnk936vg4=

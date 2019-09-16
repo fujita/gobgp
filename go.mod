@@ -19,7 +19,7 @@ require (
 	github.com/kr/text v0.0.0-20160504234017-7cafcd837844 // indirect
 	github.com/magiconair/properties v1.7.3 // indirect
 	github.com/mitchellh/mapstructure v0.0.0-20170523030023-d0303fe80992 // indirect
-	github.com/osrg/critbitgo v1.2.0
+	github.com/osrg/critbitgo v1.2.1-0.20190916065649-282eee430cfb
 	github.com/pelletier/go-buffruneio v0.2.0 // indirect
 	github.com/pelletier/go-toml v1.0.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
