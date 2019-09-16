@@ -20,9 +20,9 @@ import (
 	"math/bits"
 	"net"
 	"strings"
-	"unsafe"
 
 	"github.com/armon/go-radix"
+	"github.com/osrg/critbitgo"
 	"github.com/osrg/gobgp/pkg/packet/bgp"
 	log "github.com/sirupsen/logrus"
 )
@@ -58,20 +58,74 @@ type entry interface {
 	count() int
 }
 
+type cri struct {
+	n *critbitgo.Net
+}
+
+func (c *cri) key(nlri bgp.AddrPrefixInterface) *net.IPNet {
+	switch T := nlri.(type) {
+	case *bgp.IPAddrPrefix:
+		return &net.IPNet{
+			IP:   net.IP(T.Prefix.To4()),
+			Mask: net.CIDRMask(int(T.Length), 32),
+		}
+	case *bgp.IPv6AddrPrefix:
+		return &net.IPNet{
+			IP:   net.IP(T.Prefix.To16()),
+			Mask: net.CIDRMask(int(T.Length), 128),
+		}
+	}
+	return nil
+}
+
+func (c *cri) set(d *Destination) {
+	c.n.Add(c.key(d.nlri), d)
+}
+
+func (c *cri) get(nlri bgp.AddrPrefixInterface) *Destination {
+	v, ok, _ := c.n.Get(c.key(nlri))
+	if ok {
+		return v.(*Destination)
+	}
+	return nil
+}
+
+func (c *cri) delete(nlri bgp.AddrPrefixInterface) {
+	c.n.Delete(c.key(nlri))
+}
+
+func (c *cri) walk(fn func(*Destination) bool) {
+	if c.n.Size() == 0 {
+		return
+	}
+	c.n.Walk(func(_ *net.IPNet, value interface{}) bool {
+		fn(value.(*Destination))
+		return true
+	})
+}
+
+func (c *cri) count() int {
+	return c.n.Size()
+}
+
 type hashmap struct {
 	destinations map[string]*Destination
 }
 
+func (m *hashmap) key(nlri bgp.AddrPrefixInterface) string {
+	return nlri.String()
+}
+
 func (m *hashmap) set(d *Destination) {
-	m.destinations[tableKey(d.nlri)] = d
+	m.destinations[m.key(d.nlri)] = d
 }
 
 func (m *hashmap) get(nlri bgp.AddrPrefixInterface) *Destination {
-	return m.destinations[tableKey(nlri)]
+	return m.destinations[m.key(nlri)]
 }
 
 func (m *hashmap) delete(nlri bgp.AddrPrefixInterface) {
-	delete(m.destinations, tableKey(nlri))
+	delete(m.destinations, m.key(nlri))
 	if len(m.destinations) == 0 {
 		m.destinations = make(map[string]*Destination)
 	}
@@ -89,33 +143,27 @@ func (m *hashmap) count() int {
 	return len(m.destinations)
 }
 
-func tableKey(nlri bgp.AddrPrefixInterface) string {
-	switch T := nlri.(type) {
-	case *bgp.IPAddrPrefix:
-		b := make([]byte, 5)
-		copy(b, T.Prefix.To4())
-		b[4] = T.Length
-		return *(*string)(unsafe.Pointer(&b))
-	case *bgp.IPv6AddrPrefix:
-		b := make([]byte, 17)
-		copy(b, T.Prefix.To16())
-		b[16] = T.Length
-		return *(*string)(unsafe.Pointer(&b))
-	}
-	return nlri.String()
-}
-
 type Table struct {
 	routeFamily bgp.RouteFamily
 	entry       entry
 }
 
 func NewTable(rf bgp.RouteFamily, dsts ...*Destination) *Table {
+	var e entry
+	switch rf {
+	case bgp.RF_IPv4_UC, bgp.RF_IPv6_UC:
+		e = &cri{
+			critbitgo.NewNet(),
+		}
+	default:
+		e = &hashmap{
+			destinations: make(map[string]*Destination),
+		}
+	}
+
 	t := &Table{
 		routeFamily: rf,
-		entry: &hashmap{
-			destinations: make(map[string]*Destination),
-		},
+		entry:       e,
 	}
 	for _, dst := range dsts {
 		t.entry.set(dst)

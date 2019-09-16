@@ -45,16 +45,6 @@ func TestTableGetRouteFamily(t *testing.T) {
 	assert.Equal(t, rf, bgp.RF_IPv4_UC)
 }
 
-func TestTableKey(t *testing.T) {
-	n1, _ := bgp.NewPrefixFromRouteFamily(bgp.AFI_IP, bgp.SAFI_UNICAST, "0.0.0.0/0")
-	d1 := NewDestination(n1, 0)
-	n2, _ := bgp.NewPrefixFromRouteFamily(bgp.AFI_IP, bgp.SAFI_UNICAST, "0.0.0.0/1")
-	d2 := NewDestination(n2, 0)
-	assert.Equal(t, len(tableKey(d1.GetNlri())), 5)
-	tb := NewTable(bgp.RF_IPv4_UC, d1, d2)
-	assert.Equal(t, tb.Count(), 2)
-}
-
 func TableCreatePeer() []*PeerInfo {
 	peerT1 := &PeerInfo{AS: 65000}
 	peerT2 := &PeerInfo{AS: 65001}
