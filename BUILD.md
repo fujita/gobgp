@@ -2,7 +2,7 @@
 
 ## Building the development environment
 
-You need a working [Go environment](https://golang.org/doc/install) (1.11 or newer) with the module support enabled.
+You need a working [Go environment](https://golang.org/doc/install) (1.12 or newer) with the module support enabled.
 
 ```bash
 $ git clone git://github.com/osrg/gobgp
