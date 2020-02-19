@@ -29,7 +29,7 @@ _docker: &_docker
     - test $TRAVIS_OS_NAME == "linux" && sudo sysctl -w net.ipv6.conf.all.disable_ipv6=0
     - test $TRAVIS_OS_NAME == "linux" && sudo sysctl -w net.ipv6.conf.default.disable_ipv6=0
     - test $TRAVIS_OS_NAME == "linux" && sudo sysctl -w net.ipv6.conf.docker0.disable_ipv6=1
-    - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+    - apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
     - sudo add-apt-repository "deb https://apt.dockerproject.org/repo ubuntu-trusty main"
     - sudo apt-get update
     - sudo apt-get install -y docker-engine=17.03.1~ce-0~ubuntu-trusty
