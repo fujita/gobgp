@@ -30,8 +30,7 @@ _docker: &_docker
     - test $TRAVIS_OS_NAME == "linux" && sudo sysctl -w net.ipv6.conf.default.disable_ipv6=0
     - test $TRAVIS_OS_NAME == "linux" && sudo sysctl -w net.ipv6.conf.docker0.disable_ipv6=1
     - sudo cp test/scenario_test/ci-scripts/daemon.json /etc/docker/
-    - sudo systemctl daemon-reload
-    - sudo systemctl restart docker
+    - sudo service docker restart
   install:
     - pip3 install -r test/pip-requires.txt
     - fab -r test/lib make-gobgp-ctn --tag $DOCKER_IMAGE --from-image $FROM_IMAGE
