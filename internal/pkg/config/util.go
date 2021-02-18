@@ -461,9 +461,9 @@ func NewPeerFromConfigStruct(pconf *Neighbor) *api.Peer {
 		ApplyPolicy: newApplyPolicyFromConfigStruct(&pconf.ApplyPolicy),
 		Conf: &api.PeerConf{
 			NeighborAddress:   pconf.Config.NeighborAddress,
-			PeerAs:            pconf.Config.PeerAs,
-			LocalAs:           pconf.Config.LocalAs,
-			PeerType:          uint32(pconf.Config.PeerType.ToInt()),
+			PeerAsn:           pconf.Config.PeerAs,
+			LocalAsn:          pconf.Config.LocalAs,
+			PeerType:          api.PeerType(pconf.Config.PeerType.ToInt()),
 			AuthPassword:      pconf.Config.AuthPassword,
 			RouteFlapDamping:  pconf.Config.RouteFlapDamping,
 			Description:       pconf.Config.Description,
@@ -500,8 +500,8 @@ func NewPeerFromConfigStruct(pconf *Neighbor) *api.Peer {
 					Total:        s.Messages.Sent.Total,
 				},
 			},
-			PeerAs:          s.PeerAs,
-			PeerType:        uint32(s.PeerType.ToInt()),
+			PeerAsn:         s.PeerAs,
+			PeerType:        api.PeerType(s.PeerType.ToInt()),
 			NeighborAddress: pconf.State.NeighborAddress,
 			Queues:          &api.Queues{},
 			RemoteCap:       remoteCap,
@@ -568,17 +568,17 @@ func NewPeerGroupFromConfigStruct(pconf *PeerGroup) *api.PeerGroup {
 	return &api.PeerGroup{
 		ApplyPolicy: newApplyPolicyFromConfigStruct(&pconf.ApplyPolicy),
 		Conf: &api.PeerGroupConf{
-			PeerAs:           pconf.Config.PeerAs,
-			LocalAs:          pconf.Config.LocalAs,
-			PeerType:         uint32(pconf.Config.PeerType.ToInt()),
+			PeerAsn:          pconf.Config.PeerAs,
+			LocalAsn:         pconf.Config.LocalAs,
+			PeerType:         api.PeerType(pconf.Config.PeerType.ToInt()),
 			AuthPassword:     pconf.Config.AuthPassword,
 			RouteFlapDamping: pconf.Config.RouteFlapDamping,
 			Description:      pconf.Config.Description,
 			PeerGroupName:    pconf.Config.PeerGroupName,
 		},
 		Info: &api.PeerGroupState{
-			PeerAs:        s.PeerAs,
-			PeerType:      uint32(s.PeerType.ToInt()),
+			PeerAsn:       s.PeerAs,
+			PeerType:      api.PeerType(s.PeerType.ToInt()),
 			TotalPaths:    s.TotalPaths,
 			TotalPrefixes: s.TotalPrefixes,
 		},
@@ -635,7 +635,7 @@ func NewGlobalFromConfigStruct(c *Global) *api.Global {
 	applyPolicy := newApplyPolicyFromConfigStruct(&c.ApplyPolicy)
 
 	return &api.Global{
-		As:               c.Config.As,
+		Asn:              c.Config.As,
 		RouterId:         c.Config.RouterId,
 		ListenPort:       c.Config.Port,
 		ListenAddresses:  c.Config.LocalAddressList,

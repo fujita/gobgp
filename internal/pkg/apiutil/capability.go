@@ -70,7 +70,7 @@ func NewGracefulRestartCapability(a *bgp.CapGracefulRestart) *api.GracefulRestar
 
 func NewFourOctetASNumberCapability(a *bgp.CapFourOctetASNumber) *api.FourOctetASNumberCapability {
 	return &api.FourOctetASNumberCapability{
-		As: a.CapValue,
+		Asn: a.CapValue,
 	}
 }
 
@@ -206,7 +206,7 @@ func unmarshalCapability(a *any.Any) (bgp.ParameterCapabilityInterface, error) {
 		}
 		return bgp.NewCapGracefulRestart(restarting, notification, uint16(a.Time), tuples), nil
 	case *api.FourOctetASNumberCapability:
-		return bgp.NewCapFourOctetASNumber(a.As), nil
+		return bgp.NewCapFourOctetASNumber(a.Asn), nil
 	case *api.AddPathCapability:
 		tuples := make([]*bgp.CapAddPathTuple, 0, len(a.Tuples))
 		for _, t := range a.Tuples {

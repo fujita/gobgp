@@ -30,7 +30,11 @@ import "gobgp.proto";
 message OriginAttribute { uint32 origin = 1; }
 
 message AsSegment {
-  uint32 type = 1;
+  enum SegmentType {
+    UNKNOWN = 0; AS_SET = 1; AS_SEQUENCE = 2;
+    AS_CONFED_SEQUENCE = 3; AS_CONFED_SET = 4;
+  }
+  SegmentType segment_type = 1;
   repeated uint32 numbers = 2;
 }
 
@@ -45,8 +49,8 @@ message LocalPrefAttribute { uint32 local_pref = 1; }
 message AtomicAggregateAttribute {}
 
 message AggregatorAttribute {
-  uint32 as = 2;
-  string address = 3;
+  uint32 asn = 1;
+  string address = 2;
 }
 
 message CommunitiesAttribute { repeated uint32 communities = 1; }
@@ -93,7 +97,7 @@ message RouteDistinguisherFourOctetAS {
 }
 
 message EthernetSegmentIdentifier {
-  uint32 type = 1;
+  uint32 esi_type = 1;
   bytes value = 2;
 }
 
@@ -214,7 +218,7 @@ message LabeledVPNIPAddressPrefix {
 // RouteTargetMembershipNLRI represents the NLRI for:
 // - AFI=1, SAFI=132
 message RouteTargetMembershipNLRI {
-  uint32 as = 1;
+  uint32 asn = 1;
   // One of:
   // - TwoOctetAsSpecificExtended
   // - IPv4AddressSpecificExtended
@@ -223,7 +227,7 @@ message RouteTargetMembershipNLRI {
 }
 
 message FlowSpecIPPrefix {
-  uint32 type = 1;
+  uint32 prefix_type = 1;
   uint32 prefix_len = 2;
   string prefix = 3;
   // IPv6 only
@@ -231,7 +235,7 @@ message FlowSpecIPPrefix {
 }
 
 message FlowSpecMAC {
-  uint32 type = 1;
+  uint32 mac_type = 1;
   string address = 2;
 }
 
@@ -242,7 +246,7 @@ message FlowSpecComponentItem {
 }
 
 message FlowSpecComponent {
-  uint32 type = 1;
+  uint32 component_type = 1;
   repeated FlowSpecComponentItem items = 2;
 }
 
@@ -349,7 +353,7 @@ enum LsProtocolID {
 // LsAddrPrefix represents the NLRI for:
 // - AFI=16388, SAFI=71
 message LsAddrPrefix {
-  LsNLRIType type = 1;
+  LsNLRIType nlri_type = 1;
   // One of:
   // - LsNodeNLRI
   // - LsLinkNLRI
@@ -393,7 +397,7 @@ message MpUnreachNLRIAttribute {
 message TwoOctetAsSpecificExtended {
   bool is_transitive = 1;
   uint32 sub_type = 2;
-  uint32 as = 3;
+  uint32 asn = 3;
   uint32 local_admin = 4;
 }
 
@@ -407,7 +411,7 @@ message IPv4AddressSpecificExtended {
 message FourOctetAsSpecificExtended {
   bool is_transitive = 1;
   uint32 sub_type = 2;
-  uint32 as = 3;
+  uint32 asn = 3;
   uint32 local_admin = 4;
 }
 
@@ -439,7 +443,7 @@ message MacMobilityExtended {
 message RouterMacExtended { string mac = 1; }
 
 message TrafficRateExtended {
-  uint32 as = 1;
+  uint32 asn = 1;
   float rate = 2;
 }
 
@@ -449,7 +453,7 @@ message TrafficActionExtended {
 }
 
 message RedirectTwoOctetAsSpecificExtended {
-  uint32 as = 1;
+  uint32 asn = 1;
   uint32 local_admin = 2;
 }
 
@@ -459,14 +463,14 @@ message RedirectIPv4AddressSpecificExtended {
 }
 
 message RedirectFourOctetAsSpecificExtended {
-  uint32 as = 1;
+  uint32 asn = 1;
   uint32 local_admin = 2;
 }
 
 message TrafficRemarkExtended { uint32 dscp = 1; }
 
 message UnknownExtended {
-  uint32 type = 1;
+  uint32 extended_type = 1;
   bytes value = 2;
 }
 
@@ -492,13 +496,13 @@ message ExtendedCommunitiesAttribute {
 message As4PathAttribute { repeated AsSegment segments = 1; }
 
 message As4AggregatorAttribute {
-  uint32 as = 2;
-  string address = 3;
+  uint32 asn = 1;
+  string address = 2;
 }
 
 message PmsiTunnelAttribute {
   uint32 flags = 1;
-  uint32 type = 2;
+  uint32 attr_type = 2;
   uint32 label = 3;
   bytes id = 4;
 }
@@ -629,12 +633,12 @@ message TunnelEncapSubTLVUDPDestPort {
 }
 
 message TunnelEncapSubTLVUnknown {
-  uint32 type = 1;
+  uint32 sub_type = 1;
   bytes value = 2;
 }
 
 message TunnelEncapTLV {
-  uint32 type = 1;
+  uint32 sub_type = 1;
   // Each TLV must be one of:
   // - TunnelEncapSubTLVEncapsulation
   // - TunnelEncapSubTLVProtocol
@@ -668,7 +672,7 @@ message IP6ExtendedCommunitiesAttribute {
 message AigpTLVIGPMetric { uint64 metric = 1; }
 
 message AigpTLVUnknown {
-  uint32 type = 1;
+  uint32 tlv_type = 1;
   bytes value = 2;
 }
 
@@ -763,7 +767,7 @@ message LsAttribute {
 
 message UnknownAttribute {
   uint32 flags = 1;
-  uint32 type = 2;
+  uint32 attr_type = 2;
   bytes value = 3;
 }
 

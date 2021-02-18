@@ -49,12 +49,12 @@ func Test_AsPathAttribute(t *testing.T) {
 	input := &api.AsPathAttribute{
 		Segments: []*api.AsSegment{
 			{
-				Type:    1, // SET
-				Numbers: []uint32{100, 200},
+				SegmentType: 1, // SET
+				Numbers:     []uint32{100, 200},
 			},
 			{
-				Type:    2, // SEQ
-				Numbers: []uint32{300, 400},
+				SegmentType: 2, // SEQ
+				Numbers:     []uint32{300, 400},
 			},
 		},
 	}
@@ -138,7 +138,7 @@ func Test_AggregatorAttribute(t *testing.T) {
 	assert := assert.New(t)
 
 	input := &api.AggregatorAttribute{
-		As:      65000,
+		Asn:     65000,
 		Address: "1.1.1.1",
 	}
 
@@ -148,7 +148,7 @@ func Test_AggregatorAttribute(t *testing.T) {
 	assert.Nil(err)
 
 	output := NewAggregatorAttributeFromNative(n.(*bgp.PathAttributeAggregator))
-	assert.Equal(input.As, output.As)
+	assert.Equal(input.Asn, output.Asn)
 	assert.Equal(input.Address, output.Address)
 }
 
@@ -468,8 +468,8 @@ func Test_MpReachNLRIAttribute_EVPN_AD_Route(t *testing.T) {
 	})
 	assert.Nil(err)
 	esi := &api.EthernetSegmentIdentifier{
-		Type:  0,
-		Value: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9},
+		EsiType: 0,
+		Value:   []byte{1, 2, 3, 4, 5, 6, 7, 8, 9},
 	}
 	a, err := ptypes.MarshalAny(&api.EVPNEthernetAutoDiscoveryRoute{
 		Rd:          rd,
@@ -516,8 +516,8 @@ func Test_MpReachNLRIAttribute_EVPN_MAC_IP_Route(t *testing.T) {
 	})
 	assert.Nil(err)
 	esi := &api.EthernetSegmentIdentifier{
-		Type:  0,
-		Value: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9},
+		EsiType: 0,
+		Value:   []byte{1, 2, 3, 4, 5, 6, 7, 8, 9},
 	}
 	a, err := ptypes.MarshalAny(&api.EVPNMACIPAdvertisementRoute{
 		Rd:          rd,
@@ -609,8 +609,8 @@ func Test_MpReachNLRIAttribute_EVPN_ES_Route(t *testing.T) {
 	})
 	assert.Nil(err)
 	esi := &api.EthernetSegmentIdentifier{
-		Type:  0,
-		Value: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9},
+		EsiType: 0,
+		Value:   []byte{1, 2, 3, 4, 5, 6, 7, 8, 9},
 	}
 	a, err := ptypes.MarshalAny(&api.EVPNEthernetSegmentRoute{
 		Rd:        rd,
@@ -656,8 +656,8 @@ func Test_MpReachNLRIAttribute_EVPN_Prefix_Route(t *testing.T) {
 	})
 	assert.Nil(err)
 	esi := &api.EthernetSegmentIdentifier{
-		Type:  0,
-		Value: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9},
+		EsiType: 0,
+		Value:   []byte{1, 2, 3, 4, 5, 6, 7, 8, 9},
 	}
 	a, err := ptypes.MarshalAny(&api.EVPNIPPrefixRoute{
 		Rd:          rd,
@@ -797,8 +797,8 @@ func Test_MpReachNLRIAttribute_RTC_UC(t *testing.T) {
 	})
 	assert.Nil(err)
 	a, err := ptypes.MarshalAny(&api.RouteTargetMembershipNLRI{
-		As: 65000,
-		Rt: rt,
+		Asn: 65000,
+		Rt:  rt,
 	})
 	assert.Nil(err)
 	nlris = append(nlris, a)
@@ -834,21 +834,21 @@ func Test_MpReachNLRIAttribute_FS_IPv4_UC(t *testing.T) {
 
 	rules := make([]*any.Any, 0, 3)
 	rule, err := ptypes.MarshalAny(&api.FlowSpecIPPrefix{
-		Type:      1, // Destination Prefix
-		PrefixLen: 24,
-		Prefix:    "192.168.101.0",
+		PrefixType: 1, // Destination Prefix
+		PrefixLen:  24,
+		Prefix:     "192.168.101.0",
 	})
 	assert.Nil(err)
 	rules = append(rules, rule)
 	rule, err = ptypes.MarshalAny(&api.FlowSpecIPPrefix{
-		Type:      2, // Source Prefix
-		PrefixLen: 24,
-		Prefix:    "192.168.201.0",
+		PrefixType: 2, // Source Prefix
+		PrefixLen:  24,
+		Prefix:     "192.168.201.0",
 	})
 	assert.Nil(err)
 	rules = append(rules, rule)
 	rule, err = ptypes.MarshalAny(&api.FlowSpecComponent{
-		Type: 3, // IP Protocol
+		ComponentType: 3, // IP Protocol
 		Items: []*api.FlowSpecComponentItem{
 			{
 				Op:    0x80 | 0x01, // End, EQ
@@ -903,21 +903,21 @@ func Test_MpReachNLRIAttribute_FS_IPv4_VPN(t *testing.T) {
 
 	rules := make([]*any.Any, 0, 3)
 	rule, err := ptypes.MarshalAny(&api.FlowSpecIPPrefix{
-		Type:      1, // Destination Prefix
-		PrefixLen: 24,
-		Prefix:    "192.168.101.0",
+		PrefixType: 1, // Destination Prefix
+		PrefixLen:  24,
+		Prefix:     "192.168.101.0",
 	})
 	assert.Nil(err)
 	rules = append(rules, rule)
 	rule, err = ptypes.MarshalAny(&api.FlowSpecIPPrefix{
-		Type:      2, // Source Prefix
-		PrefixLen: 24,
-		Prefix:    "192.168.201.0",
+		PrefixType: 2, // Source Prefix
+		PrefixLen:  24,
+		Prefix:     "192.168.201.0",
 	})
 	assert.Nil(err)
 	rules = append(rules, rule)
 	rule, err = ptypes.MarshalAny(&api.FlowSpecComponent{
-		Type: 3, // IP Protocol
+		ComponentType: 3, // IP Protocol
 		Items: []*api.FlowSpecComponentItem{
 			{
 				Op:    0x80 | 0x01, // End, EQ
@@ -967,21 +967,21 @@ func Test_MpReachNLRIAttribute_FS_IPv6_UC(t *testing.T) {
 
 	rules := make([]*any.Any, 0, 3)
 	rule, err := ptypes.MarshalAny(&api.FlowSpecIPPrefix{
-		Type:      1, // Destination Prefix
-		PrefixLen: 64,
-		Prefix:    "2001:db8:1::",
+		PrefixType: 1, // Destination Prefix
+		PrefixLen:  64,
+		Prefix:     "2001:db8:1::",
 	})
 	assert.Nil(err)
 	rules = append(rules, rule)
 	rule, err = ptypes.MarshalAny(&api.FlowSpecIPPrefix{
-		Type:      2, // Source Prefix
-		PrefixLen: 64,
-		Prefix:    "2001:db8:2::",
+		PrefixType: 2, // Source Prefix
+		PrefixLen:  64,
+		Prefix:     "2001:db8:2::",
 	})
 	assert.Nil(err)
 	rules = append(rules, rule)
 	rule, err = ptypes.MarshalAny(&api.FlowSpecComponent{
-		Type: 3, // Next Header
+		ComponentType: 3, // Next Header
 		Items: []*api.FlowSpecComponentItem{
 			{
 				Op:    0x80 | 0x01, // End, EQ
@@ -1036,21 +1036,21 @@ func Test_MpReachNLRIAttribute_FS_IPv6_VPN(t *testing.T) {
 
 	rules := make([]*any.Any, 0, 3)
 	rule, err := ptypes.MarshalAny(&api.FlowSpecIPPrefix{
-		Type:      1, // Destination Prefix
-		PrefixLen: 64,
-		Prefix:    "2001:db8:1::",
+		PrefixType: 1, // Destination Prefix
+		PrefixLen:  64,
+		Prefix:     "2001:db8:1::",
 	})
 	assert.Nil(err)
 	rules = append(rules, rule)
 	rule, err = ptypes.MarshalAny(&api.FlowSpecIPPrefix{
-		Type:      2, // Source Prefix
-		PrefixLen: 64,
-		Prefix:    "2001:db8:2::",
+		PrefixType: 2, // Source Prefix
+		PrefixLen:  64,
+		Prefix:     "2001:db8:2::",
 	})
 	assert.Nil(err)
 	rules = append(rules, rule)
 	rule, err = ptypes.MarshalAny(&api.FlowSpecComponent{
-		Type: 3, // Next Header
+		ComponentType: 3, // Next Header
 		Items: []*api.FlowSpecComponentItem{
 			{
 				Op:    0x80 | 0x01, // End, EQ
@@ -1106,19 +1106,19 @@ func Test_MpReachNLRIAttribute_FS_L2_VPN(t *testing.T) {
 
 	rules := make([]*any.Any, 0, 3)
 	rule, err := ptypes.MarshalAny(&api.FlowSpecMAC{
-		Type:    15, // Source MAC
+		MacType: 15, // Source MAC
 		Address: "aa:bb:cc:11:22:33",
 	})
 	assert.Nil(err)
 	rules = append(rules, rule)
 	rule, err = ptypes.MarshalAny(&api.FlowSpecMAC{
-		Type:    16, // Destination MAC
+		MacType: 16, // Destination MAC
 		Address: "dd:ee:ff:11:22:33",
 	})
 	assert.Nil(err)
 	rules = append(rules, rule)
 	rule, err = ptypes.MarshalAny(&api.FlowSpecComponent{
-		Type: 21, // VLAN ID
+		ComponentType: 21, // VLAN ID
 		Items: []*api.FlowSpecComponentItem{
 			{
 				Op:    0x80 | 0x01, // End, EQ
@@ -1211,7 +1211,7 @@ func Test_ExtendedCommunitiesAttribute(t *testing.T) {
 	a, err := ptypes.MarshalAny(&api.TwoOctetAsSpecificExtended{
 		IsTransitive: true,
 		SubType:      0x02, // ROUTE_TARGET
-		As:           65001,
+		Asn:          65001,
 		LocalAdmin:   100,
 	})
 	assert.Nil(err)
@@ -1227,7 +1227,7 @@ func Test_ExtendedCommunitiesAttribute(t *testing.T) {
 	a, err = ptypes.MarshalAny(&api.FourOctetAsSpecificExtended{
 		IsTransitive: true,
 		SubType:      0x02, // ROUTE_TARGET
-		As:           65003,
+		Asn:          65003,
 		LocalAdmin:   300,
 	})
 	assert.Nil(err)
@@ -1281,7 +1281,7 @@ func Test_ExtendedCommunitiesAttribute(t *testing.T) {
 	assert.Nil(err)
 	communities = append(communities, a)
 	a, err = ptypes.MarshalAny(&api.TrafficRateExtended{
-		As:   65004,
+		Asn:  65004,
 		Rate: 100.0,
 	})
 	assert.Nil(err)
@@ -1293,7 +1293,7 @@ func Test_ExtendedCommunitiesAttribute(t *testing.T) {
 	assert.Nil(err)
 	communities = append(communities, a)
 	a, err = ptypes.MarshalAny(&api.RedirectTwoOctetAsSpecificExtended{
-		As:         65005,
+		Asn:        65005,
 		LocalAdmin: 500,
 	})
 	assert.Nil(err)
@@ -1305,7 +1305,7 @@ func Test_ExtendedCommunitiesAttribute(t *testing.T) {
 	assert.Nil(err)
 	communities = append(communities, a)
 	a, err = ptypes.MarshalAny(&api.RedirectFourOctetAsSpecificExtended{
-		As:         65007,
+		Asn:        65007,
 		LocalAdmin: 700,
 	})
 	assert.Nil(err)
@@ -1316,8 +1316,8 @@ func Test_ExtendedCommunitiesAttribute(t *testing.T) {
 	assert.Nil(err)
 	communities = append(communities, a)
 	a, err = ptypes.MarshalAny(&api.UnknownExtended{
-		Type:  0xff, // Max of uint8
-		Value: []byte{1, 2, 3, 4, 5, 6, 7},
+		ExtendedType: 0xff, // Max of uint8
+		Value:        []byte{1, 2, 3, 4, 5, 6, 7},
 	})
 	assert.Nil(err)
 	communities = append(communities, a)
@@ -1346,12 +1346,12 @@ func Test_As4PathAttribute(t *testing.T) {
 	input := &api.As4PathAttribute{
 		Segments: []*api.AsSegment{
 			{
-				Type:    1, // SET
-				Numbers: []uint32{100, 200},
+				SegmentType: 1, // SET
+				Numbers:     []uint32{100, 200},
 			},
 			{
-				Type:    2, // SEQ
-				Numbers: []uint32{300, 400},
+				SegmentType: 2, // SEQ
+				Numbers:     []uint32{300, 400},
 			},
 		},
 	}
@@ -1372,7 +1372,7 @@ func Test_As4AggregatorAttribute(t *testing.T) {
 	assert := assert.New(t)
 
 	input := &api.As4AggregatorAttribute{
-		As:      65000,
+		Asn:     65000,
 		Address: "1.1.1.1",
 	}
 
@@ -1382,7 +1382,7 @@ func Test_As4AggregatorAttribute(t *testing.T) {
 	assert.Nil(err)
 
 	output := NewAs4AggregatorAttributeFromNative(n.(*bgp.PathAttributeAs4Aggregator))
-	assert.Equal(input.As, output.As)
+	assert.Equal(input.Asn, output.Asn)
 	assert.Equal(input.Address, output.Address)
 }
 
@@ -1390,10 +1390,10 @@ func Test_PmsiTunnelAttribute(t *testing.T) {
 	assert := assert.New(t)
 
 	input := &api.PmsiTunnelAttribute{
-		Flags: 0x01, // IsLeafInfoRequired = true
-		Type:  6,    // INGRESS_REPL
-		Label: 100,
-		Id:    net.ParseIP("1.1.1.1").To4(), // IngressReplTunnelID with IPv4
+		Flags:    0x01, // IsLeafInfoRequired = true
+		AttrType: 6,    // INGRESS_REPL
+		Label:    100,
+		Id:       net.ParseIP("1.1.1.1").To4(), // IngressReplTunnelID with IPv4
 	}
 
 	a, err := ptypes.MarshalAny(input)
@@ -1403,7 +1403,7 @@ func Test_PmsiTunnelAttribute(t *testing.T) {
 
 	output := NewPmsiTunnelAttributeFromNative(n.(*bgp.PathAttributePmsiTunnel))
 	assert.Equal(input.Flags, output.Flags)
-	assert.Equal(input.Type, output.Type)
+	assert.Equal(input.AttrType, output.AttrType)
 	assert.Equal(input.Label, output.Label)
 	assert.Equal(input.Id, output.Id)
 }
@@ -1434,8 +1434,8 @@ func Test_TunnelEncapAttribute(t *testing.T) {
 	assert.Nil(err)
 	subTlvs = append(subTlvs, a)
 	a, err = ptypes.MarshalAny(&api.TunnelEncapSubTLVUnknown{
-		Type:  0xff, // Max of uint8
-		Value: []byte{0x55, 0x66, 0x77, 0x88},
+		SubType: 0xff, // Max of uint8
+		Value:   []byte{0x55, 0x66, 0x77, 0x88},
 	})
 	assert.Nil(err)
 	subTlvs = append(subTlvs, a)
@@ -1443,8 +1443,8 @@ func Test_TunnelEncapAttribute(t *testing.T) {
 	input := &api.TunnelEncapAttribute{
 		Tlvs: []*api.TunnelEncapTLV{
 			{
-				Type: 8, // VXLAN
-				Tlvs: subTlvs,
+				SubType: 8, // VXLAN
+				Tlvs:    subTlvs,
 			},
 		},
 	}
@@ -1456,7 +1456,7 @@ func Test_TunnelEncapAttribute(t *testing.T) {
 
 	output := NewTunnelEncapAttributeFromNative(n.(*bgp.PathAttributeTunnelEncap))
 	assert.Equal(1, len(output.Tlvs))
-	assert.Equal(input.Tlvs[0].Type, output.Tlvs[0].Type)
+	assert.Equal(input.Tlvs[0].SubType, output.Tlvs[0].SubType)
 	assert.Equal(len(output.Tlvs[0].Tlvs), len(output.Tlvs[0].Tlvs))
 	for idx, inputSubTlv := range input.Tlvs[0].Tlvs {
 		outputSubTlv := output.Tlvs[0].Tlvs[idx]
@@ -1512,8 +1512,8 @@ func Test_AigpAttribute(t *testing.T) {
 	assert.Nil(err)
 	tlvs = append(tlvs, a)
 	a, err = ptypes.MarshalAny(&api.AigpTLVUnknown{
-		Type:  0xff, // Max of uint8
-		Value: []byte{0x11, 0x22, 0x33, 0x44},
+		TlvType: 0xff, // Max of uint8
+		Value:   []byte{0x11, 0x22, 0x33, 0x44},
 	})
 	assert.Nil(err)
 	tlvs = append(tlvs, a)
@@ -1570,9 +1570,9 @@ func Test_UnknownAttribute(t *testing.T) {
 	assert := assert.New(t)
 
 	input := &api.UnknownAttribute{
-		Flags: (1 << 6) | (1 << 7), // OPTIONAL and TRANSITIVE
-		Type:  0xff,
-		Value: []byte{0x11, 0x22, 0x33, 0x44},
+		Flags:    (1 << 6) | (1 << 7), // OPTIONAL and TRANSITIVE
+		AttrType: 0xff,
+		Value:    []byte{0x11, 0x22, 0x33, 0x44},
 	}
 
 	a, err := ptypes.MarshalAny(input)
@@ -1582,7 +1582,7 @@ func Test_UnknownAttribute(t *testing.T) {
 
 	output := NewUnknownAttributeFromNative(n.(*bgp.PathAttributeUnknown))
 	assert.Equal(input.Flags, output.Flags)
-	assert.Equal(input.Type, output.Type)
+	assert.Equal(input.AttrType, output.AttrType)
 	assert.Equal(input.Value, output.Value)
 }
 

@@ -39,7 +39,7 @@ func UnmarshalAttribute(an *any.Any) (bgp.PathAttributeInterface, error) {
 	case *api.AsPathAttribute:
 		params := make([]bgp.AsPathParamInterface, 0, len(a.Segments))
 		for _, segment := range a.Segments {
-			params = append(params, bgp.NewAs4PathParam(uint8(segment.Type), segment.Numbers))
+			params = append(params, bgp.NewAs4PathParam(uint8(segment.SegmentType), segment.Numbers))
 		}
 		return bgp.NewPathAttributeAsPath(params), nil
 	case *api.NextHopAttribute:
@@ -60,7 +60,7 @@ func UnmarshalAttribute(an *any.Any) (bgp.PathAttributeInterface, error) {
 		if net.ParseIP(a.Address).To4() == nil {
 			return nil, fmt.Errorf("invalid aggregator address: %s", a.Address)
 		}
-		return bgp.NewPathAttributeAggregator(a.As, a.Address), nil
+		return bgp.NewPathAttributeAggregator(a.Asn, a.Address), nil
 	case *api.CommunitiesAttribute:
 		return bgp.NewPathAttributeCommunities(a.Communities), nil
 	case *api.OriginatorIdAttribute:
@@ -91,8 +91,8 @@ func NewAsPathAttributeFromNative(a *bgp.PathAttributeAsPath) *api.AsPathAttribu
 	segments := make([]*api.AsSegment, 0, len(a.Value))
 	for _, param := range a.Value {
 		segments = append(segments, &api.AsSegment{
-			Type:    uint32(param.GetType()),
-			Numbers: param.GetAS(),
+			SegmentType: api.AsSegment_SegmentType(param.GetType()),
+			Numbers:     param.GetAS(),
 		})
 	}
 	return &api.AsPathAttribute{
@@ -124,7 +124,7 @@ func NewAtomicAggregateAttributeFromNative(a *bgp.PathAttributeAtomicAggregate) 
 
 func NewAggregatorAttributeFromNative(a *bgp.PathAttributeAggregator) *api.AggregatorAttribute {
 	return &api.AggregatorAttribute{
-		As:      a.Value.AS,
+		Asn:     a.Value.AS,
 		Address: a.Value.Address.String(),
 	}
 }
@@ -310,14 +310,14 @@ func UnmarshalRD(a *any.Any) (bgp.RouteDistinguisherInterface, error) {
 
 func NewEthernetSegmentIdentifierFromNative(a *bgp.EthernetSegmentIdentifier) *api.EthernetSegmentIdentifier {
 	return &api.EthernetSegmentIdentifier{
-		Type:  uint32(a.Type),
-		Value: a.Value,
+		EsiType: uint32(a.Type),
+		Value:   a.Value,
 	}
 }
 
 func unmarshalESI(a *api.EthernetSegmentIdentifier) (*bgp.EthernetSegmentIdentifier, error) {
 	return &bgp.EthernetSegmentIdentifier{
-		Type:  bgp.ESIType(a.Type),
+		Type:  bgp.ESIType(a.EsiType),
 		Value: a.Value,
 	}, nil
 }
@@ -329,38 +329,38 @@ func MarshalFlowSpecRules(values []bgp.FlowSpecComponentInterface) []*any.Any {
 		switch v := value.(type) {
 		case *bgp.FlowSpecDestinationPrefix:
 			rule = &api.FlowSpecIPPrefix{
-				Type:      uint32(bgp.FLOW_SPEC_TYPE_DST_PREFIX),
-				PrefixLen: uint32(v.Prefix.(*bgp.IPAddrPrefix).Length),
-				Prefix:    v.Prefix.(*bgp.IPAddrPrefix).Prefix.String(),
+				PrefixType: uint32(bgp.FLOW_SPEC_TYPE_DST_PREFIX),
+				PrefixLen:  uint32(v.Prefix.(*bgp.IPAddrPrefix).Length),
+				Prefix:     v.Prefix.(*bgp.IPAddrPrefix).Prefix.String(),
 			}
 		case *bgp.FlowSpecSourcePrefix:
 			rule = &api.FlowSpecIPPrefix{
-				Type:      uint32(bgp.FLOW_SPEC_TYPE_SRC_PREFIX),
-				PrefixLen: uint32(v.Prefix.(*bgp.IPAddrPrefix).Length),
-				Prefix:    v.Prefix.(*bgp.IPAddrPrefix).Prefix.String(),
+				PrefixType: uint32(bgp.FLOW_SPEC_TYPE_SRC_PREFIX),
+				PrefixLen:  uint32(v.Prefix.(*bgp.IPAddrPrefix).Length),
+				Prefix:     v.Prefix.(*bgp.IPAddrPrefix).Prefix.String(),
 			}
 		case *bgp.FlowSpecDestinationPrefix6:
 			rule = &api.FlowSpecIPPrefix{
-				Type:      uint32(bgp.FLOW_SPEC_TYPE_DST_PREFIX),
-				PrefixLen: uint32(v.Prefix.(*bgp.IPv6AddrPrefix).Length),
-				Prefix:    v.Prefix.(*bgp.IPv6AddrPrefix).Prefix.String(),
-				Offset:    uint32(v.Offset),
+				PrefixType: uint32(bgp.FLOW_SPEC_TYPE_DST_PREFIX),
+				PrefixLen:  uint32(v.Prefix.(*bgp.IPv6AddrPrefix).Length),
+				Prefix:     v.Prefix.(*bgp.IPv6AddrPrefix).Prefix.String(),
+				Offset:     uint32(v.Offset),
 			}
 		case *bgp.FlowSpecSourcePrefix6:
 			rule = &api.FlowSpecIPPrefix{
-				Type:      uint32(bgp.FLOW_SPEC_TYPE_SRC_PREFIX),
-				PrefixLen: uint32(v.Prefix.(*bgp.IPv6AddrPrefix).Length),
-				Prefix:    v.Prefix.(*bgp.IPv6AddrPrefix).Prefix.String(),
-				Offset:    uint32(v.Offset),
+				PrefixType: uint32(bgp.FLOW_SPEC_TYPE_SRC_PREFIX),
+				PrefixLen:  uint32(v.Prefix.(*bgp.IPv6AddrPrefix).Length),
+				Prefix:     v.Prefix.(*bgp.IPv6AddrPrefix).Prefix.String(),
+				Offset:     uint32(v.Offset),
 			}
 		case *bgp.FlowSpecSourceMac:
 			rule = &api.FlowSpecMAC{
-				Type:    uint32(bgp.FLOW_SPEC_TYPE_SRC_MAC),
+				MacType: uint32(bgp.FLOW_SPEC_TYPE_SRC_MAC),
 				Address: v.Mac.String(),
 			}
 		case *bgp.FlowSpecDestinationMac:
 			rule = &api.FlowSpecMAC{
-				Type:    uint32(bgp.FLOW_SPEC_TYPE_DST_MAC),
+				MacType: uint32(bgp.FLOW_SPEC_TYPE_DST_MAC),
 				Address: v.Mac.String(),
 			}
 		case *bgp.FlowSpecComponent:
@@ -372,8 +372,8 @@ func MarshalFlowSpecRules(values []bgp.FlowSpecComponentInterface) []*any.Any {
 				})
 			}
 			rule = &api.FlowSpecComponent{
-				Type:  uint32(v.Type()),
-				Items: items,
+				ComponentType: uint32(v.Type()),
+				Items:         items,
 			}
 		}
 		a, _ := ptypes.MarshalAny(rule)
@@ -392,7 +392,7 @@ func UnmarshalFlowSpecRules(values []*any.Any) ([]bgp.FlowSpecComponentInterface
 		}
 		switch v := value.Message.(type) {
 		case *api.FlowSpecIPPrefix:
-			typ := bgp.BGPFlowSpecType(v.Type)
+			typ := bgp.BGPFlowSpecType(v.PrefixType)
 			isIPv4 := net.ParseIP(v.Prefix).To4() != nil
 			switch {
 			case typ == bgp.FLOW_SPEC_TYPE_DST_PREFIX && isIPv4:
@@ -405,7 +405,7 @@ func UnmarshalFlowSpecRules(values []*any.Any) ([]bgp.FlowSpecComponentInterface
 				rule = bgp.NewFlowSpecSourcePrefix6(bgp.NewIPv6AddrPrefix(uint8(v.PrefixLen), v.Prefix), uint8(v.Offset))
 			}
 		case *api.FlowSpecMAC:
-			typ := bgp.BGPFlowSpecType(v.Type)
+			typ := bgp.BGPFlowSpecType(v.MacType)
 			mac, err := net.ParseMAC(v.Address)
 			if err != nil {
 				return nil, fmt.Errorf("invalid mac address for %s flow spec component: %s", typ.String(), v.Address)
@@ -421,7 +421,7 @@ func UnmarshalFlowSpecRules(values []*any.Any) ([]bgp.FlowSpecComponentInterface
 			for _, item := range v.Items {
 				items = append(items, bgp.NewFlowSpecComponentItem(uint8(item.Op), item.Value))
 			}
-			rule = bgp.NewFlowSpecComponent(bgp.BGPFlowSpecType(v.Type), items)
+			rule = bgp.NewFlowSpecComponent(bgp.BGPFlowSpecType(v.ComponentType), items)
 		}
 		if rule == nil {
 			return nil, fmt.Errorf("invalid flow spec component: %v", value.Message)
@@ -604,8 +604,8 @@ func MarshalNLRI(value bgp.AddrPrefixInterface) *any.Any {
 		}
 	case *bgp.RouteTargetMembershipNLRI:
 		nlri = &api.RouteTargetMembershipNLRI{
-			As: v.AS,
-			Rt: MarshalRT(v.RouteTarget),
+			Asn: v.AS,
+			Rt:  MarshalRT(v.RouteTarget),
 		}
 	case *bgp.FlowSpecIPv4Unicast:
 		nlri = &api.FlowSpecNLRI{
@@ -634,7 +634,7 @@ func MarshalNLRI(value bgp.AddrPrefixInterface) *any.Any {
 		switch n := v.NLRI.(type) {
 		case *bgp.LsNodeNLRI:
 			nlri = &api.LsAddrPrefix{
-				Type:       api.LsNLRIType_LS_NLRI_NODE,
+				NlriType:   api.LsNLRIType_LS_NLRI_NODE,
 				Nlri:       MarshalLsNodeNLRI(n),
 				Length:     uint32(n.Length),
 				ProtocolId: api.LsProtocolID(n.ProtocolID),
@@ -643,7 +643,7 @@ func MarshalNLRI(value bgp.AddrPrefixInterface) *any.Any {
 
 		case *bgp.LsLinkNLRI:
 			nlri = &api.LsAddrPrefix{
-				Type:       api.LsNLRIType_LS_NLRI_LINK,
+				NlriType:   api.LsNLRIType_LS_NLRI_LINK,
 				Nlri:       MarshalLsLinkNLRI(n),
 				Length:     uint32(n.Length),
 				ProtocolId: api.LsProtocolID(n.ProtocolID),
@@ -652,7 +652,7 @@ func MarshalNLRI(value bgp.AddrPrefixInterface) *any.Any {
 
 		case *bgp.LsPrefixV4NLRI:
 			nlri = &api.LsAddrPrefix{
-				Type:       api.LsNLRIType_LS_NLRI_PREFIX_V4,
+				NlriType:   api.LsNLRIType_LS_NLRI_PREFIX_V4,
 				Nlri:       MarshalLsPrefixV4NLRI(n),
 				Length:     uint32(n.Length),
 				ProtocolId: api.LsProtocolID(n.ProtocolID),
@@ -661,7 +661,7 @@ func MarshalNLRI(value bgp.AddrPrefixInterface) *any.Any {
 
 		case *bgp.LsPrefixV6NLRI:
 			nlri = &api.LsAddrPrefix{
-				Type:       api.LsNLRIType_LS_NLRI_PREFIX_V6,
+				NlriType:   api.LsNLRIType_LS_NLRI_PREFIX_V6,
 				Nlri:       MarshalLsPrefixV6NLRI(n),
 				Length:     uint32(n.Length),
 				ProtocolId: api.LsProtocolID(n.ProtocolID),
@@ -805,7 +805,7 @@ func UnmarshalNLRI(rf bgp.RouteFamily, an *any.Any) (bgp.AddrPrefixInterface, er
 		if err != nil {
 			return nil, err
 		}
-		nlri = bgp.NewRouteTargetMembershipNLRI(v.As, rt)
+		nlri = bgp.NewRouteTargetMembershipNLRI(v.Asn, rt)
 	case *api.FlowSpecNLRI:
 		rules, err := UnmarshalFlowSpecRules(v.Rules)
 		if err != nil {
@@ -886,7 +886,7 @@ func MarshalRT(rt bgp.ExtendedCommunityInterface) *any.Any {
 		r = &api.TwoOctetAsSpecificExtended{
 			IsTransitive: true,
 			SubType:      uint32(bgp.EC_SUBTYPE_ROUTE_TARGET),
-			As:           uint32(v.AS),
+			Asn:          uint32(v.AS),
 			LocalAdmin:   uint32(v.LocalAdmin),
 		}
 	case *bgp.IPv4AddressSpecificExtended:
@@ -900,7 +900,7 @@ func MarshalRT(rt bgp.ExtendedCommunityInterface) *any.Any {
 		r = &api.FourOctetAsSpecificExtended{
 			IsTransitive: true,
 			SubType:      uint32(bgp.EC_SUBTYPE_ROUTE_TARGET),
-			As:           uint32(v.AS),
+			Asn:          uint32(v.AS),
 			LocalAdmin:   uint32(v.LocalAdmin),
 		}
 	default:
@@ -929,7 +929,7 @@ func UnmarshalRT(a *any.Any) (bgp.ExtendedCommunityInterface, error) {
 	}
 	switch v := value.Message.(type) {
 	case *api.TwoOctetAsSpecificExtended:
-		return bgp.NewTwoOctetAsSpecificExtended(bgp.ExtendedCommunityAttrSubType(v.SubType), uint16(v.As), v.LocalAdmin, v.IsTransitive), nil
+		return bgp.NewTwoOctetAsSpecificExtended(bgp.ExtendedCommunityAttrSubType(v.SubType), uint16(v.Asn), v.LocalAdmin, v.IsTransitive), nil
 	case *api.IPv4AddressSpecificExtended:
 		rt := bgp.NewIPv4AddressSpecificExtended(bgp.ExtendedCommunityAttrSubType(v.SubType), v.Address, uint16(v.LocalAdmin), v.IsTransitive)
 		if rt == nil {
@@ -937,7 +937,7 @@ func UnmarshalRT(a *any.Any) (bgp.ExtendedCommunityInterface, error) {
 		}
 		return rt, nil
 	case *api.FourOctetAsSpecificExtended:
-		return bgp.NewFourOctetAsSpecificExtended(bgp.ExtendedCommunityAttrSubType(v.SubType), v.As, uint16(v.LocalAdmin), v.IsTransitive), nil
+		return bgp.NewFourOctetAsSpecificExtended(bgp.ExtendedCommunityAttrSubType(v.SubType), v.Asn, uint16(v.LocalAdmin), v.IsTransitive), nil
 	}
 	return nil, fmt.Errorf("invalid route target type: %s", a.TypeUrl)
 }
@@ -963,7 +963,7 @@ func NewExtendedCommunitiesAttributeFromNative(a *bgp.PathAttributeExtendedCommu
 			community = &api.TwoOctetAsSpecificExtended{
 				IsTransitive: v.IsTransitive,
 				SubType:      uint32(v.SubType),
-				As:           uint32(v.AS),
+				Asn:          uint32(v.AS),
 				LocalAdmin:   uint32(v.LocalAdmin),
 			}
 		case *bgp.IPv4AddressSpecificExtended:
@@ -977,7 +977,7 @@ func NewExtendedCommunitiesAttributeFromNative(a *bgp.PathAttributeExtendedCommu
 			community = &api.FourOctetAsSpecificExtended{
 				IsTransitive: v.IsTransitive,
 				SubType:      uint32(v.SubType),
-				As:           uint32(v.AS),
+				Asn:          uint32(v.AS),
 				LocalAdmin:   uint32(v.LocalAdmin),
 			}
 		case *bgp.ValidationExtended:
@@ -1019,7 +1019,7 @@ func NewExtendedCommunitiesAttributeFromNative(a *bgp.PathAttributeExtendedCommu
 			}
 		case *bgp.TrafficRateExtended:
 			community = &api.TrafficRateExtended{
-				As:   uint32(v.AS),
+				Asn:  uint32(v.AS),
 				Rate: v.Rate,
 			}
 		case *bgp.TrafficActionExtended:
@@ -1029,7 +1029,7 @@ func NewExtendedCommunitiesAttributeFromNative(a *bgp.PathAttributeExtendedCommu
 			}
 		case *bgp.RedirectTwoOctetAsSpecificExtended:
 			community = &api.RedirectTwoOctetAsSpecificExtended{
-				As:         uint32(v.AS),
+				Asn:        uint32(v.AS),
 				LocalAdmin: v.LocalAdmin,
 			}
 		case *bgp.RedirectIPv4AddressSpecificExtended:
@@ -1039,7 +1039,7 @@ func NewExtendedCommunitiesAttributeFromNative(a *bgp.PathAttributeExtendedCommu
 			}
 		case *bgp.RedirectFourOctetAsSpecificExtended:
 			community = &api.RedirectFourOctetAsSpecificExtended{
-				As:         v.AS,
+				Asn:        v.AS,
 				LocalAdmin: uint32(v.LocalAdmin),
 			}
 		case *bgp.TrafficRemarkExtended:
@@ -1048,8 +1048,8 @@ func NewExtendedCommunitiesAttributeFromNative(a *bgp.PathAttributeExtendedCommu
 			}
 		case *bgp.UnknownExtended:
 			community = &api.UnknownExtended{
-				Type:  uint32(v.Type),
-				Value: v.Value,
+				ExtendedType: uint32(v.Type),
+				Value:        v.Value,
 			}
 		default:
 			log.WithFields(log.Fields{
@@ -1076,11 +1076,11 @@ func unmarshalExComm(a *api.ExtendedCommunitiesAttribute) (*bgp.PathAttributeExt
 		}
 		switch v := value.Message.(type) {
 		case *api.TwoOctetAsSpecificExtended:
-			community = bgp.NewTwoOctetAsSpecificExtended(bgp.ExtendedCommunityAttrSubType(v.SubType), uint16(v.As), v.LocalAdmin, v.IsTransitive)
+			community = bgp.NewTwoOctetAsSpecificExtended(bgp.ExtendedCommunityAttrSubType(v.SubType), uint16(v.Asn), v.LocalAdmin, v.IsTransitive)
 		case *api.IPv4AddressSpecificExtended:
 			community = bgp.NewIPv4AddressSpecificExtended(bgp.ExtendedCommunityAttrSubType(v.SubType), v.Address, uint16(v.LocalAdmin), v.IsTransitive)
 		case *api.FourOctetAsSpecificExtended:
-			community = bgp.NewFourOctetAsSpecificExtended(bgp.ExtendedCommunityAttrSubType(v.SubType), v.As, uint16(v.LocalAdmin), v.IsTransitive)
+			community = bgp.NewFourOctetAsSpecificExtended(bgp.ExtendedCommunityAttrSubType(v.SubType), v.Asn, uint16(v.LocalAdmin), v.IsTransitive)
 		case *api.ValidationExtended:
 			community = bgp.NewValidationExtended(bgp.ValidationState(v.State))
 		case *api.ColorExtended:
@@ -1100,19 +1100,19 @@ func unmarshalExComm(a *api.ExtendedCommunitiesAttribute) (*bgp.PathAttributeExt
 		case *api.RouterMacExtended:
 			community = bgp.NewRoutersMacExtended(v.Mac)
 		case *api.TrafficRateExtended:
-			community = bgp.NewTrafficRateExtended(uint16(v.As), v.Rate)
+			community = bgp.NewTrafficRateExtended(uint16(v.Asn), v.Rate)
 		case *api.TrafficActionExtended:
 			community = bgp.NewTrafficActionExtended(v.Terminal, v.Sample)
 		case *api.RedirectTwoOctetAsSpecificExtended:
-			community = bgp.NewRedirectTwoOctetAsSpecificExtended(uint16(v.As), v.LocalAdmin)
+			community = bgp.NewRedirectTwoOctetAsSpecificExtended(uint16(v.Asn), v.LocalAdmin)
 		case *api.RedirectIPv4AddressSpecificExtended:
 			community = bgp.NewRedirectIPv4AddressSpecificExtended(v.Address, uint16(v.LocalAdmin))
 		case *api.RedirectFourOctetAsSpecificExtended:
-			community = bgp.NewRedirectFourOctetAsSpecificExtended(v.As, uint16(v.LocalAdmin))
+			community = bgp.NewRedirectFourOctetAsSpecificExtended(v.Asn, uint16(v.LocalAdmin))
 		case *api.TrafficRemarkExtended:
 			community = bgp.NewTrafficRemarkExtended(uint8(v.Dscp))
 		case *api.UnknownExtended:
-			community = bgp.NewUnknownExtended(bgp.ExtendedCommunityAttrType(v.Type), v.Value)
+			community = bgp.NewUnknownExtended(bgp.ExtendedCommunityAttrType(v.ExtendedType), v.Value)
 		}
 		if community == nil {
 			return nil, fmt.Errorf("invalid extended community: %v", value.Message)
@@ -1126,8 +1126,8 @@ func NewAs4PathAttributeFromNative(a *bgp.PathAttributeAs4Path) *api.As4PathAttr
 	segments := make([]*api.AsSegment, 0, len(a.Value))
 	for _, param := range a.Value {
 		segments = append(segments, &api.AsSegment{
-			Type:    uint32(param.Type),
-			Numbers: param.AS,
+			SegmentType: api.AsSegment_SegmentType(param.Type),
+			Numbers:     param.AS,
 		})
 	}
 	return &api.As4PathAttribute{
@@ -1137,7 +1137,7 @@ func NewAs4PathAttributeFromNative(a *bgp.PathAttributeAs4Path) *api.As4PathAttr
 
 func NewAs4AggregatorAttributeFromNative(a *bgp.PathAttributeAs4Aggregator) *api.As4AggregatorAttribute {
 	return &api.As4AggregatorAttribute{
-		As:      a.Value.AS,
+		Asn:     a.Value.AS,
 		Address: a.Value.Address.String(),
 	}
 }
@@ -1149,10 +1149,10 @@ func NewPmsiTunnelAttributeFromNative(a *bgp.PathAttributePmsiTunnel) *api.PmsiT
 	}
 	id, _ := a.TunnelID.Serialize()
 	return &api.PmsiTunnelAttribute{
-		Flags: flags,
-		Type:  uint32(a.TunnelType),
-		Label: a.Label,
-		Id:    id,
+		Flags:    flags,
+		AttrType: uint32(a.TunnelType),
+		Label:    a.Label,
+		Id:       id,
 	}
 }
 
@@ -1182,8 +1182,8 @@ func NewTunnelEncapAttributeFromNative(a *bgp.PathAttributeTunnelEncap) *api.Tun
 				}
 			case *bgp.TunnelEncapSubTLVUnknown:
 				subTlv = &api.TunnelEncapSubTLVUnknown{
-					Type:  uint32(sv.Type),
-					Value: sv.Value,
+					SubType: uint32(sv.Type),
+					Value:   sv.Value,
 				}
 			case *bgp.TunnelEncapSubTLVSRBSID:
 				subTlv = MarshalSRBSID(sv)
@@ -1220,8 +1220,8 @@ func NewTunnelEncapAttributeFromNative(a *bgp.PathAttributeTunnelEncap) *api.Tun
 			subTlvs = append(subTlvs, an)
 		}
 		tlvs = append(tlvs, &api.TunnelEncapTLV{
-			Type: uint32(v.Type),
-			Tlvs: subTlvs,
+			SubType: uint32(v.Type),
+			Tlvs:    subTlvs,
 		})
 	}
 	return &api.TunnelEncapAttribute{
@@ -1272,8 +1272,8 @@ func NewAigpAttributeFromNative(a *bgp.PathAttributeAigp) *api.AigpAttribute {
 			}
 		case *bgp.AigpTLVDefault:
 			tlv = &api.AigpTLVUnknown{
-				Type:  uint32(v.Type()),
-				Value: v.Value,
+				TlvType: uint32(v.Type()),
+				Value:   v.Value,
 			}
 		}
 		an, _ := ptypes.MarshalAny(tlv)
@@ -1427,9 +1427,9 @@ func NewLsAttributeFromNative(a *bgp.PathAttributeLs) *api.LsAttribute {
 
 func NewUnknownAttributeFromNative(a *bgp.PathAttributeUnknown) *api.UnknownAttribute {
 	return &api.UnknownAttribute{
-		Flags: uint32(a.Flags),
-		Type:  uint32(a.Type),
-		Value: a.Value,
+		Flags:    uint32(a.Flags),
+		AttrType: uint32(a.Type),
+		Value:    a.Value,
 	}
 }
 
@@ -1539,7 +1539,7 @@ func unmarshalAttribute(an *any.Any) (bgp.PathAttributeInterface, error) {
 	case *api.AsPathAttribute:
 		params := make([]bgp.AsPathParamInterface, 0, len(a.Segments))
 		for _, segment := range a.Segments {
-			params = append(params, bgp.NewAs4PathParam(uint8(segment.Type), segment.Numbers))
+			params = append(params, bgp.NewAs4PathParam(uint8(segment.SegmentType), segment.Numbers))
 		}
 		return bgp.NewPathAttributeAsPath(params), nil
 	case *api.NextHopAttribute:
@@ -1560,7 +1560,7 @@ func unmarshalAttribute(an *any.Any) (bgp.PathAttributeInterface, error) {
 		if net.ParseIP(a.Address).To4() == nil {
 			return nil, fmt.Errorf("invalid aggregator address: %s", a.Address)
 		}
-		return bgp.NewPathAttributeAggregator(a.As, a.Address), nil
+		return bgp.NewPathAttributeAggregator(a.Asn, a.Address), nil
 	case *api.CommunitiesAttribute:
 		return bgp.NewPathAttributeCommunities(a.Communities), nil
 	case *api.OriginatorIdAttribute:
@@ -1619,16 +1619,16 @@ func unmarshalAttribute(an *any.Any) (bgp.PathAttributeInterface, error) {
 	case *api.As4PathAttribute:
 		params := make([]*bgp.As4PathParam, 0, len(a.Segments))
 		for _, segment := range a.Segments {
-			params = append(params, bgp.NewAs4PathParam(uint8(segment.Type), segment.Numbers))
+			params = append(params, bgp.NewAs4PathParam(uint8(segment.SegmentType), segment.Numbers))
 		}
 		return bgp.NewPathAttributeAs4Path(params), nil
 	case *api.As4AggregatorAttribute:
 		if net.ParseIP(a.Address).To4() == nil {
 			return nil, fmt.Errorf("invalid as4 aggregator address: %s", a.Address)
 		}
-		return bgp.NewPathAttributeAs4Aggregator(a.As, a.Address), nil
+		return bgp.NewPathAttributeAs4Aggregator(a.Asn, a.Address), nil
 	case *api.PmsiTunnelAttribute:
-		typ := bgp.PmsiTunnelType(a.Type)
+		typ := bgp.PmsiTunnelType(a.AttrType)
 		var isLeafInfoRequired bool
 		if a.Flags&0x01 > 0 {
 			isLeafInfoRequired = true
@@ -1713,13 +1713,13 @@ func unmarshalAttribute(an *any.Any) (bgp.PathAttributeInterface, error) {
 					}
 					subTlv = s
 				case *api.TunnelEncapSubTLVUnknown:
-					subTlv = bgp.NewTunnelEncapSubTLVUnknown(bgp.EncapSubTLVType(sv.Type), sv.Value)
+					subTlv = bgp.NewTunnelEncapSubTLVUnknown(bgp.EncapSubTLVType(sv.SubType), sv.Value)
 				default:
 					return nil, fmt.Errorf("invalid tunnel encapsulation attribute sub tlv: %v type: %T", subValue.Message, sv)
 				}
 				subTlvs = append(subTlvs, subTlv)
 			}
-			tlvs = append(tlvs, bgp.NewTunnelEncapTLV(bgp.TunnelType(tlv.Type), subTlvs))
+			tlvs = append(tlvs, bgp.NewTunnelEncapTLV(bgp.TunnelType(tlv.SubType), subTlvs))
 		}
 		return bgp.NewPathAttributeTunnelEncap(tlvs), nil
 	case *api.IP6ExtendedCommunitiesAttribute:
@@ -1755,7 +1755,7 @@ func unmarshalAttribute(an *any.Any) (bgp.PathAttributeInterface, error) {
 			case *api.AigpTLVIGPMetric:
 				tlv = bgp.NewAigpTLVIgpMetric(v.Metric)
 			case *api.AigpTLVUnknown:
-				tlv = bgp.NewAigpTLVDefault(bgp.AigpTLVType(v.Type), v.Value)
+				tlv = bgp.NewAigpTLVDefault(bgp.AigpTLVType(v.TlvType), v.Value)
 			}
 			if tlv == nil {
 				return nil, fmt.Errorf("invalid aigp attribute tlv: %v", value.Message)
@@ -1773,7 +1773,7 @@ func unmarshalAttribute(an *any.Any) (bgp.PathAttributeInterface, error) {
 	case *api.PrefixSID:
 		return bgp.NewPathAttributePrefixSID(a)
 	case *api.UnknownAttribute:
-		return bgp.NewPathAttributeUnknown(bgp.BGPAttrFlag(a.Flags), bgp.BGPAttrType(a.Type), a.Value), nil
+		return bgp.NewPathAttributeUnknown(bgp.BGPAttrFlag(a.Flags), bgp.BGPAttrType(a.AttrType), a.Value), nil
 	}
 	return nil, errors.New("unknown path attribute")
 }

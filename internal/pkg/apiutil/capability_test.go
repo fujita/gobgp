@@ -144,7 +144,7 @@ func Test_FourOctetASNumberCapability(t *testing.T) {
 	assert := assert.New(t)
 
 	input := &api.FourOctetASNumberCapability{
-		As: 100,
+		Asn: 100,
 	}
 
 	a, err := ptypes.MarshalAny(input)

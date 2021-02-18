@@ -2703,7 +2703,7 @@ func (s *BgpServer) GetBgp(ctx context.Context, r *api.GetBgpRequest) (*api.GetB
 		g := s.bgpConfig.Global
 		rsp = &api.GetBgpResponse{
 			Global: &api.Global{
-				As:               g.Config.As,
+				Asn:              g.Config.As,
 				RouterId:         g.Config.RouterId,
 				ListenPort:       g.Config.Port,
 				ListenAddresses:  g.Config.LocalAddressList,
@@ -3583,7 +3583,7 @@ func (s *BgpServer) EnableMrt(ctx context.Context, r *api.EnableMrtRequest) erro
 		return s.mrtManager.enable(&config.MrtConfig{
 			DumpInterval:     r.DumpInterval,
 			RotationInterval: r.RotationInterval,
-			DumpType:         config.IntToMrtTypeMap[int(r.DumpType)],
+			DumpType:         config.IntToMrtTypeMap[int(r.MrtType)],
 			FileName:         r.Filename,
 		})
 	}, false)
@@ -3791,14 +3791,14 @@ func (s *BgpServer) MonitorPeer(ctx context.Context, r *api.MonitorPeerRequest, 
 				}
 				p := &api.Peer{
 					Conf: &api.PeerConf{
-						PeerAs:            msg.PeerAS,
-						LocalAs:           msg.LocalAS,
+						PeerAsn:           msg.PeerAS,
+						LocalAsn:          msg.LocalAS,
 						NeighborAddress:   msg.PeerAddress.String(),
 						NeighborInterface: msg.PeerInterface,
 					},
 					State: &api.PeerState{
-						PeerAs:          msg.PeerAS,
-						LocalAs:         msg.LocalAS,
+						PeerAsn:         msg.PeerAS,
+						LocalAsn:        msg.LocalAS,
 						NeighborAddress: msg.PeerAddress.String(),
 						SessionState:    api.PeerState_SessionState(int(msg.State) + 1),
 						AdminState:      api.PeerState_AdminState(msg.AdminState),

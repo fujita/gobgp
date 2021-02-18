@@ -608,8 +608,8 @@ func readAddPathsFromAPIStruct(c *config.AddPaths, a *api.AddPaths) {
 func newNeighborFromAPIStruct(a *api.Peer) (*config.Neighbor, error) {
 	pconf := &config.Neighbor{}
 	if a.Conf != nil {
-		pconf.Config.PeerAs = a.Conf.PeerAs
-		pconf.Config.LocalAs = a.Conf.LocalAs
+		pconf.Config.PeerAs = a.Conf.PeerAsn
+		pconf.Config.LocalAs = a.Conf.LocalAsn
 		pconf.Config.AuthPassword = a.Conf.AuthPassword
 		pconf.Config.RouteFlapDamping = a.Conf.RouteFlapDamping
 		pconf.Config.Description = a.Conf.Description
@@ -704,7 +704,7 @@ func newNeighborFromAPIStruct(a *api.Peer) (*config.Neighbor, error) {
 		pconf.State.SessionState = config.SessionState(strings.ToUpper(string(a.State.SessionState)))
 		pconf.State.AdminState = config.IntToAdminStateMap[int(a.State.AdminState)]
 
-		pconf.State.PeerAs = a.State.PeerAs
+		pconf.State.PeerAs = a.State.PeerAsn
 		pconf.State.PeerType = config.IntToPeerTypeMap[int(a.State.PeerType)]
 		pconf.State.NeighborAddress = a.State.NeighborAddress
 
@@ -734,8 +734,8 @@ func newNeighborFromAPIStruct(a *api.Peer) (*config.Neighbor, error) {
 func newPeerGroupFromAPIStruct(a *api.PeerGroup) (*config.PeerGroup, error) {
 	pconf := &config.PeerGroup{}
 	if a.Conf != nil {
-		pconf.Config.PeerAs = a.Conf.PeerAs
-		pconf.Config.LocalAs = a.Conf.LocalAs
+		pconf.Config.PeerAs = a.Conf.PeerAsn
+		pconf.Config.LocalAs = a.Conf.LocalAsn
 		pconf.Config.AuthPassword = a.Conf.AuthPassword
 		pconf.Config.RouteFlapDamping = a.Conf.RouteFlapDamping
 		pconf.Config.Description = a.Conf.Description
@@ -806,7 +806,7 @@ func newPeerGroupFromAPIStruct(a *api.PeerGroup) (*config.PeerGroup, error) {
 	if a.Info != nil {
 		pconf.State.TotalPaths = a.Info.TotalPaths
 		pconf.State.TotalPrefixes = a.Info.TotalPrefixes
-		pconf.State.PeerAs = a.Info.PeerAs
+		pconf.State.PeerAs = a.Info.PeerAsn
 		pconf.State.PeerType = config.IntToPeerTypeMap[int(a.Info.PeerType)]
 	}
 	return pconf, nil
@@ -1349,7 +1349,7 @@ func newAfiSafiInConditionFromApiStruct(a []*api.Family) (*table.AfiSafiInCondit
 		if configType, ok := bgp.AddressFamilyNameMap[bgp.RouteFamily(rf)]; ok {
 			afiSafiTypes = append(afiSafiTypes, config.AfiSafiType(configType))
 		} else {
-			return nil, fmt.Errorf("unknown afi-safi-in type value: %d", aType)
+			return nil, fmt.Errorf("unknown afi-safi-in type value: %v", aType)
 		}
 	}
 	return table.NewAfiSafiInCondition(afiSafiTypes)
@@ -1618,7 +1618,7 @@ func newRoaListFromTableStructList(origin []*table.ROA) []*api.Roa {
 		port, _ := strconv.ParseUint(portStr, 10, 32)
 		ones, _ := r.Network.Mask.Size()
 		l = append(l, &api.Roa{
-			As:        r.AS,
+			Asn:       r.AS,
 			Maxlen:    uint32(r.MaxLen),
 			Prefixlen: uint32(ones),
 			Prefix:    r.Network.IP.String(),
@@ -1719,7 +1719,7 @@ func newGlobalFromAPIStruct(a *api.Global) *config.Global {
 
 	global := &config.Global{
 		Config: config.GlobalConfig{
-			As:               a.As,
+			As:               a.Asn,
 			RouterId:         a.RouterId,
 			Port:             a.ListenPort,
 			LocalAddressList: a.ListenAddresses,

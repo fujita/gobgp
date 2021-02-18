@@ -85,8 +85,8 @@ func getNeighbors(address string, enableAdv bool) ([]*api.Peer, error) {
 
 func getASN(p *api.Peer) string {
 	asn := "*"
-	if p.State.PeerAs > 0 {
-		asn = fmt.Sprint(p.State.PeerAs)
+	if p.State.PeerAsn > 0 {
+		asn = fmt.Sprint(p.State.PeerAsn)
 	}
 	return asn
 }
@@ -707,7 +707,7 @@ func showValidationInfo(p *api.Path, shownAs map[uint32]struct{}) error {
 			}
 			fmt.Printf(format, "Network", "AS", "MaxLen")
 			for _, m := range l {
-				fmt.Printf(format, m.Prefix, fmt.Sprint(m.As), fmt.Sprint(m.Maxlen))
+				fmt.Printf(format, m.Prefix, fmt.Sprint(m.Asn), fmt.Sprint(m.Maxlen))
 			}
 		}
 	}
@@ -1240,7 +1240,7 @@ func modNeighbor(cmdType string, args []string) error {
 			if err != nil {
 				return err
 			}
-			peer.Conf.PeerAs = uint32(as)
+			peer.Conf.PeerAsn = uint32(as)
 		}
 		if len(m["family"]) == 1 {
 			peer.AfiSafis = make([]*api.AfiSafi, 0) // for the case of cmdUpdate
