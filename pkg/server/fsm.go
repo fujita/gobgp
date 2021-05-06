@@ -1015,6 +1015,11 @@ func (h *fsmHandler) recvMessageWithError() (*fsmMsg, error) {
 			case bgp.BGP_MSG_ROUTE_REFRESH:
 				fmsg.MsgType = fsmMsgRouteRefresh
 			case bgp.BGP_MSG_UPDATE:
+				select {
+				case h.holdTimerResetCh <- true:
+				default:
+				}
+				return nil, nil
 				body := m.Body.(*bgp.BGPUpdate)
 				isEBGP := h.fsm.pConf.IsEBGPPeer(h.fsm.gConf)
 				isConfed := h.fsm.pConf.IsConfederationMember(h.fsm.gConf)
