@@ -295,6 +295,7 @@ const (
 	BGP_CAP_ADD_PATH                    BGPCapabilityCode = 69
 	BGP_CAP_ENHANCED_ROUTE_REFRESH      BGPCapabilityCode = 70
 	BGP_CAP_LONG_LIVED_GRACEFUL_RESTART BGPCapabilityCode = 71
+	BGP_CAP_FQDN                        BGPCapabilityCode = 73
 	BGP_CAP_ROUTE_REFRESH_CISCO         BGPCapabilityCode = 128
 )
 
@@ -309,6 +310,7 @@ var CapNameMap = map[BGPCapabilityCode]string{
 	BGP_CAP_ENHANCED_ROUTE_REFRESH:      "enhanced-route-refresh",
 	BGP_CAP_ROUTE_REFRESH_CISCO:         "cisco-route-refresh",
 	BGP_CAP_LONG_LIVED_GRACEFUL_RESTART: "long-lived-graceful-restart",
+	BGP_CAP_FQDN:                        "fqdn",
 }
 
 func (c BGPCapabilityCode) String() string {
@@ -916,6 +918,65 @@ func NewCapLongLivedGracefulRestart(tuples []*CapLongLivedGracefulRestartTuple) 
 	}
 }
 
+type CapFQDN struct {
+	DefaultParameterCapability
+	HostNameLen   uint8
+	HostName      []byte
+	DomainNameLen uint8
+	DomainName    []byte
+}
+
+func (c *CapFQDN) DecodeFromBytes(data []byte) error {
+	c.DefaultParameterCapability.DecodeFromBytes(data)
+	data = data[2:]
+	if len(data) > 64 {
+		return NewMessageError(BGP_ERROR_OPEN_MESSAGE_ERROR, BGP_ERROR_SUB_UNSUPPORTED_CAPABILITY, nil, "CapabilityFQDN bytes more than allowed")
+	}
+	hostNameLen := uint8(data[0])
+	c.HostNameLen = hostNameLen
+	c.HostName = data[1 : c.HostNameLen+1]
+	domainNameLen := uint8(data[c.HostNameLen+1])
+	c.DomainNameLen = domainNameLen
+	c.DomainName = data[c.HostNameLen+2:]
+	return nil
+}
+
+func (c *CapFQDN) Serialize() ([]byte, error) {
+	buf := make([]byte, c.HostNameLen+c.DomainNameLen+2)
+	buf[0] = c.HostNameLen
+	copy(buf[1:c.HostNameLen+1], c.HostName)
+	buf[c.HostNameLen+1] = c.DomainNameLen
+	copy(buf[c.HostNameLen+2:], c.DomainName)
+	c.DefaultParameterCapability.CapValue = buf
+	return c.DefaultParameterCapability.Serialize()
+}
+
+func (c *CapFQDN) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		HostNameLen   uint8  `json:"hostname_len"`
+		HostName      []byte `json:"hostname"`
+		DomainNameLen uint8  `json:"domainname_len"`
+		DomainName    []byte `json:"domainname"`
+	}{
+		HostNameLen:   c.HostNameLen,
+		HostName:      c.HostName,
+		DomainNameLen: c.DomainNameLen,
+		DomainName:    c.DomainName,
+	})
+}
+
+func NewCapFQDN(hostname []byte, domain []byte) *CapFQDN {
+	return &CapFQDN{
+		DefaultParameterCapability{
+			CapCode: BGP_CAP_FQDN,
+		},
+		uint8(len(hostname)),
+		hostname,
+		uint8(len(domain)),
+		domain,
+	}
+}
+
 type CapUnknown struct {
 	DefaultParameterCapability
 }
@@ -955,6 +1016,8 @@ func DecodeCapability(data []byte) (ParameterCapabilityInterface, error) {
 		c = &CapRouteRefreshCisco{}
 	case BGP_CAP_LONG_LIVED_GRACEFUL_RESTART:
 		c = &CapLongLivedGracefulRestart{}
+	case BGP_CAP_FQDN:
+		c = &CapFQDN{}
 	default:
 		c = &CapUnknown{}
 	}
