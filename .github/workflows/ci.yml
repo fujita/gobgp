@@ -30,6 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - run: |
+          go version
           test -z "$(go fmt ./...)"
           go vet ./...
           export PATH=${PATH}:`go env GOPATH`/bin
