@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"net"
 	"syscall"
-
-	log "github.com/sirupsen/logrus"
 )
 
 func setTCPMD5SigSockopt(l *net.TCPListener, address string, key string) error {
@@ -41,24 +39,21 @@ func setBindToDevSockopt(sc syscall.RawConn, device string) error {
 	return fmt.Errorf("binding connection to a device is not supported")
 }
 
-func dialerControl(network, address string, c syscall.RawConn, ttl, ttlMin uint8, password string, bindInterface string) error {
+func dialerControl(logger log.Logger, network, address string, c syscall.RawConn, ttl, minTtl uint8, password string, bindInterface string) error {
 	if password != "" {
-		log.WithFields(log.Fields{
-			"Topic": "Peer",
-			"Key":   address,
-		}).Warn("setting md5 for active connection is not supported")
+		logger.Warn("setting md5 for active connection is not supported",
+			"Topic", "Peer",
+			"Key", address)
 	}
 	if ttl != 0 {
-		log.WithFields(log.Fields{
-			"Topic": "Peer",
-			"Key":   address,
-		}).Warn("setting ttl for active connection is not supported")
+		logger.Warn("setting ttl for active connection is not supported",
+			"Topic", "Peer",
+			"Key", address)
 	}
 	if ttlMin != 0 {
-		log.WithFields(log.Fields{
-			"Topic": "Peer",
-			"Key":   address,
-		}).Warn("setting min ttl for active connection is not supported")
+		logger.Warn("setting min ttl for active connection is not supported",
+			"Topic", "Peer",
+			"Key", address)
 	}
 	return nil
 }
