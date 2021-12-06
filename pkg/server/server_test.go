@@ -24,10 +24,10 @@ import (
 	"testing"
 	"time"
 
-	apb "google.golang.org/protobuf/types/known/anypb"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apb "google.golang.org/protobuf/types/known/anypb"
 
 	api "github.com/osrg/gobgp/v3/api"
 	"github.com/osrg/gobgp/v3/internal/pkg/apiutil"

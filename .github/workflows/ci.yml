@@ -33,7 +33,7 @@ jobs:
           test -z "$(go fmt ./...)"
           go vet ./...
           export PATH=${PATH}:`go env GOPATH`/bin
-          go get -u honnef.co/go/tools/cmd/staticcheck
+          go install honnef.co/go/tools/cmd/staticcheck@2021.1.2
           staticcheck ./...
 
   embeded:
