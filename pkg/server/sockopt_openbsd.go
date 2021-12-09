@@ -24,6 +24,8 @@ import (
 	"os"
 	"syscall"
 	"unsafe"
+
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -388,7 +390,7 @@ func setBindToDevSockopt(sc syscall.RawConn, device string) error {
 
 func dialerControl(logger log.Logger, network, address string, c syscall.RawConn, ttl, minTtl uint8, password string, bindInterface string) error {
 	if password != "" {
-		logger.Warn("setting md5 for active connection is not supported",
+		log.Warn("setting md5 for active connection is not supported",
 			"Topic", "Peer",
 			"Key", address)
 	}
