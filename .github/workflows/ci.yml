@@ -16,6 +16,9 @@ jobs:
           go env
           go build ./cmd/gobgp
           go build ./cmd/gobgpd
+        env:
+          GOOS: ${{ matrix.GOOS }}
+          GOARCH: ${{ matrix.GOARCH }}
 
   unit:
     name: unit
