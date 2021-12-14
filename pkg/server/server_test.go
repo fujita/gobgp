@@ -549,9 +549,15 @@ func TestMonitor(test *testing.T) {
 		bgp.NewPathAttributeOrigin(0),
 		bgp.NewPathAttributeNextHop("10.0.0.1"),
 	}
-	if err := t.addPathList("", []*table.Path{table.NewPath(nil, bgp.NewIPAddrPrefix(24, "10.0.0.0"), false, attrs, time.Now(), false)}); err != nil {
-		test.Error(err)
+	prefix := bgp.NewIPAddrPrefix(24, "10.0.0.0")
+	path, _ := apiutil.NewPath(prefix, false, attrs, time.Now())
+	if _, err := t.AddPath(context.Background(), &api.AddPathRequest{
+		TableType: api.TableType_GLOBAL,
+		Path:      path,
+	}); err != nil {
+		test.Fatal(err)
 	}
+
 	ev := <-w.Event()
 	b := ev.(*watchEventBestPath)
 	assert.Equal(1, len(b.PathList))
