@@ -41,7 +41,9 @@ $ gobgp g r
    Network              Next Hop             AS_PATH              Age        Attrs
 *> 10.0.0.0/24          1.1.1.1              100 200              00:08:02   [{Origin: ?}]
 ```
+
 ### Adding BGP-SR policy
+
 [`tools/grpc/python/sr_policy.py`](https://github.com/osrg/gobgp/blob/master/tools/grpc/python/sr_policy.py)
 shows an example for adding a bgp-sr route.
 Let's run this script.
@@ -49,7 +51,6 @@ Let's run this script.
 ```bash
 $ PYTHONPATH=$PYTHONPATH:. python sr_policy.py
 ```
-
 
 ## Result of injecting the SR policy
 
