@@ -31,7 +31,7 @@ option go_package = "github.com/osrg/gobgp/v4/api;api";
 
 message Attribute {
   oneof attr {
-    UnknownAttribute unknown = 1;
+    UnknownAttribute unknown  = 1;
     OriginAttribute origin = 2;
     AsPathAttribute as_path = 3;
     NextHopAttribute next_hop = 4;
