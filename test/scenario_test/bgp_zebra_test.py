@@ -202,6 +202,22 @@ class GoBGPTestBase(unittest.TestCase):
         addrs = [e[1] for e in o2.ip6_addrs if 'br03_v6' in e[2]]
         self.assertEqual(len(addrs), 1)
         o2_addr = addrs[0]
+
+        time.sleep(60)
+
+        o1.show_addr()
+        o1.show_route(True)
+        g1.show_addr()
+        g1.show_route(True)
+        q1.show_addr()
+        q1.show_route(True)
+        o2.show_addr()
+        o2.show_route(True)
+
+        time.sleep(60)
+
+        g1.get_reachability(o2_addr)
+
         o1.get_reachability(o2_addr)
 
     def test_07_mpath_test_setup(self):
