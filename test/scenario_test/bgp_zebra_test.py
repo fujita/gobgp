@@ -203,6 +203,8 @@ class GoBGPTestBase(unittest.TestCase):
         self.assertEqual(len(addrs), 1)
         o2_addr = addrs[0]
 
+        time.sleep(60)
+
         o1.show_addr()
         o1.show_route(True)
         g1.show_addr()
@@ -211,6 +213,8 @@ class GoBGPTestBase(unittest.TestCase):
         q1.show_route(True)
         o2.show_addr()
         o2.show_route(True)
+
+        time.sleep(60)
 
         g1.get_reachability(o2_addr)
 
