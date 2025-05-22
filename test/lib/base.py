@@ -594,7 +594,7 @@ class BGPContainer(Container):
         print(yellow(res))
 
     def show_route(self):
-        cmd = '/sbin/ip route'
+        cmd = '/sbin/ip -6 route'
         res = self.local(cmd, capture=True)
         print(yellow(res))
 
