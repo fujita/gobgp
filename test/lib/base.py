@@ -593,8 +593,11 @@ class BGPContainer(Container):
         res = self.local(cmd, capture=True)
         print(yellow(res))
 
-    def show_route(self):
-        cmd = '/sbin/ip -6 route'
+    def show_route(self, ipv6=False):
+        if ipv6:
+            cmd = '/sbin/ip -6 route'
+        else:
+            cmd = '/sbin/ip route'
         res = self.local(cmd, capture=True)
         print(yellow(res))
 

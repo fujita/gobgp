@@ -204,13 +204,15 @@ class GoBGPTestBase(unittest.TestCase):
         o2_addr = addrs[0]
 
         o1.show_addr()
-        o1.show_route()
+        o1.show_route(True)
         g1.show_addr()
-        g1.show_route()
+        g1.show_route(True)
         q1.show_addr()
-        q1.show_route()
+        q1.show_route(True)
         o2.show_addr()
-        o2.show_route()
+        o2.show_route(True)
+
+        g1.get_reachability(o2_addr)
 
         o1.get_reachability(o2_addr)
 
