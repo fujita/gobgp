@@ -190,6 +190,15 @@ class GoBGPTestBase(unittest.TestCase):
         o1 = self.others['ipv6'][0]
         o2 = self.others['ipv6'][1]
 
+        g1.show_addr()
+        g1.show_route()
+        q1.show_addr()
+        q1.show_route()
+        o1.show_addr()
+        o1.show_route()
+        o2.show_addr()
+        o2.show_route()
+
         # set o1's default gateway as g1
         g1_addr = [a for a in g1.ip6_addrs if a[2] == self.bridges['br01_v6'].name][0][1].split('/')[0]
         o1.add_static_route(self.bridges['br03_v6'].subnet, g1_addr)

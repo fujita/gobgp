@@ -588,6 +588,15 @@ class BGPContainer(Container):
     def reload_config(self):
         raise Exception('implement reload_config() method')
 
+    def show_addr(self):
+        cmd = '/sbin/ip addr'
+        res = self.local(cmd, capture=True)
+        print(yellow(res))
+
+    def show_route(self):
+        cmd = '/sbin/ip route'
+        res = self.local(cmd, capture=True)
+        print(yellow(res))
 
 class OSPFContainer(Container):
     WAIT_FOR_BOOT = 1
