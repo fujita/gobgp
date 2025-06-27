@@ -99,7 +99,18 @@ func TimingHookOption(hook FSMTimingHook) ServerOption {
 	}
 }
 
+type sharedData struct {
+	mu sync.Mutex
+}
+
+func newSharedData() *sharedData {
+	return &sharedData{
+		mu: sync.Mutex{},
+	}
+}
+
 type BgpServer struct {
+	shared       *sharedData
 	apiServer    *server
 	bgpConfig    oc.Bgp
 	acceptCh     chan net.Conn
@@ -135,8 +146,10 @@ func NewBgpServer(opt ...ServerOption) *BgpServer {
 		logger = log.NewDefaultLogger()
 	}
 	roaTable := table.NewROATable(logger)
+	shared := newSharedData()
 
 	s := &BgpServer{
+		shared:       shared,
 		neighborMap:  make(map[string]*peer),
 		peerGroupMap: make(map[string]*peerGroup),
 		policy:       table.NewRoutingPolicy(logger),
@@ -152,7 +165,7 @@ func NewBgpServer(opt ...ServerOption) *BgpServer {
 	s.mrtManager = newMrtManager(s)
 	if len(opts.grpcAddress) != 0 {
 		grpc.EnableTracing = false
-		s.apiServer = newAPIserver(s, grpc.NewServer(opts.grpcOption...), opts.grpcAddress)
+		s.apiServer = newAPIserver(s, shared, grpc.NewServer(opts.grpcOption...), opts.grpcAddress)
 		go func() {
 			if err := s.apiServer.serve(); err != nil {
 				logger.Fatal("failed to listen grpc port",
