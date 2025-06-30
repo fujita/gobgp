@@ -374,7 +374,6 @@ func makePeerAndHandler() (*peer, *fsmHandler) {
 	h := &fsmHandler{
 		fsm:           p.fsm,
 		stateReasonCh: make(chan fsmStateReason, 2),
-		incoming:      channels.NewInfiniteChannel(),
 		outgoing:      channels.NewInfiniteChannel(),
 	}
 
