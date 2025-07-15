@@ -22,6 +22,10 @@ import (
 )
 
 func cleanInfiniteChannel(ch *channels.InfiniteChannel) {
+	if ch == nil {
+		return
+	}
+
 	ch.Close()
 	// drain all remaining items
 	for range ch.Out() {

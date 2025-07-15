@@ -16,9 +16,11 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/osrg/gobgp/v4/internal/pkg/table"
@@ -111,9 +113,13 @@ type peer struct {
 	sentPaths           map[table.PathDestLocalKey]map[uint32]struct{}
 	sendMaxPathFiltered map[table.PathLocalKey]struct{}
 	llgrEndChs          []chan struct{}
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	wg                  *sync.WaitGroup
 }
 
 func newPeer(g *oc.Global, conf *oc.Neighbor, loc *table.TableManager, policy *table.RoutingPolicy, logger log.Logger) *peer {
+	ctx, cancel := context.WithCancel(context.Background())
 	peer := &peer{
 		localRib:            loc,
 		policy:              policy,
@@ -121,6 +127,9 @@ func newPeer(g *oc.Global, conf *oc.Neighbor, loc *table.TableManager, policy *t
 		prefixLimitWarned:   make(map[bgp.Family]bool),
 		sentPaths:           make(map[table.PathDestLocalKey]map[uint32]struct{}),
 		sendMaxPathFiltered: make(map[table.PathLocalKey]struct{}),
+		ctx:                 ctx,
+		cancel:              cancel,
+		wg:                  &sync.WaitGroup{},
 	}
 	if peer.isRouteServerClient() {
 		peer.tableId = conf.State.NeighborAddress
@@ -648,13 +657,6 @@ func (peer *peer) handleUpdate(e *fsmMsg) ([]*table.Path, []bgp.Family, *bgp.BGP
 		return paths, eor, nil
 	}
 	return nil, nil, nil
-}
-
-func (peer *peer) startFSMHandler(callback func(*fsmMsg, bool)) {
-	handler := newFSMHandler(peer.fsm, peer.fsm.outgoingCh, callback)
-	peer.fsm.lock.Lock()
-	peer.fsm.h = handler
-	peer.fsm.lock.Unlock()
 }
 
 func (peer *peer) StaleAll(rfList []bgp.Family) []*table.Path {
