@@ -240,6 +240,8 @@ func (fsm *fsm) changeState(reason *fsmStateReason, isActive bool, callback func
 	if nextState != oldState {
 		fsm.lock.Lock()
 
+		fsm.reason = reason
+
 		if nextState == bgp.BGP_FSM_ESTABLISHED {
 			fsm.logger.Info("Peer Up",
 				log.Fields{
@@ -353,7 +355,6 @@ func (fsm *fsm) changeState(reason *fsmStateReason, isActive bool, callback func
 			// 	reason.Type = fsmNotificationSent
 			// 	reason.BGPNotification = fsm.h.sentNotification
 			// }
-			fsm.lock.Lock()
 			fsm.logger.Info("Peer Down",
 				log.Fields{
 					"Topic":  "Peer",
@@ -378,7 +379,6 @@ func (fsm *fsm) changeState(reason *fsmStateReason, isActive bool, callback func
 					fsm.gracefulRestartTimer.Reset(time.Duration(fsm.pConf.GracefulRestart.State.PeerRestartTime) * time.Second)
 				}
 			}
-			fsm.lock.Unlock()
 		}
 
 		msg := &fsmMsg{
@@ -803,7 +803,10 @@ func (h *fsmHandler) stop() {
 }
 
 func (h *fsmHandler) idleState() {
+	fmt.Println("idleState: start", h.fsm.idleHoldTime)
+	h.fsm.lock.RLock()
 	idleHoldTimer := time.NewTimer(time.Second * time.Duration(h.fsm.idleHoldTime))
+	h.fsm.lock.RUnlock()
 
 	for {
 		select {
@@ -854,10 +857,17 @@ func (h *fsmHandler) connectState() {
 		return tick, addr, port, password, ttl, ttlMin, fsm.pConf.Transport.Config.TcpMss, fsm.pConf.Transport.Config.LocalAddress, int(fsm.pConf.Transport.Config.LocalPort), fsm.pConf.Transport.Config.BindInterface
 	}()
 
-	tick := minConnectRetryInterval
+	retryCounter := 0
 	for {
-		r := rand.New(rand.NewSource(time.Now().UnixNano()))
-		timer := time.NewTimer(time.Duration(r.Intn(tick*1000)+tick*1000) * time.Millisecond)
+		// Add random jitter (0-2 seconds) before initial active connection attempt
+		// to avoid thundering herd problem when multiple BGP speakers start simultaneously.
+		var delay float64
+		if retryCounter == 0 {
+			delay = rand.Float64() * 2
+		} else {
+			delay = float64(retryInterval)
+		}
+		timer := time.NewTimer(time.Duration(delay) * time.Second)
 		select {
 		case <-h.ctx.Done():
 			h.eventCh <- handlerEvent{
@@ -887,7 +897,7 @@ func (h *fsmHandler) connectState() {
 		if err == nil {
 			d := net.Dialer{
 				LocalAddr: laddr,
-				Timeout:   time.Duration(max(retryInterval-1, minConnectRetryInterval)) * time.Second,
+				Timeout:   time.Duration(retryInterval) * time.Second,
 				KeepAlive: -1,
 				Control: func(network, address string, c syscall.RawConn) error {
 					return netutils.DialerControl(fsm.logger, network, address, c, ttl, ttlMin, mss, password, bindInterface)
@@ -926,7 +936,7 @@ func (h *fsmHandler) connectState() {
 				}
 			}
 		}
-		tick = retryInterval
+		retryCounter++
 	}
 }
 
