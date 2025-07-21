@@ -525,8 +525,9 @@ func (fsm *fsm) Serve(ctx context.Context, wg *sync.WaitGroup, callback func(*fs
 			}
 
 		case conn := <-fsm.connCh:
-			fmt.Println("new connection received")
-			if fsm.active != nil {
+			fmt.Println("new connection received", conn.RemoteAddr())
+			if fsm.passive != nil {
+				fmt.Println("passive FSM is already running, so close the connection")
 				conn.Close()
 			} else if adminState == adminStateUp {
 				fsm.passive = newFSMHandler(fsm, bgp.BGP_FSM_OPENSENT, callback, passiveEventCh, conn)
@@ -591,7 +592,7 @@ func (fsm *fsm) Serve(ctx context.Context, wg *sync.WaitGroup, callback func(*fs
 				case bgp.BGP_FSM_CONNECT:
 					// stop the active FSM to try to connect.
 					fsm.active.stop()
-					fsm.active.conn.Close()
+					//fsm.active.conn.Close()
 					fsm.active = nil
 				case bgp.BGP_FSM_OPENCONFIRM:
 					callchangeState = false
