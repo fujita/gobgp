@@ -481,7 +481,26 @@ func (fsm *fsm) Serve(ctx context.Context, wg *sync.WaitGroup, callback func(*fs
 			if err == nil {
 				switch stateOp.State {
 				case adminStateDown:
-					stopHandlers()
+					var handler *fsmHandler
+					if fsm.active != nil {
+						fsm.active.stop()
+						if fsm.active.state == bgp.BGP_FSM_ESTABLISHED {
+							handler = fsm.active
+						}
+						fsm.active = nil
+					}
+					if fsm.passive != nil {
+						fsm.passive.stop()
+						if fsm.passive.state == bgp.BGP_FSM_ESTABLISHED {
+							handler = fsm.passive
+						}
+						fsm.passive = nil
+					}
+					if handler != nil {
+						handler.sendNotification(bgp.BGP_ERROR_CEASE, bgp.BGP_ERROR_SUB_ADMINISTRATIVE_SHUTDOWN, stateOp.Communication)
+						handler.conn.Close()
+					}
+
 					fsm.changeState(newfsmStateReason(fsmAdminDown, nil, nil), true, callback)
 				}
 			}
