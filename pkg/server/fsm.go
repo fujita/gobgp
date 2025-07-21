@@ -280,6 +280,13 @@ func (fsm *fsm) changeState(reason *fsmStateReason, isActive bool, callback func
 
 			fsm.pConf.Timers.State.NegotiatedHoldTime = float64(handler.holdtime)
 
+			myHoldTime := fsm.pConf.Timers.Config.HoldTime
+			keepalive := fsm.pConf.Timers.Config.KeepaliveInterval
+			if n := fsm.pConf.Timers.State.NegotiatedHoldTime; n < myHoldTime {
+				keepalive = n / 3
+			}
+			fsm.pConf.Timers.State.KeepaliveInterval = keepalive
+
 			gr, ok := fsm.capMap[bgp.BGP_CAP_GRACEFUL_RESTART]
 			if fsm.pConf.GracefulRestart.Config.Enabled && ok {
 				state := &fsm.pConf.GracefulRestart.State
@@ -470,12 +477,12 @@ func (fsm *fsm) Serve(ctx context.Context, wg *sync.WaitGroup, callback func(*fs
 			cleanInfiniteChannel(fsm.outgoingCh)
 			return
 		case stateOp := <-fsm.adminStateCh:
-			err := fsm.changeadminState(adminStateDown)
-			if err != nil {
+			err := fsm.changeadminState(stateOp.State)
+			if err == nil {
 				switch stateOp.State {
 				case adminStateDown:
 					stopHandlers()
-					fsm.changeState(newfsmStateReason(fsmRestartTimerExpired, nil, nil), true, callback)
+					fsm.changeState(newfsmStateReason(fsmAdminDown, nil, nil), true, callback)
 				}
 			}
 		case <-fsm.gracefulRestartTimer.C:
@@ -2005,6 +2012,7 @@ func (h *fsmHandler) sendMessageloop(ctx context.Context) *fsmStateReason {
 }
 
 func (fsm *fsm) changeadminState(s adminState) error {
+	fmt.Println("changeadminState called with state:", s.String())
 	fsm.lock.Lock()
 	defer fsm.lock.Unlock()
 
