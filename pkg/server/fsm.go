@@ -222,6 +222,9 @@ func (fsm *fsm) passiveState() bgp.FSMState {
 	if fsm.passive != nil {
 		return fsm.passive.state
 	}
+	if fsm.adminState == adminStateUp {
+		return bgp.BGP_FSM_ACTIVE
+	}
 	return bgp.BGP_FSM_IDLE
 }
 
