@@ -267,6 +267,7 @@ func (fsm *fsm) changeState(reason *fsmStateReason, isActive bool, callback func
 
 			fsm.pConf.State.PeerAs = handler.peerAS
 			fsm.peerInfo.AS = handler.peerAS
+			fsm.pConf.State.PeerType = handler.peerType
 			fsm.peerInfo.ID = open.ID
 			fsm.capMap, fsm.rfMap = open2Cap(open, fsm.pConf)
 
@@ -1583,7 +1584,7 @@ func (h *fsmHandler) opensentState() {
 		fmt.Println("opensentState: exiting due to context done")
 		return
 	case r := <-recvCh:
-		fmt.Println("opensentState: received message")
+		fmt.Println("opensentState: received message", r.err)
 		if r.err == nil {
 			body := r.msg.MsgData.(*bgp.BGPMessage).Body
 			switch body := body.(type) {
@@ -1600,6 +1601,7 @@ func (h *fsmHandler) opensentState() {
 				if err != nil {
 					//m, _ := fsm.sendNotificationFromErrorMsg(err.(*bgp.MessageError))
 					//return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmInvalidMsg, m, nil)
+					fmt.Println("opensentState: received invalid open message")
 					h.eventCh <- handlerEvent{
 						state:  bgp.BGP_FSM_IDLE,
 						reason: newfsmStateReason(fsmInvalidMsg, m, nil),
@@ -1649,6 +1651,7 @@ func (h *fsmHandler) opensentState() {
 				// send notification?
 				//h.conn.Close()
 				//return bgp.BGP_FSM_IDLE, newfsmStateReason(fsmInvalidMsg, nil, nil)
+				fmt.Println("opensentState: received non open message", r.err)
 				h.eventCh <- handlerEvent{
 					state:  bgp.BGP_FSM_IDLE,
 					reason: newfsmStateReason(fsmInvalidMsg, m, nil),
