@@ -1630,7 +1630,7 @@ func (r *IPAddrPrefix) SAFI() uint8 {
 }
 
 func (r *IPAddrPrefix) Len(options ...*MarshallingOption) int {
-	return 1 + (int(r.P.Bits())+7)/8
+	return 1 + (r.P.Bits()+7)/8
 }
 
 func (r *IPAddrPrefix) String() string {

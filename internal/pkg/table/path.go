@@ -1341,12 +1341,12 @@ func nlriToIPNet(nlri bgp.AddrPrefixInterface) *net.IPNet {
 	case *bgp.IPAddrPrefix:
 		return &net.IPNet{
 			IP:   T.P.Addr().AsSlice(),
-			Mask: net.CIDRMask(int(T.P.Bits()), 32),
+			Mask: net.CIDRMask(T.P.Bits(), 32),
 		}
 	case *bgp.IPv6AddrPrefix:
 		return &net.IPNet{
 			IP:   T.P.Addr().AsSlice(),
-			Mask: net.CIDRMask(int(T.P.Bits()), 128),
+			Mask: net.CIDRMask(T.P.Bits(), 128),
 		}
 	case *bgp.LabeledIPAddrPrefix:
 		return &net.IPNet{
