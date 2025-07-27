@@ -1381,13 +1381,13 @@ func addrPrefixOnlySerialize(nlri AddrPrefixInterface) []byte {
 	switch T := nlri.(type) {
 	case *IPAddrPrefix:
 		b := make([]byte, 5)
-		copy(b, T.Prefix.To4())
-		b[4] = T.Length
+		copy(b, T.P.Addr().AsSlice())
+		b[4] = uint8(T.P.Bits())
 		return b
 	case *IPv6AddrPrefix:
 		b := make([]byte, 17)
-		copy(b, T.Prefix.To16())
-		b[16] = T.Length
+		copy(b, T.P.Addr().AsSlice())
+		b[16] = uint8(T.P.Bits())
 		return b
 	case *LabeledVPNIPAddrPrefix:
 		b := make([]byte, 13)
@@ -1541,7 +1541,8 @@ func (r *IPAddrPrefixDefault) MarshalJSON() ([]byte, error) {
 }
 
 type IPAddrPrefix struct {
-	IPAddrPrefixDefault
+	PrefixDefault
+	P       netip.Prefix
 	addrlen uint8
 }
 
@@ -1565,8 +1566,37 @@ func (r *IPAddrPrefix) DecodeFromBytes(data []byte, options ...*MarshallingOptio
 		eSubCode := uint8(BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST)
 		return NewMessageError(eCode, eSubCode, nil, "prefix misses length field")
 	}
-	r.Length = data[0]
-	return r.decodePrefix(data[1:], r.Length, r.addrlen)
+	bitlen := data[0]
+	data = data[1:]
+
+	nlriError := func(msg string) error {
+		eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
+		eSubCode := uint8(BGP_ERROR_SUB_INVALID_NETWORK_FIELD)
+		return NewMessageError(eCode, eSubCode, nil, msg)
+	}
+
+	bytelen := (int(bitlen) + 7) / 8
+	if len(data) < bytelen {
+		return nlriError("network bytes is short")
+	}
+	if bitlen > r.addrlen*8 {
+		fmt.Println("HELLLO", r.addrlen, bitlen)
+		return nlriError("network bit length is too long")
+	}
+
+	var b [16]byte
+	copy(b[:], data[:bytelen])
+	// clear trailing bits in the last byte. rfc doesn't require
+	// this but some bgp implementations need this...
+	rem := bitlen % 8
+	if rem != 0 {
+		mask := 0xff00 >> rem
+		lastByte := b[bytelen-1] & byte(mask)
+		b[bytelen-1] = lastByte
+	}
+	addr, _ := netip.AddrFromSlice(b[:r.addrlen])
+	r.P = netip.PrefixFrom(addr, int(bitlen))
+	return nil
 }
 
 func (r *IPAddrPrefix) Serialize(options ...*MarshallingOption) ([]byte, error) {
@@ -1582,11 +1612,13 @@ func (r *IPAddrPrefix) Serialize(options ...*MarshallingOption) ([]byte, error) 
 			return nil, err
 		}
 	}
-	buf = append(buf, r.Length)
-	pbuf, err := r.serializePrefix(r.Length)
-	if err != nil {
-		return nil, err
-	}
+	bits := uint8(r.P.Bits())
+	buf = append(buf, bits)
+
+	byteLen := (int(bits) + 7) / 8
+	pbuf := make([]byte, byteLen)
+	copy(pbuf, r.P.Addr().AsSlice()[:byteLen])
+
 	return append(buf, pbuf...), nil
 }
 
@@ -1599,19 +1631,45 @@ func (r *IPAddrPrefix) SAFI() uint8 {
 }
 
 func (r *IPAddrPrefix) Len(options ...*MarshallingOption) int {
-	return 1 + (int(r.Length)+7)/8
+	return 1 + (int(r.P.Bits())+7)/8
+}
+
+func (r *IPAddrPrefix) String() string {
+	return r.P.String()
+}
+
+func (p *IPAddrPrefix) Flat() map[string]string {
+	return map[string]string{
+		"Prefix":    p.P.Addr().String(),
+		"PrefixLen": fmt.Sprintf("%d", p.P.Bits()),
+	}
+}
+
+func (r *IPAddrPrefix) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Prefix string `json:"prefix"`
+	}{
+		Prefix: r.P.String(),
+	})
 }
 
 func NewIPAddrPrefix(length uint8, prefix string) *IPAddrPrefix {
-	p := &IPAddrPrefix{
-		IPAddrPrefixDefault{
-			Length: length,
-		},
-		4,
+	if prefix != "" {
+		addr := netip.MustParseAddr(prefix)
+		addrlen := net.IPv4len
+		if addr.Is6() {
+			addrlen = net.IPv6len
+		}
+
+		p := &IPAddrPrefix{
+			addrlen: uint8(addrlen),
+		}
+		buf := append([]byte{length}, addr.AsSlice()[:addrlen]...)
+		p.DecodeFromBytes(buf)
+		return p
+	} else {
+		return &IPAddrPrefix{}
 	}
-	// TODO: pass the error to the caller
-	_ = p.decodePrefix(net.ParseIP(prefix).To4(), length, 4)
-	return p
 }
 
 func isIPv4MappedIPv6(ip net.IP) bool {
@@ -1626,26 +1684,14 @@ func (r *IPv6AddrPrefix) AFI() uint16 {
 	return AFI_IP6
 }
 
-func (r *IPv6AddrPrefix) String() string {
-	prefix := r.Prefix.String()
-	if isIPv4MappedIPv6(r.Prefix) {
-		prefix = "::ffff:" + prefix
-	}
-	return prefix + "/" + strconv.FormatUint(uint64(r.Length), 10)
-}
-
 func NewIPv6AddrPrefix(length uint8, prefix string) *IPv6AddrPrefix {
-	p := &IPv6AddrPrefix{
-		IPAddrPrefix{
-			IPAddrPrefixDefault{
-				Length: length,
-			},
-			16,
+	p := *NewIPAddrPrefix(length, prefix)
+	return &IPv6AddrPrefix{
+		IPAddrPrefix: IPAddrPrefix{
+			P:       p.P,
+			addrlen: net.IPv6len,
 		},
 	}
-	// TODO: pass the error to the caller
-	_ = p.decodePrefix(net.ParseIP(prefix), length, 16)
-	return p
 }
 
 const (
@@ -5085,44 +5131,44 @@ func CompareFlowSpecNLRI(n, m *FlowSpecNLRI) (int, error) {
 			// For IP prefix values (IP destination and source prefix) precedence is
 			// given to the lowest IP value of the common prefix length; if the
 			// common prefix is equal, then the most specific prefix has precedence.
-			var p, q *IPAddrPrefixDefault
+			var p, q *netip.Prefix
 			var pCommon, qCommon uint64
 			if n.AFI() == AFI_IP {
 				if v.Type() == FLOW_SPEC_TYPE_DST_PREFIX {
-					p = &v.(*FlowSpecDestinationPrefix).Prefix.(*IPAddrPrefix).IPAddrPrefixDefault
-					q = &w.(*FlowSpecDestinationPrefix).Prefix.(*IPAddrPrefix).IPAddrPrefixDefault
+					p = &v.(*FlowSpecDestinationPrefix).Prefix.(*IPAddrPrefix).P
+					q = &w.(*FlowSpecDestinationPrefix).Prefix.(*IPAddrPrefix).P
 				} else {
-					p = &v.(*FlowSpecSourcePrefix).Prefix.(*IPAddrPrefix).IPAddrPrefixDefault
-					q = &w.(*FlowSpecSourcePrefix).Prefix.(*IPAddrPrefix).IPAddrPrefixDefault
+					p = &v.(*FlowSpecSourcePrefix).Prefix.(*IPAddrPrefix).P
+					q = &w.(*FlowSpecSourcePrefix).Prefix.(*IPAddrPrefix).P
 				}
-				min := p.Length
-				if q.Length < p.Length {
-					min = q.Length
+				min := p.Bits()
+				if q.Bits() < p.Bits() {
+					min = q.Bits()
 				}
-				pCommon = uint64(binary.BigEndian.Uint32([]byte(p.Prefix.To4())) >> (32 - min))
-				qCommon = uint64(binary.BigEndian.Uint32([]byte(q.Prefix.To4())) >> (32 - min))
+				pCommon = uint64(binary.BigEndian.Uint32(p.Addr().AsSlice()) >> (32 - min))
+				qCommon = uint64(binary.BigEndian.Uint32(q.Addr().AsSlice()) >> (32 - min))
 			} else if n.AFI() == AFI_IP6 {
 				if v.Type() == FLOW_SPEC_TYPE_DST_PREFIX {
-					p = &v.(*FlowSpecDestinationPrefix6).Prefix.(*IPv6AddrPrefix).IPAddrPrefixDefault
-					q = &w.(*FlowSpecDestinationPrefix6).Prefix.(*IPv6AddrPrefix).IPAddrPrefixDefault
+					p = &v.(*FlowSpecDestinationPrefix6).Prefix.(*IPv6AddrPrefix).P
+					q = &w.(*FlowSpecDestinationPrefix6).Prefix.(*IPv6AddrPrefix).P
 				} else {
-					p = &v.(*FlowSpecSourcePrefix6).Prefix.(*IPv6AddrPrefix).IPAddrPrefixDefault
-					q = &w.(*FlowSpecSourcePrefix6).Prefix.(*IPv6AddrPrefix).IPAddrPrefixDefault
+					p = &v.(*FlowSpecSourcePrefix6).Prefix.(*IPv6AddrPrefix).P
+					q = &w.(*FlowSpecSourcePrefix6).Prefix.(*IPv6AddrPrefix).P
 				}
-				min := uint(p.Length)
-				if q.Length < p.Length {
-					min = uint(q.Length)
+				min := uint(p.Bits())
+				if q.Bits() < p.Bits() {
+					min = uint(q.Bits())
 				}
 				var mask uint
 				if min-64 > 0 {
 					mask = min - 64
 				}
-				pCommon = binary.BigEndian.Uint64([]byte(p.Prefix.To16()[:8])) >> mask
-				qCommon = binary.BigEndian.Uint64([]byte(q.Prefix.To16()[:8])) >> mask
+				pCommon = binary.BigEndian.Uint64([]byte(p.Addr().AsSlice()[:8])) >> mask
+				qCommon = binary.BigEndian.Uint64([]byte(q.Addr().AsSlice()[:8])) >> mask
 				if pCommon == qCommon && mask == 0 {
 					mask = 64 - min
-					pCommon = binary.BigEndian.Uint64([]byte(p.Prefix.To16()[8:])) >> mask
-					qCommon = binary.BigEndian.Uint64([]byte(q.Prefix.To16()[8:])) >> mask
+					pCommon = binary.BigEndian.Uint64([]byte(p.Addr().AsSlice()[8:])) >> mask
+					qCommon = binary.BigEndian.Uint64([]byte(q.Addr().AsSlice()[8:])) >> mask
 				}
 			}
 
@@ -5130,9 +5176,9 @@ func CompareFlowSpecNLRI(n, m *FlowSpecNLRI) (int, error) {
 				return invert, nil
 			} else if pCommon > qCommon {
 				return invert * -1, nil
-			} else if p.Length > q.Length {
+			} else if p.Bits() > q.Bits() {
 				return invert, nil
-			} else if p.Length < q.Length {
+			} else if p.Bits() < q.Bits() {
 				return invert * -1, nil
 			}
 		} else {
