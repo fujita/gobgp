@@ -1580,7 +1580,6 @@ func (r *IPAddrPrefix) DecodeFromBytes(data []byte, options ...*MarshallingOptio
 		return nlriError("network bytes is short")
 	}
 	if bitlen > r.addrlen*8 {
-		fmt.Println("HELLLO", r.addrlen, bitlen)
 		return nlriError("network bit length is too long")
 	}
 
@@ -1665,7 +1664,10 @@ func NewIPAddrPrefix(length uint8, prefix string) *IPAddrPrefix {
 			addrlen: uint8(addrlen),
 		}
 		buf := append([]byte{length}, addr.AsSlice()[:addrlen]...)
-		p.DecodeFromBytes(buf)
+		err := p.DecodeFromBytes(buf)
+		if err != nil {
+			return nil
+		}
 		return p
 	} else {
 		return &IPAddrPrefix{}
@@ -5163,12 +5165,12 @@ func CompareFlowSpecNLRI(n, m *FlowSpecNLRI) (int, error) {
 				if min-64 > 0 {
 					mask = min - 64
 				}
-				pCommon = binary.BigEndian.Uint64([]byte(p.Addr().AsSlice()[:8])) >> mask
-				qCommon = binary.BigEndian.Uint64([]byte(q.Addr().AsSlice()[:8])) >> mask
+				pCommon = binary.BigEndian.Uint64(p.Addr().AsSlice()[:8]) >> mask
+				qCommon = binary.BigEndian.Uint64(q.Addr().AsSlice()[:8]) >> mask
 				if pCommon == qCommon && mask == 0 {
 					mask = 64 - min
-					pCommon = binary.BigEndian.Uint64([]byte(p.Addr().AsSlice()[8:])) >> mask
-					qCommon = binary.BigEndian.Uint64([]byte(q.Addr().AsSlice()[8:])) >> mask
+					pCommon = binary.BigEndian.Uint64(p.Addr().AsSlice()[8:]) >> mask
+					qCommon = binary.BigEndian.Uint64(q.Addr().AsSlice()[8:]) >> mask
 				}
 			}
 
