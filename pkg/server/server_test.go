@@ -1689,11 +1689,11 @@ func TestDoNotReactToDuplicateRTCMemberships(t *testing.T) {
 				for _, path := range msg.PathList {
 					t.Logf("tester received path: %s", path.String())
 					if vpnPath, ok := path.GetNlri().(*bgp.LabeledVPNIPAddrPrefix); ok {
-						if vpnPath.Prefix.Equal(prefix.Prefix) {
+						if vpnPath.Prefix.Equal(net.IP(prefix.P.Addr().AsSlice())) {
 							t.Logf("tester found expected prefix: %s", vpnPath.Prefix)
 							found = true
 						} else {
-							t.Logf("unknown prefix %s != %s", vpnPath.Prefix, prefix.Prefix)
+							t.Logf("unknown prefix %s != %s", vpnPath.Prefix, prefix.P.Addr())
 						}
 					}
 				}
@@ -1793,11 +1793,11 @@ func TestDelVrfWithRTC(t *testing.T) {
 				for _, path := range msg.PathList {
 					t.Logf("tester received path: %s", path.String())
 					if vpnPath, ok := path.GetNlri().(*bgp.LabeledVPNIPAddrPrefix); ok {
-						if vpnPath.Prefix.Equal(prefix.Prefix) {
+						if vpnPath.Prefix.Equal(net.IP(prefix.P.Addr().AsSlice())) {
 							t.Logf("tester found expected prefix: %s", vpnPath.Prefix)
 							found = true
 						} else {
-							t.Logf("unknown prefix %s != %s", vpnPath.Prefix, prefix.Prefix)
+							t.Logf("unknown prefix %s != %s", vpnPath.Prefix, prefix.P.Addr())
 						}
 					}
 				}
@@ -1826,11 +1826,11 @@ func TestDelVrfWithRTC(t *testing.T) {
 				for _, path := range msg.PathList {
 					t.Logf("tester received path: %s", path.String())
 					if vpnPath, ok := path.GetNlri().(*bgp.LabeledVPNIPAddrPrefix); ok {
-						if vpnPath.Prefix.Equal(prefix.Prefix) && path.IsWithdraw {
+						if vpnPath.Prefix.Equal(net.IP(prefix.P.Addr().AsSlice())) && path.IsWithdraw {
 							t.Logf("tester found expected withdrawn prefix: %s", vpnPath.Prefix)
 							withdrawVPN = true
 						} else {
-							t.Logf("unknown prefix %s != %s", vpnPath.Prefix, prefix.Prefix)
+							t.Logf("unknown prefix %s != %s", vpnPath.Prefix, prefix.P.Addr())
 						}
 					}
 				}
