@@ -192,11 +192,9 @@ func NewPath(source *PeerInfo, nlri bgp.AddrPrefixInterface, isWithdraw bool, pa
 }
 
 func NewEOR(family bgp.Family) *Path {
-	nlri, _ := bgp.NewPrefixFromFamily(family)
 	return &Path{
 		info: &originInfo{
-			nlri: nlri,
-			eor:  true,
+			eor: true,
 		},
 	}
 }
