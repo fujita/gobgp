@@ -34,7 +34,10 @@ var logger = log.NewDefaultLogger()
 func (manager *TableManager) ProcessUpdate(fromPeer *PeerInfo, message *bgp.BGPMessage) ([]*Path, error) {
 	pathList := make([]*Path, 0)
 	dsts := make([]*Update, 0)
-	for _, path := range ProcessMessage(message, fromPeer, time.Now()) {
+	m := make(map[bgp.Family]*PeerInfo)
+	m[manager.rfList[0]] = fromPeer
+
+	for _, path := range ProcessMessage(message, m, time.Now()) {
 		dsts = append(dsts, manager.Update(path)...)
 	}
 	for _, d := range dsts {
@@ -2108,13 +2111,13 @@ func TestProcessBGPUpdate_Timestamp(t *testing.T) {
 	adjRib := NewAdjRib(logger, []bgp.Family{bgp.RF_IPv4_UC, bgp.RF_IPv6_UC})
 	m1 := bgp.NewBGPUpdateMessage(nil, pathAttributes, nlri)
 	peer := peerR1()
-	pList1 := ProcessMessage(m1, peer, time.Now())
+	pList1 := ProcessMessage(m1, infoMap(peer), time.Now())
 	path1 := pList1[0]
 	t1 := path1.GetTimestamp()
 	adjRib.Update(pList1)
 
 	m2 := bgp.NewBGPUpdateMessage(nil, pathAttributes, nlri)
-	pList2 := ProcessMessage(m2, peer, time.Now())
+	pList2 := ProcessMessage(m2, infoMap(peer), time.Now())
 	// path2 := pList2[0].(*IPv4Path)
 	// t2 = path2.timestamp
 	adjRib.Update(pList2)
@@ -2132,7 +2135,7 @@ func TestProcessBGPUpdate_Timestamp(t *testing.T) {
 	}
 
 	m3 := bgp.NewBGPUpdateMessage(nil, pathAttributes2, nlri)
-	pList3 := ProcessMessage(m3, peer, time.Now())
+	pList3 := ProcessMessage(m3, infoMap(peer), time.Now())
 	t3 := pList3[0].GetTimestamp()
 	adjRib.Update(pList3)
 

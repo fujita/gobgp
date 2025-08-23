@@ -112,6 +112,7 @@ type peer struct {
 	sentPaths           map[table.PathDestLocalKey]map[uint32]struct{}
 	sendMaxPathFiltered map[table.PathLocalKey]struct{}
 	llgrEndChs          []chan struct{}
+	peerInfo            map[bgp.Family]*table.PeerInfo
 }
 
 func newPeer(g *oc.Global, conf *oc.Neighbor, loc *table.TableManager, policy *table.RoutingPolicy, logger log.Logger) *peer {
@@ -623,10 +624,9 @@ func (peer *peer) handleUpdate(e *fsmMsg) ([]*table.Path, []bgp.Family, *bgp.BGP
 
 	peer.fsm.lock.Lock()
 	peer.fsm.pConf.Timers.State.UpdateRecvTime = time.Now().Unix()
-	peerInfo := peer.fsm.peerInfo
 	peer.fsm.lock.Unlock()
 
-	pathList := table.ProcessMessage(m, peerInfo, e.timestamp)
+	pathList := table.ProcessMessage(m, peer.peerInfo, e.timestamp)
 	if len(pathList) > 0 {
 		paths := make([]*table.Path, 0, len(pathList))
 		eor := []bgp.Family{}

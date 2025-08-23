@@ -508,7 +508,7 @@ func TestBMP(t *testing.T) {
 	n := []*bgp.IPAddrPrefix{}
 
 	msg := bgp.NewBGPUpdateMessage(w, p, n)
-	pList := ProcessMessage(msg, peerR1(), time.Now())
+	pList := ProcessMessage(msg, map[bgp.Family]*PeerInfo{bgp.RF_IPv6_UC: peerR1()}, time.Now())
 	CreateUpdateMsgFromPaths(pList)
 }
 
@@ -538,7 +538,7 @@ func TestMixedMPReachMPUnreach(t *testing.T) {
 		bgp.NewPathAttributeMpUnreachNLRI(nlri2),
 	}
 	msg := bgp.NewBGPUpdateMessage(nil, p, nil)
-	pList := ProcessMessage(msg, peerR1(), time.Now())
+	pList := ProcessMessage(msg, map[bgp.Family]*PeerInfo{bgp.RF_IPv6_UC: peerR1()}, time.Now())
 	assert.Equal(t, len(pList), 2)
 	assert.Equal(t, pList[0].IsWithdraw, false)
 	assert.Equal(t, pList[1].IsWithdraw, true)
@@ -568,7 +568,7 @@ func TestMixedNLRIAndMPUnreach(t *testing.T) {
 		bgp.NewPathAttributeMpUnreachNLRI(nlri2),
 	}
 	msg := bgp.NewBGPUpdateMessage(nil, p, nlri1)
-	pList := ProcessMessage(msg, peerR1(), time.Now())
+	pList := ProcessMessage(msg, infoMap(peerR1()), time.Now())
 
 	assert.Equal(t, len(pList), 2)
 	assert.Equal(t, pList[0].IsWithdraw, false)
@@ -602,7 +602,7 @@ func TestMergeV4NLRIs(t *testing.T) {
 		addrs = append(addrs, fmt.Sprintf("1.1.%d.%d", i>>8&0xff, i&0xff))
 		nlri := []*bgp.IPAddrPrefix{bgp.NewIPAddrPrefix(32, addrs[i])}
 		msg := bgp.NewBGPUpdateMessage(nil, attrs, nlri)
-		paths = append(paths, ProcessMessage(msg, peerR1(), time.Now())...)
+		paths = append(paths, ProcessMessage(msg, infoMap(peerR1()), time.Now())...)
 	}
 	msgs := CreateUpdateMsgFromPaths(paths)
 	assert.Equal(t, len(msgs), 2)
@@ -636,7 +636,7 @@ func TestNotMergeV4NLRIs(t *testing.T) {
 		bgp.NewPathAttributeNextHop("1.1.1.1"),
 	}
 	nlri1 := []*bgp.IPAddrPrefix{bgp.NewIPAddrPrefix(32, "1.1.1.1")}
-	paths = append(paths, ProcessMessage(bgp.NewBGPUpdateMessage(nil, attrs1, nlri1), peerR1(), time.Now())...)
+	paths = append(paths, ProcessMessage(bgp.NewBGPUpdateMessage(nil, attrs1, nlri1), infoMap(peerR1()), time.Now())...)
 
 	attrs2 := []bgp.PathAttributeInterface{
 		bgp.NewPathAttributeOrigin(0),
@@ -644,7 +644,7 @@ func TestNotMergeV4NLRIs(t *testing.T) {
 		bgp.NewPathAttributeNextHop("2.2.2.2"),
 	}
 	nlri2 := []*bgp.IPAddrPrefix{bgp.NewIPAddrPrefix(32, "2.2.2.2")}
-	paths = append(paths, ProcessMessage(bgp.NewBGPUpdateMessage(nil, attrs2, nlri2), peerR1(), time.Now())...)
+	paths = append(paths, ProcessMessage(bgp.NewBGPUpdateMessage(nil, attrs2, nlri2), infoMap(peerR1()), time.Now())...)
 
 	assert.NotEmpty(t, paths[0].GetHash(), paths[1].GetHash())
 
@@ -673,7 +673,7 @@ func TestMergeV4Withdraw(t *testing.T) {
 			bgp.NewPathAttributeNextHop("1.1.1.1"),
 		}
 		msg := bgp.NewBGPUpdateMessage(nlri, attrs, nil)
-		paths = append(paths, ProcessMessage(msg, peerR1(), time.Now())...)
+		paths = append(paths, ProcessMessage(msg, infoMap(peerR1()), time.Now())...)
 	}
 	msgs := CreateUpdateMsgFromPaths(paths)
 	assert.Equal(t, len(msgs), 2)

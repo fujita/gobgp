@@ -31,34 +31,25 @@ const (
 	GLOBAL_RIB_NAME = "global"
 )
 
-func ProcessMessage(m *bgp.BGPMessage, peerInfo *PeerInfo, timestamp time.Time) []*Path {
-	update := m.Body.(*bgp.BGPUpdate)
+func ProcessMessage(msg *bgp.BGPMessage, peerInfomap map[bgp.Family]*PeerInfo, timestamp time.Time) []*Path {
+	update := msg.Body.(*bgp.BGPUpdate)
 
 	if y, f := update.IsEndOfRib(); y {
 		// this message has no normal updates or withdrawals.
 		return []*Path{NewEOR(f)}
 	}
 
-	adds := make([]bgp.AddrPrefixInterface, 0, len(update.NLRI))
-	for _, nlri := range update.NLRI {
-		adds = append(adds, nlri)
-	}
-
-	dels := make([]bgp.AddrPrefixInterface, 0, len(update.WithdrawnRoutes))
-	for _, nlri := range update.WithdrawnRoutes {
-		dels = append(dels, nlri)
-	}
+	pathList := []*Path{}
 
 	attrs := make([]bgp.PathAttributeInterface, 0, len(update.PathAttributes))
 	var reach *bgp.PathAttributeMpReachNLRI
+	var unreach *bgp.PathAttributeMpUnreachNLRI
 	for _, attr := range update.PathAttributes {
 		switch a := attr.(type) {
 		case *bgp.PathAttributeMpReachNLRI:
 			reach = a
 		case *bgp.PathAttributeMpUnreachNLRI:
-			l := make([]bgp.AddrPrefixInterface, 0, len(a.Value))
-			l = append(l, a.Value...)
-			dels = append(dels, l...)
+			unreach = a
 		default:
 			// update msg may not contain next_hop (type:3) in attr
 			// due to it uses MpReachNLRI and it also has empty update.NLRI
@@ -66,13 +57,8 @@ func ProcessMessage(m *bgp.BGPMessage, peerInfo *PeerInfo, timestamp time.Time) 
 		}
 	}
 
-	listLen := len(adds) + len(dels)
-	if reach != nil {
-		listLen += len(reach.Value)
-	}
-
 	var hash uint64
-	if len(adds) > 0 || reach != nil {
+	if len(update.NLRI) > 0 || reach != nil {
 		total := bytes.NewBuffer(make([]byte, 0))
 		for _, a := range attrs {
 			b, _ := a.Serialize()
@@ -81,24 +67,42 @@ func ProcessMessage(m *bgp.BGPMessage, peerInfo *PeerInfo, timestamp time.Time) 
 		hash = farm.Hash64(total.Bytes())
 	}
 
-	pathList := make([]*Path, 0, listLen)
-	for _, nlri := range adds {
+	if len(update.NLRI) > 0 && len(update.WithdrawnRoutes) > 0 {
+		peerInfo := peerInfomap[bgp.RF_IPv4_UC]
+
+		for _, nlri := range update.NLRI {
+			p := NewPath(peerInfo, nlri, false, attrs, timestamp, false)
+			p.SetHash(hash)
+		}
+	}
+
+	peerInfo := peerInfomap[bgp.RF_IPv4_UC]
+	for _, nlri := range update.NLRI {
 		p := NewPath(peerInfo, nlri, false, attrs, timestamp, false)
 		p.SetHash(hash)
 		pathList = append(pathList, p)
 	}
-	if reach != nil {
-		nexthop := reach.Nexthop.String()
 
+	for _, nlri := range update.WithdrawnRoutes {
+		p := NewPath(peerInfo, nlri, true, []bgp.PathAttributeInterface{}, timestamp, false)
+		p.SetHash(hash)
+		pathList = append(pathList, p)
+	}
+
+	if reach != nil {
+		// FIXME: we should not add MpReach attribute here.
+		nexthop := reach.Nexthop
+		peerInfo := peerInfomap[bgp.NewFamily(reach.AFI, reach.SAFI)]
+
+		// when build path from reach
+		// reachAttrs might not contain next_hop if `attrs` does not have one
+		// this happens when a MP peer send update to gobgp
+		// However nlri is always populated because how we build the path
+		// path.info{nlri: nlri}
+		// Compute a new attribute array for each path with one NLRI to make serialization
+		// of path attrs faster
 		for _, nlri := range reach.Value {
-			// when build path from reach
-			// reachAttrs might not contain next_hop if `attrs` does not have one
-			// this happens when a MP peer send update to gobgp
-			// However nlri is always populated because how we build the path
-			// path.info{nlri: nlri}
-			// Compute a new attribute array for each path with one NLRI to make serialization
-			// of path attrs faster
-			nlriAttr := bgp.NewPathAttributeMpReachNLRI(nexthop, nlri)
+			nlriAttr := bgp.NewPathAttributeMpReachNLRI(nexthop.String(), nlri)
 			reachAttrs := makeAttributeList(attrs, nlriAttr)
 
 			p := NewPath(peerInfo, nlri, false, reachAttrs, timestamp, false)
@@ -106,9 +110,14 @@ func ProcessMessage(m *bgp.BGPMessage, peerInfo *PeerInfo, timestamp time.Time) 
 			pathList = append(pathList, p)
 		}
 	}
-	for _, nlri := range dels {
-		p := NewPath(peerInfo, nlri, true, []bgp.PathAttributeInterface{}, timestamp, false)
-		pathList = append(pathList, p)
+
+	if unreach != nil {
+		peerInfo := peerInfomap[bgp.NewFamily(unreach.AFI, unreach.SAFI)]
+
+		for _, nlri := range unreach.Value {
+			p := NewPath(peerInfo, nlri, true, []bgp.PathAttributeInterface{}, timestamp, false)
+			pathList = append(pathList, p)
+		}
 	}
 	return pathList
 }

@@ -975,8 +975,9 @@ func newPeerandInfo(t *testing.T, myAs, as uint32, address string, rib *table.Ta
 	}
 	remoteAddr := netip.MustParseAddr(address)
 	localAddr := netip.MustParseAddr("1.1.1.1")
-	info := table.NewPeerInfo(gConf, nConf, as, myAs, remoteAddr, localAddr, remoteAddr, localAddr)
-	p.fsm.peerInfo = info
+	info := table.NewPeerInfo(gConf, nConf, as, myAs, remoteAddr, localAddr, remoteAddr, localAddr, bgp.RF_IPv4_UC)
+	p.peerInfo = make(map[bgp.Family]*table.PeerInfo)
+	p.peerInfo[bgp.RF_IPv4_UC] = info
 	return p, info
 }
 

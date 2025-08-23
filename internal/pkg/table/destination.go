@@ -86,6 +86,7 @@ type PeerInfo struct {
 	Address                 netip.Addr
 	LocalAddress            netip.Addr
 	RouteReflectorClusterID netip.Addr
+	Family                  bgp.Family
 	RouteReflectorClient    bool
 	MultihopTtl             uint8
 	Confederation           bool
@@ -121,7 +122,9 @@ func (i *PeerInfo) String() string {
 	return s.String()
 }
 
-func NewPeerInfo(g *oc.Global, p *oc.Neighbor, AS, localAS uint32, ID, localID netip.Addr, addr, localAddr netip.Addr) *PeerInfo {
+func NewPeerInfo(g *oc.Global, p *oc.Neighbor, AS, localAS uint32, ID, localID netip.Addr,
+	addr, localAddr netip.Addr, family bgp.Family) *PeerInfo {
+
 	clusterID, _ := netip.ParseAddr(string(p.RouteReflector.State.RouteReflectorClusterId))
 	return &PeerInfo{
 		AS:                      AS,
@@ -130,6 +133,7 @@ func NewPeerInfo(g *oc.Global, p *oc.Neighbor, AS, localAS uint32, ID, localID n
 		LocalID:                 localID,
 		Address:                 addr,
 		LocalAddress:            localAddr,
+		Family:                  family,
 		RouteReflectorClusterID: clusterID,
 		RouteReflectorClient:    p.RouteReflector.Config.RouteReflectorClient,
 		MultihopTtl:             p.EbgpMultihop.Config.MultihopTtl,
