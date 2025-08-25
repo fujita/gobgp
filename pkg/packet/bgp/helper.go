@@ -128,13 +128,10 @@ func NewTestBGPUpdateMessage() *BGPMessage {
 		// NewPathAttributeMpUnreachNLRI([]AddrPrefixInterface{}),
 		NewPathAttributeUnknown(BGP_ATTR_FLAG_TRANSITIVE, 100, []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}),
 	}
-
-	NewPathAttributeMpReachNLRI(RF_IPv4_UC, prefixes1, netip.MustParseAddr("112.22.2.0"))
-
 	n := []*IPAddrPrefix{NewIPAddrPrefix(24, "13.2.3.1")}
 	return NewBGPUpdateMessage(w, p, n)
 }
 
-func ignoreError[T any](value T, err error) T {
+func ignoreError[T any](value T, _ error) T {
 	return value
 }
