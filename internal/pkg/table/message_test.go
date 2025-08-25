@@ -17,6 +17,7 @@ package table
 
 import (
 	"fmt"
+	"net/netip"
 	"reflect"
 	"testing"
 	"time"
@@ -534,9 +535,11 @@ func TestMixedMPReachMPUnreach(t *testing.T) {
 	p := []bgp.PathAttributeInterface{
 		bgp.NewPathAttributeOrigin(0),
 		bgp.NewPathAttributeAsPath(aspath1),
-		bgp.NewPathAttributeMpReachNLRI("1::1", nlri1),
-		bgp.NewPathAttributeMpUnreachNLRI(nlri2),
 	}
+	attr, _ := bgp.NewPathAttributeMpReachNLRI(bgp.RF_IPv6_UC, []bgp.AddrPrefixInterface{nlri1}, netip.MustParseAddr("1::1"))
+	p = append(p, attr)
+	p = append(p, bgp.NewPathAttributeMpUnreachNLRI(nlri2))
+
 	msg := bgp.NewBGPUpdateMessage(nil, p, nil)
 	pList := ProcessMessage(msg, peerR1(), time.Now())
 	assert.Equal(t, len(pList), 2)

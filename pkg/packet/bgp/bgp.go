@@ -11807,23 +11807,36 @@ func (p *PathAttributeMpReachNLRI) String() string {
 	return fmt.Sprintf("{MpReach(%s): {Nexthop: %s, NLRIs: %s}}", NewFamily(p.AFI, p.SAFI), p.Nexthop, p.Value)
 }
 
-func NewPathAttributeMpReachNLRI(nexthop string, nlris ...AddrPrefixInterface) *PathAttributeMpReachNLRI {
+func NewPathAttributeMpReachNLRI(family Family, nlris []AddrPrefixInterface, nextHops ...netip.Addr) (*PathAttributeMpReachNLRI, error) {
 	if len(nlris) == 0 {
-		return nil
+		return nil, fmt.Errorf("no NLRI")
 	}
+
+	if len(nextHops) > 2 {
+		return nil, fmt.Errorf("too many nexthops")
+	}
+
+	for _, n := range nextHops {
+		if !n.IsValid() {
+			return nil, fmt.Errorf("invalid nexthop")
+		}
+	}
+
 	// AFI(2) + SAFI(1) + NexthopLength(1) + Nexthop(variable)
 	// + Reserved(1) + NLRI(variable)
 	l := 5
-	afi := nlris[0].AFI()
-	safi := nlris[0].SAFI()
-	// TODO: return error
-	nh, _ := netip.ParseAddr(nexthop)
-	nhlen := BGP_ATTR_NHLEN_IPV6_GLOBAL
-	if nh.Is4() && afi != AFI_IP6 {
-		nhlen = BGP_ATTR_NHLEN_IPV4
+
+	nhlen := 0
+	if len(nextHops) > 0 {
+		if nextHops[0].Is4() {
+			nhlen = BGP_ATTR_NHLEN_IPV4
+		} else {
+			nhlen = BGP_ATTR_NHLEN_IPV6_GLOBAL
+			nhlen *= len(nextHops)
+		}
 	}
 
-	switch safi {
+	switch family.Safi() {
 	case SAFI_FLOW_SPEC_VPN, SAFI_FLOW_SPEC_UNICAST:
 	// Should not have Nexthop
 	case SAFI_MPLS_VPN:
@@ -11837,17 +11850,26 @@ func NewPathAttributeMpReachNLRI(nexthop string, nlris ...AddrPrefixInterface) *
 		l += n.Len()
 	}
 	t := BGP_ATTR_TYPE_MP_REACH_NLRI
-	return &PathAttributeMpReachNLRI{
+	pattr := &PathAttributeMpReachNLRI{
 		PathAttribute: PathAttribute{
 			Flags:  getPathAttrFlags(t, l),
 			Type:   t,
 			Length: uint16(l),
 		},
-		Nexthop: nh,
-		AFI:     afi,
-		SAFI:    safi,
-		Value:   nlris,
+		AFI:   family.Afi(),
+		SAFI:  family.Safi(),
+		Value: nlris,
 	}
+
+	switch len(nextHops) {
+	case 2:
+		pattr.LinkLocalNexthop = nextHops[1]
+		fallthrough
+	case 1:
+		pattr.Nexthop = nextHops[0]
+	}
+
+	return pattr, nil
 }
 
 type PathAttributeMpUnreachNLRI struct {

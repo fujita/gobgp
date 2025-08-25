@@ -20,6 +20,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -162,7 +163,8 @@ func injectMrt() error {
 								if mrtOpts.NextHop != nil {
 									nexthop = mrtOpts.NextHop.String()
 								}
-								attrs = append(attrs, bgp.NewPathAttributeMpReachNLRI(nexthop, nlri))
+								a2, _ := bgp.NewPathAttributeMpReachNLRI(rib.Family, []bgp.AddrPrefixInterface{nlri}, netip.MustParseAddr(nexthop))
+								attrs = append(attrs, a2)
 							}
 						}
 					}

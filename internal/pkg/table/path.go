@@ -458,7 +458,8 @@ func (path *Path) GetNexthop() netip.Addr {
 func (path *Path) SetNexthop(nexthop net.IP) {
 	if path.GetFamily() == bgp.RF_IPv4_UC && nexthop.To4() == nil {
 		path.delPathAttr(bgp.BGP_ATTR_TYPE_NEXT_HOP)
-		mpreach := bgp.NewPathAttributeMpReachNLRI(nexthop.String(), path.GetNlri())
+		n, _ := netip.AddrFromSlice(nexthop)
+		mpreach, _ := bgp.NewPathAttributeMpReachNLRI(path.GetFamily(), []bgp.AddrPrefixInterface{path.GetNlri()}, n)
 		path.setPathAttr(mpreach)
 		return
 	}
@@ -469,7 +470,9 @@ func (path *Path) SetNexthop(nexthop net.IP) {
 	attr = path.getPathAttr(bgp.BGP_ATTR_TYPE_MP_REACH_NLRI)
 	if attr != nil {
 		oldNlri := attr.(*bgp.PathAttributeMpReachNLRI)
-		path.setPathAttr(bgp.NewPathAttributeMpReachNLRI(nexthop.String(), oldNlri.Value...))
+		n, _ := netip.AddrFromSlice(nexthop)
+		attr, _ := bgp.NewPathAttributeMpReachNLRI(path.GetFamily(), oldNlri.Value, n)
+		path.setPathAttr(attr)
 	}
 }
 
@@ -1259,7 +1262,8 @@ func (p *Path) ToGlobal(vrf *Vrf) *Path {
 	path := NewPath(newFamily, p.OriginInfo().source, nlri, p.IsWithdraw, p.GetPathAttrs(), p.GetTimestamp(), false)
 	path.SetExtCommunities(vrf.ExportRt, false)
 	path.delPathAttr(bgp.BGP_ATTR_TYPE_NEXT_HOP)
-	path.setPathAttr(bgp.NewPathAttributeMpReachNLRI(nh.String(), nlri))
+	attr, _ := bgp.NewPathAttributeMpReachNLRI(newFamily, []bgp.AddrPrefixInterface{nlri}, nh)
+	path.setPathAttr(attr)
 	return path
 }
 
