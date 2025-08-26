@@ -319,17 +319,9 @@ def emit_class_def(ctx, stmt, struct_name, prefix, fd):
                 print('if len(lhs.{0}) != len(rhs.{0}) {{'.format(val_name), file=fd)
                 print('return false', file=fd)
                 print('}', file=fd)
-                print('{', file=fd)
-                print('lmap := make(map[string]*{0})'.format(type_name[2:]), file=fd)
-                print('for i, l := range lhs.{0} {{'.format(val_name), file=fd)
-                print('lmap[mapkey(i, string({0}))] = &lhs.{1}[i]'.format(' + '.join('l.{0}'.format(convert_to_golang(v)) for v in elem.split(' ')), val_name), file=fd)
-                print('}', file=fd)
                 print('for i, r := range rhs.{0} {{'.format(val_name), file=fd)
-                print('if l, y := lmap[mapkey(i, string({0}))]; !y {{'.format('+'.join('r.{0}'.format(convert_to_golang(v)) for v in elem.split(' '))), file=fd)
+                print('if !r.Equal(&lhs.{0}[i]) {{'.format(val_name), file=fd)
                 print('return false', file=fd)
-                print('} else if !r.Equal(l) {', file=fd)
-                print('return false', file=fd)
-                print('}', file=fd)
                 print('}', file=fd)
                 print('}', file=fd)
             else:
@@ -719,9 +711,9 @@ _type_translation_map = {
     'decimal64': 'float64',
     'boolean': 'bool',
     'empty': 'bool',
-    'inet:ip-address': 'string',
-    'inet:ip-prefix': 'string',
-    'inet:ipv4-address': 'string',
+    'inet:ip-address': 'netip.Addr',
+    'inet:ip-prefix': 'netip.Prefix',
+    'inet:ipv4-address': 'netip.Addr',
     'inet:as-number': 'uint32',
     'bgp-set-community-option-type': 'string',
     'inet:port-number': 'uint16',
@@ -772,6 +764,7 @@ def generate_header(fd):
     print('', file=fd)
     print('import (', file=fd)
     print('"fmt"', file=fd)
+    print('"net/netip"', file=fd)
     print('', file=fd)
     print('"github.com/osrg/gobgp/v4/pkg/packet/bgp"', file=fd)
     print(')', file=fd)
