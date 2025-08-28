@@ -2283,11 +2283,12 @@ func (lhs *AsPathOptions) Equal(rhs *AsPathOptions) bool {
 // BGP neighbor or group.
 type RouteReflectorState struct {
 	// original -> bgp:route-reflector-cluster-id
+	// bgp:route-reflector-cluster-id's original type is bgp-types:rr-cluster-id-type.
 	// route-reflector cluster id to use when local router is
 	// configured as a route reflector.  Commonly set at the group
 	// level, but allows a different cluster
 	// id to be set for each neighbor.
-	RouteReflectorClusterId RrClusterIdType `mapstructure:"route-reflector-cluster-id" json:"route-reflector-cluster-id,omitempty"`
+	RouteReflectorClusterId netip.Addr `mapstructure:"route-reflector-cluster-id" json:"route-reflector-cluster-id,omitempty"`
 	// original -> bgp:route-reflector-client
 	// bgp:route-reflector-client's original type is boolean.
 	// Configure the neighbor as a route reflector client.
@@ -2299,11 +2300,12 @@ type RouteReflectorState struct {
 // for the BGP neighbor or group.
 type RouteReflectorConfig struct {
 	// original -> bgp:route-reflector-cluster-id
+	// bgp:route-reflector-cluster-id's original type is bgp-types:rr-cluster-id-type.
 	// route-reflector cluster id to use when local router is
 	// configured as a route reflector.  Commonly set at the group
 	// level, but allows a different cluster
 	// id to be set for each neighbor.
-	RouteReflectorClusterId RrClusterIdType `mapstructure:"route-reflector-cluster-id" json:"route-reflector-cluster-id,omitempty"`
+	RouteReflectorClusterId netip.Addr `mapstructure:"route-reflector-cluster-id" json:"route-reflector-cluster-id,omitempty"`
 	// original -> bgp:route-reflector-client
 	// bgp:route-reflector-client's original type is boolean.
 	// Configure the neighbor as a route reflector client.

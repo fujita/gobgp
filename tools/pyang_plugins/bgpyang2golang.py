@@ -723,6 +723,7 @@ _type_translation_map = {
     'route-family': 'bgp.Family',
     'bgp-capability': 'bgp.ParameterCapabilityInterface',
     'bgp-open-message': '*bgp.BGPMessage',
+    'bgp-types:rr-cluster-id-type': 'netip.Addr',
 }
 
 
