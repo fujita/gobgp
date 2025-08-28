@@ -1021,7 +1021,8 @@ type BgpSetMedType string
 // struct for container gobgp:state.
 type DynamicNeighborState struct {
 	// original -> gobgp:prefix
-	Prefix string `mapstructure:"prefix" json:"prefix,omitempty"`
+	// gobgp:prefix's original type is inet:ip-prefix.
+	Prefix netip.Prefix `mapstructure:"prefix" json:"prefix,omitempty"`
 	// original -> gobgp:peer-group
 	PeerGroup string `mapstructure:"peer-group" json:"peer-group,omitempty"`
 }
@@ -1029,7 +1030,8 @@ type DynamicNeighborState struct {
 // struct for container gobgp:config.
 type DynamicNeighborConfig struct {
 	// original -> gobgp:prefix
-	Prefix string `mapstructure:"prefix" json:"prefix,omitempty"`
+	// gobgp:prefix's original type is inet:ip-prefix.
+	Prefix netip.Prefix `mapstructure:"prefix" json:"prefix,omitempty"`
 	// original -> gobgp:peer-group
 	PeerGroup string `mapstructure:"peer-group" json:"peer-group,omitempty"`
 }
@@ -6115,9 +6117,9 @@ type NeighborSet struct {
 	// reference the set in match conditions.
 	NeighborSetName string `mapstructure:"neighbor-set-name" json:"neighbor-set-name,omitempty"`
 	// original -> gobgp:neighbor-info
-	// original type is list of inet:ip-address
-	// neighbor ip address or prefix.
-	NeighborInfoList []netip.Addr `mapstructure:"neighbor-info-list" json:"neighbor-info-list,omitempty"`
+	// original type is list of inet:ip-prefix
+	// neighbor prefix.
+	NeighborInfoList []netip.Prefix `mapstructure:"neighbor-info-list" json:"neighbor-info-list,omitempty"`
 }
 
 func (lhs *NeighborSet) Equal(rhs *NeighborSet) bool {

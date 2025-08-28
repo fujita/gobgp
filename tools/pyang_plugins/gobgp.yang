@@ -1080,8 +1080,8 @@ module gobgp {
 
     leaf-list neighbor-info {
       description
-            "neighbor ip address or prefix";
-      type inet:ip-address;
+            "neighbor prefix";
+      type inet:ip-prefix;
     }
   }
 
@@ -1390,7 +1390,7 @@ module gobgp {
      This configuration structure was taken from the latest openconfig.";
 
     leaf prefix {
-      type string;
+      type inet:ip-prefix;
     }
     leaf peer-group {
       type string;
