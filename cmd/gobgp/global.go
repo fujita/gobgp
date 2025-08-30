@@ -2087,7 +2087,12 @@ func parsePath(rf bgp.Family, args []string) (*api.Path, error) {
 			if ip.To4() == nil {
 				return nil, fmt.Errorf("invalid ipv4 prefix")
 			}
-			nlri = bgp.NewIPAddrPrefix(uint8(ones), ip.String())
+			addr, ok := netip.AddrFromSlice(ip.To4())
+			if !ok {
+				return nil, fmt.Errorf("invalid ipv4 address")
+			}
+			prefix := netip.PrefixFrom(addr, ones)
+			nlri, _ = bgp.NewIPAddrPrefix(prefix)
 		} else {
 			if ip.To16() == nil {
 				return nil, fmt.Errorf("invalid ipv6 prefix")
