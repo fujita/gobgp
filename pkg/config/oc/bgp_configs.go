@@ -5297,8 +5297,9 @@ type BgpActions struct {
 	// update.
 	SetLocalPref uint32 `mapstructure:"set-local-pref" json:"set-local-pref,omitempty"`
 	// original -> bgp-pol:set-next-hop
+	// bgp-pol:set-next-hop's original type is bgp-next-hop-type.
 	// set the next-hop attribute in the route update.
-	SetNextHop BgpNextHopType `mapstructure:"set-next-hop" json:"set-next-hop,omitempty"`
+	SetNextHop netip.Addr `mapstructure:"set-next-hop" json:"set-next-hop,omitempty"`
 	// original -> bgp-pol:set-med
 	// set the med metric attribute in the route
 	// update.

@@ -724,6 +724,7 @@ _type_translation_map = {
     'bgp-capability': 'bgp.ParameterCapabilityInterface',
     'bgp-open-message': '*bgp.BGPMessage',
     'bgp-types:rr-cluster-id-type': 'netip.Addr',
+    'bgp-next-hop-type': 'netip.Addr',
 }
 
 
