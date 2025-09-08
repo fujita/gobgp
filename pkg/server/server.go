@@ -2236,11 +2236,11 @@ func (s *BgpServer) fixupApiPath(vrfId string, pathList []*table.Path) error {
 }
 
 func pathTokey(path *table.Path) string {
-	return fmt.Sprintf("%d:%s", path.GetNlri().PathIdentifier(), path.GetPrefix())
+	return fmt.Sprintf("%d:%s", path.RemoteID(), path.GetPrefix())
 }
 
 func apiutilPathTokey(path *apiutil.Path) string {
-	return fmt.Sprintf("%d:%s", path.Nlri.PathIdentifier(), path.Nlri.String())
+	return fmt.Sprintf("%d:%s", path.RemoteID, path.Nlri.String())
 }
 
 func (s *BgpServer) addPathList(vrfId string, pathList []*table.Path) error {
@@ -2304,7 +2304,7 @@ func apiutil2Path(path *apiutil.Path, isVRFTable bool, isWithdraw ...bool) (*tab
 		attr, _ := bgp.NewPathAttributeNextHop(nexthop)
 		pattrs = append(pattrs, attr)
 	} else {
-		attr, _ := bgp.NewPathAttributeMpReachNLRI(path.Family, []bgp.AddrPrefixInterface{path.Nlri}, nexthop)
+		attr, _ := bgp.NewPathAttributeMpReachNLRI(path.Family, []bgp.PathNLRI{{NLRI: path.Nlri}}, nexthop)
 		pattrs = append(pattrs, attr)
 	}
 
@@ -2313,6 +2313,7 @@ func apiutil2Path(path *apiutil.Path, isVRFTable bool, isWithdraw ...bool) (*tab
 	if p == nil {
 		return nil, fmt.Errorf("invalid path: %v", path)
 	}
+	p.SetRemoteID(path.RemoteID)
 	if !doWithdraw {
 		total := bytes.NewBuffer(make([]byte, 0))
 		for _, a := range pattrs {
@@ -4398,6 +4399,8 @@ func toPathApiUtil(path *table.Path) *apiutil.Path {
 		IsFromExternal:     path.IsFromExternal(),
 		NoImplicitWithdraw: path.NoImplicitWithdraw(),
 		IsNexthopInvalid:   path.IsNexthopInvalid,
+		RemoteID:           path.RemoteID(),
+		LocalID:            path.LocalID(),
 	}
 	if s := path.GetSource(); s != nil {
 		p.PeerASN = s.AS

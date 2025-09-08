@@ -291,7 +291,7 @@ func newPathFromIPRouteMessage(logger log.Logger, m *zebra.Message, version uint
 		if len(body.Nexthops) > 0 {
 			nexthop, err := netip.ParseAddr(body.Nexthops[0].Gate.String())
 			if err == nil {
-				attr, _ := bgp.NewPathAttributeMpReachNLRI(family, []bgp.AddrPrefixInterface{nlri}, nexthop)
+				attr, _ := bgp.NewPathAttributeMpReachNLRI(family, []bgp.PathNLRI{{NLRI: nlri}}, nexthop)
 				pattr = append(pattr, attr)
 			}
 		}
