@@ -1410,22 +1410,6 @@ func LabelString(nlri AddrPrefixInterface) string {
 	return label
 }
 
-// func (p *PrefixDefault) decodePathIdentifier(data []byte) ([]byte, error) {
-// 	if len(data) < 4 {
-// 		code := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
-// 		subcode := uint8(BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST)
-// 		return nil, NewMessageError(code, subcode, nil, "prefix misses path identifier field")
-// 	}
-// 	p.SetPathIdentifier(binary.BigEndian.Uint32(data[:4]))
-// 	return data[4:], nil
-// }
-
-// func (p *PrefixDefault) serializeIdentifier() ([]byte, error) {
-// 	buf := make([]byte, 4)
-// 	binary.BigEndian.PutUint32(buf, p.PathLocalIdentifier())
-// 	return buf, nil
-// }
-
 type IPAddrPrefixDefault struct {
 	Prefix netip.Prefix
 }
