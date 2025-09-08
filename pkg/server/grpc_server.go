@@ -523,8 +523,6 @@ func api2Path(resource api.TableType, path *api.Path, isWithdraw bool) (*table.P
 	if err != nil {
 		return nil, err
 	}
-	// FIXME
-	//nlri.SetPathIdentifier(path.Identifier)
 
 	attrList, err := apiutil.GetNativePathAttributes(path)
 	if err != nil {
@@ -584,6 +582,7 @@ func api2Path(resource api.TableType, path *api.Path, isWithdraw bool) (*table.P
 		}
 		newPath.SetHash(farm.Hash64(total.Bytes()))
 	}
+	newPath.SetRemoteID(path.Identifier)
 	newPath.SetIsFromExternal(path.IsFromExternal)
 	return newPath, nil
 }

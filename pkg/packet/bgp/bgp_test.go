@@ -715,7 +715,7 @@ func Test_AddPath(t *testing.T) {
 		assert.NoError(err)
 		assert.Equal(m2.WithdrawnRoutes[0].ID, uint32(10))
 
-		m1 = NewBGPUpdateMessage([]PathNLRI{}, []PathAttributeInterface{}, []PathNLRI{PathNLRI{NLRI: n1, ID: 20}})
+		m1 = NewBGPUpdateMessage([]PathNLRI{}, []PathAttributeInterface{}, []PathNLRI{{NLRI: n1, ID: 20}})
 		bits, err = m1.Body.Serialize(opt)
 		assert.NoError(err)
 		err = m2.DecodeFromBytes(bits, opt)
