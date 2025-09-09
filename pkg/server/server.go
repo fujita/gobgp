@@ -2309,11 +2309,10 @@ func apiutil2Path(path *apiutil.Path, isVRFTable bool, isWithdraw ...bool) (*tab
 	}
 
 	doWithdraw := len(isWithdraw) > 0 && isWithdraw[0] || path.Withdrawal
-	p := table.NewPath(path.Family, source, path.Nlri, doWithdraw, pattrs, time.Unix(path.Age, 0), path.NoImplicitWithdraw)
+	p := table.NewPath(path.Family, source, bgp.PathNLRI{NLRI: path.Nlri, ID: path.RemoteID}, doWithdraw, pattrs, time.Unix(path.Age, 0), path.NoImplicitWithdraw)
 	if p == nil {
 		return nil, fmt.Errorf("invalid path: %v", path)
 	}
-	p.SetRemoteID(path.RemoteID)
 	if !doWithdraw {
 		total := bytes.NewBuffer(make([]byte, 0))
 		for _, a := range pattrs {

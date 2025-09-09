@@ -117,7 +117,7 @@ func TestNeighAddrTieBreak(t *testing.T) {
 	p0 := func() *Path {
 		aspath := bgp.NewPathAttributeAsPath([]bgp.AsPathParamInterface{bgp.NewAs4PathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65001})})
 		attrs := []bgp.PathAttributeInterface{aspath, bgp.NewPathAttributeMultiExitDisc(0)}
-		return NewPath(bgp.RF_IPv4_UC, peer0, nlri, false, attrs, time.Now(), false)
+		return NewPath(bgp.RF_IPv4_UC, peer0, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 	}()
 
 	peer1 := &PeerInfo{AS: 65001, LocalAS: 1, Address: netip.MustParseAddr("3.3.3.3"), ID: netip.MustParseAddr("2.2.2.2")} // same ID as peer0, separate eBGP session
@@ -125,7 +125,7 @@ func TestNeighAddrTieBreak(t *testing.T) {
 	p1 := func() *Path {
 		aspath := bgp.NewPathAttributeAsPath([]bgp.AsPathParamInterface{bgp.NewAs4PathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65001})})
 		attrs := []bgp.PathAttributeInterface{aspath, bgp.NewPathAttributeMultiExitDisc(0)}
-		return NewPath(bgp.RF_IPv4_UC, peer1, nlri, false, attrs, time.Now(), false)
+		return NewPath(bgp.RF_IPv4_UC, peer1, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 	}()
 
 	assert.Equal(t, compareByNeighborAddress(p0, p1), p0)
@@ -137,13 +137,13 @@ func TestMedTieBreaker(t *testing.T) {
 	p0 := func() *Path {
 		aspath := bgp.NewPathAttributeAsPath([]bgp.AsPathParamInterface{bgp.NewAs4PathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65001, 65002}), bgp.NewAs4PathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65003, 65004})})
 		attrs := []bgp.PathAttributeInterface{aspath, bgp.NewPathAttributeMultiExitDisc(0)}
-		return NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs, time.Now(), false)
+		return NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 	}()
 
 	p1 := func() *Path {
 		aspath := bgp.NewPathAttributeAsPath([]bgp.AsPathParamInterface{bgp.NewAs4PathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65001, 65002}), bgp.NewAs4PathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65003, 65005})})
 		attrs := []bgp.PathAttributeInterface{aspath, bgp.NewPathAttributeMultiExitDisc(10)}
-		return NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs, time.Now(), false)
+		return NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 	}()
 
 	// same AS
@@ -152,7 +152,7 @@ func TestMedTieBreaker(t *testing.T) {
 	p2 := func() *Path {
 		aspath := bgp.NewPathAttributeAsPath([]bgp.AsPathParamInterface{bgp.NewAs4PathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65003})})
 		attrs := []bgp.PathAttributeInterface{aspath, bgp.NewPathAttributeMultiExitDisc(10)}
-		return NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs, time.Now(), false)
+		return NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 	}()
 
 	// different AS
@@ -161,13 +161,13 @@ func TestMedTieBreaker(t *testing.T) {
 	p3 := func() *Path {
 		aspath := bgp.NewPathAttributeAsPath([]bgp.AsPathParamInterface{bgp.NewAs4PathParam(bgp.BGP_ASPATH_ATTR_TYPE_CONFED_SEQ, []uint32{65003, 65004}), bgp.NewAs4PathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65001, 65003})})
 		attrs := []bgp.PathAttributeInterface{aspath, bgp.NewPathAttributeMultiExitDisc(0)}
-		return NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs, time.Now(), false)
+		return NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 	}()
 
 	p4 := func() *Path {
 		aspath := bgp.NewPathAttributeAsPath([]bgp.AsPathParamInterface{bgp.NewAs4PathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65001, 65002}), bgp.NewAs4PathParam(bgp.BGP_ASPATH_ATTR_TYPE_CONFED_SEQ, []uint32{65005, 65006})})
 		attrs := []bgp.PathAttributeInterface{aspath, bgp.NewPathAttributeMultiExitDisc(10)}
-		return NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs, time.Now(), false)
+		return NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 	}()
 
 	// ignore confed
@@ -175,12 +175,12 @@ func TestMedTieBreaker(t *testing.T) {
 
 	p5 := func() *Path {
 		attrs := []bgp.PathAttributeInterface{bgp.NewPathAttributeMultiExitDisc(0)}
-		return NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs, time.Now(), false)
+		return NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 	}()
 
 	p6 := func() *Path {
 		attrs := []bgp.PathAttributeInterface{bgp.NewPathAttributeMultiExitDisc(10)}
-		return NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs, time.Now(), false)
+		return NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 	}()
 
 	// no aspath
@@ -237,7 +237,7 @@ func DestCreatePath(peerD []*PeerInfo) []*Path {
 		nlriList := updateMsgD.NLRI
 		pathAttributes := updateMsgD.PathAttributes
 		nlri_info := nlriList[0]
-		pathD[i] = NewPath(bgp.RF_IPv4_UC, peerD[i], nlri_info.NLRI, false, pathAttributes, time.Now(), false)
+		pathD[i] = NewPath(bgp.RF_IPv4_UC, peerD[i], bgp.PathNLRI{NLRI: nlri_info.NLRI}, false, pathAttributes, time.Now(), false)
 	}
 	return pathD
 }
@@ -411,11 +411,11 @@ func TestGetWithdrawnPath(t *testing.T) {
 		bgp.NewPathAttributeOrigin(0),
 	}
 	nlri, _ := bgp.NewIPAddrPrefix(netip.MustParsePrefix("13.2.3.0/24"))
-	p1 := NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs, time.Now(), false)
+	p1 := NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 	nlri, _ = bgp.NewIPAddrPrefix(netip.MustParsePrefix("13.2.4.0/24"))
-	p2 := NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs, time.Now(), false)
+	p2 := NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 	nlri, _ = bgp.NewIPAddrPrefix(netip.MustParsePrefix("13.2.5.0/24"))
-	p3 := NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs, time.Now(), false)
+	p3 := NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 
 	u := &Update{
 		KnownPathList:    []*Path{p2},
@@ -438,14 +438,14 @@ func TestDestination_Calculate_ExplicitWithdraw(t *testing.T) {
 	peer2 := &PeerInfo{AS: 65002, Address: netip.MustParseAddr("2.2.2.2")}
 
 	// Create initial paths
-	p1 := NewPath(bgp.RF_IPv4_UC, peer1, nlri, false, attrs, time.Now(), false)
-	p2 := NewPath(bgp.RF_IPv4_UC, peer2, nlri, false, attrs, time.Now(), false)
+	p1 := NewPath(bgp.RF_IPv4_UC, peer1, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
+	p2 := NewPath(bgp.RF_IPv4_UC, peer2, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 
 	d := NewDestination(nlri, 1, p1, p2)
 	logger := log.NewDefaultLogger()
 
 	// Test explicit withdraw
-	withdrawPath := NewPath(bgp.RF_IPv4_UC, peer1, nlri, true, attrs, time.Now(), false)
+	withdrawPath := NewPath(bgp.RF_IPv4_UC, peer1, bgp.PathNLRI{NLRI: nlri}, true, attrs, time.Now(), false)
 	update := d.Calculate(logger, withdrawPath)
 
 	assert.Len(t, update.KnownPathList, 1)
@@ -461,7 +461,7 @@ func TestDestination_Calculate_ImplicitWithdraw(t *testing.T) {
 	peer1 := &PeerInfo{AS: 65001, Address: netip.MustParseAddr("1.1.1.1")}
 
 	// Create initial path
-	p1 := NewPath(bgp.RF_IPv4_UC, peer1, nlri, false, attrs, time.Now(), false)
+	p1 := NewPath(bgp.RF_IPv4_UC, peer1, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 	d := NewDestination(nlri, 0, p1)
 	logger := log.NewDefaultLogger()
 
@@ -470,7 +470,7 @@ func TestDestination_Calculate_ImplicitWithdraw(t *testing.T) {
 		bgp.NewPathAttributeOrigin(0),
 		bgp.NewPathAttributeMultiExitDisc(100),
 	}
-	p2 := NewPath(bgp.RF_IPv4_UC, peer1, nlri, false, newAttrs, time.Now(), false)
+	p2 := NewPath(bgp.RF_IPv4_UC, peer1, bgp.PathNLRI{NLRI: nlri}, false, newAttrs, time.Now(), false)
 	update := d.Calculate(logger, p2)
 
 	assert.Len(t, update.KnownPathList, 1)
@@ -485,7 +485,7 @@ func TestDestination_GetBestPath_InvalidNexthop(t *testing.T) {
 	nlri, _ := bgp.NewIPAddrPrefix(netip.MustParsePrefix("10.0.0.0/24"))
 	peer1 := &PeerInfo{AS: 65001, Address: netip.MustParseAddr("1.1.1.1")}
 
-	p1 := NewPath(bgp.RF_IPv4_UC, peer1, nlri, false, attrs, time.Now(), false)
+	p1 := NewPath(bgp.RF_IPv4_UC, peer1, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 
 	d := NewDestination(nlri, 0, p1)
 
@@ -507,8 +507,8 @@ func TestDestination_Select_BestAndMultiPath(t *testing.T) {
 	peer1 := &PeerInfo{AS: 65001, Address: netip.MustParseAddr("1.1.1.1")}
 	peer2 := &PeerInfo{AS: 65002, Address: netip.MustParseAddr("2.2.2.2")}
 
-	p1 := NewPath(bgp.RF_IPv4_UC, peer1, nlri, false, attrs, time.Now(), false)
-	p2 := NewPath(bgp.RF_IPv4_UC, peer2, nlri, false, attrs, time.Now(), false)
+	p1 := NewPath(bgp.RF_IPv4_UC, peer1, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
+	p2 := NewPath(bgp.RF_IPv4_UC, peer2, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 
 	d := NewDestination(nlri, 0, p1, p2)
 
@@ -532,8 +532,8 @@ func TestCompareByLLGRStaleCommunity(t *testing.T) {
 	peer1 := &PeerInfo{AS: 65001, Address: netip.MustParseAddr("1.1.1.1")}
 	peer2 := &PeerInfo{AS: 65002, Address: netip.MustParseAddr("2.2.2.2")}
 
-	p1 := NewPath(bgp.RF_IPv4_UC, peer1, nlri, false, attrs, time.Now(), false)
-	p2 := NewPath(bgp.RF_IPv4_UC, peer2, nlri, false, attrs, time.Now(), false)
+	p1 := NewPath(bgp.RF_IPv4_UC, peer1, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
+	p2 := NewPath(bgp.RF_IPv4_UC, peer2, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 
 	// Mock LLGR stale state
 	p1.SetCommunities([]uint32{uint32(bgp.COMMUNITY_LLGR_STALE)}, false)
@@ -558,8 +558,8 @@ func TestCompareByLocalOrigin(t *testing.T) {
 	peer1 := &PeerInfo{AS: 65001, Address: netip.MustParseAddr("1.1.1.1")}
 
 	// Local path (peer = nil)
-	localPath := NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs, time.Now(), false)
-	peerPath := NewPath(bgp.RF_IPv4_UC, peer1, nlri, false, attrs, time.Now(), false)
+	localPath := NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
+	peerPath := NewPath(bgp.RF_IPv4_UC, peer1, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 
 	result := compareByLocalOrigin(localPath, peerPath)
 	assert.Equal(t, localPath, result)
@@ -584,13 +584,13 @@ func TestCompareByASPath_IgnoreLength(t *testing.T) {
 		bgp.NewAs4PathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65001}),
 	})
 	attrs1 := []bgp.PathAttributeInterface{aspath1}
-	p1 := NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs1, time.Now(), false)
+	p1 := NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs1, time.Now(), false)
 
 	aspath2 := bgp.NewPathAttributeAsPath([]bgp.AsPathParamInterface{
 		bgp.NewAs4PathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65001, 65002}),
 	})
 	attrs2 := []bgp.PathAttributeInterface{aspath2}
-	p2 := NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs2, time.Now(), false)
+	p2 := NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs2, time.Now(), false)
 
 	SelectionOptions.IgnoreAsPathLength = false
 	result := compareByASPath(p1, p2)
@@ -616,13 +616,13 @@ func TestCompareByMED_AlwaysCompare(t *testing.T) {
 		bgp.NewAs4PathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65001}),
 	})
 	attrs1 := []bgp.PathAttributeInterface{aspath1, bgp.NewPathAttributeMultiExitDisc(50)}
-	p1 := NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs1, time.Now(), false)
+	p1 := NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs1, time.Now(), false)
 
 	aspath2 := bgp.NewPathAttributeAsPath([]bgp.AsPathParamInterface{
 		bgp.NewAs4PathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, []uint32{65002}),
 	})
 	attrs2 := []bgp.PathAttributeInterface{aspath2, bgp.NewPathAttributeMultiExitDisc(100)}
-	p2 := NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs2, time.Now(), false)
+	p2 := NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs2, time.Now(), false)
 
 	SelectionOptions.AlwaysCompareMed = false
 	result := compareByMED(p1, p2)
@@ -683,16 +683,16 @@ func TestDestination_Calculate_AddAndWithdrawPath(t *testing.T) {
 		bgp.NewPathAttributeOrigin(0),
 	}
 	nlri, _ := bgp.NewIPAddrPrefix(netip.MustParsePrefix("13.2.3.0/24"))
-	p1 := NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs, time.Now(), false)
+	p1 := NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 	nlri, _ = bgp.NewIPAddrPrefix(netip.MustParsePrefix("13.2.4.0/24"))
-	p2 := NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs, time.Now(), false)
+	p2 := NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 	nlri, _ = bgp.NewIPAddrPrefix(netip.MustParsePrefix("13.2.5.0/24"))
-	p3 := NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs, time.Now(), false)
+	p3 := NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 	d := NewDestination(nlri, 0, p1, p2, p3)
 
 	logger := log.NewDefaultLogger()
 	nlri, _ = bgp.NewIPAddrPrefix(netip.MustParsePrefix("13.2.6.0/24"))
-	p4 := NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs, time.Now(), false)
+	p4 := NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 	update := d.Calculate(logger, p4)
 	assert.Len(t, update.KnownPathList, 3)
 	assert.Len(t, update.KnownPathList, 3)
@@ -702,7 +702,7 @@ func TestDestination_Calculate_AddAndWithdrawPath(t *testing.T) {
 
 	// p1 is no implecit withdrawn
 	nlri, _ = bgp.NewIPAddrPrefix(netip.MustParsePrefix("13.2.3.0/24"))
-	p1 = NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs, time.Now(), true)
+	p1 = NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), true)
 	d = NewDestination(nlri, 0, p1, p2, p3)
 	update = d.Calculate(logger, p4)
 	assert.Len(t, update.KnownPathList, 3)
@@ -714,7 +714,7 @@ func TestDestination_Calculate_AddAndWithdrawPath(t *testing.T) {
 	assert.Equal(t, "13.2.5.0/24", update.KnownPathList[2].GetNlri().String())
 
 	nlri, _ = bgp.NewIPAddrPrefix(netip.MustParsePrefix("13.2.8.0/24"))
-	p5 := NewPath(bgp.RF_IPv4_UC, nil, nlri, false, attrs, time.Now(), false)
+	p5 := NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, attrs, time.Now(), false)
 	d = NewDestination(nlri, 0, p1, p2, p3, p5)
 	update = d.Calculate(logger, p4)
 

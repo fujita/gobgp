@@ -278,7 +278,7 @@ func TestTableSelectVPNv4(t *testing.T) {
 		rd, p, _ := bgp.ParseVPNPrefix(prefix)
 		nlri, _ := bgp.NewLabeledVPNIPAddrPrefix(p, *bgp.NewMPLSLabelStack(), rd)
 
-		destination := NewDestination(nlri, 0, NewPath(bgp.RF_IPv4_VPN, nil, nlri, false, nil, time.Now(), false))
+		destination := NewDestination(nlri, 0, NewPath(bgp.RF_IPv4_VPN, nil, bgp.PathNLRI{NLRI: nlri}, false, nil, time.Now(), false))
 		table.setDestination(destination)
 	}
 	assert.Equal(t, 9, len(table.GetDestinations()))
@@ -385,7 +385,7 @@ func TestTableSelectVPNv6(t *testing.T) {
 	for _, prefix := range prefixes {
 		rd, p, _ := bgp.ParseVPNPrefix(prefix)
 		nlri, _ := bgp.NewLabeledVPNIPAddrPrefix(p, *bgp.NewMPLSLabelStack(), rd)
-		destination := NewDestination(nlri, 0, NewPath(bgp.RF_IPv6_VPN, nil, nlri, false, nil, time.Now(), false))
+		destination := NewDestination(nlri, 0, NewPath(bgp.RF_IPv6_VPN, nil, bgp.PathNLRI{NLRI: nlri}, false, nil, time.Now(), false))
 		table.setDestination(destination)
 	}
 	assert.Equal(t, 9, len(table.GetDestinations()))
@@ -493,7 +493,7 @@ func TableCreatePath(peerT []*PeerInfo) []*Path {
 		nlriList := updateMsgT.NLRI
 		pathAttributes := updateMsgT.PathAttributes
 		nlri_info := nlriList[0]
-		pathT[i] = NewPath(bgp.RF_IPv4_UC, peerT[i], nlri_info.NLRI, false, pathAttributes, time.Now(), false)
+		pathT[i] = NewPath(bgp.RF_IPv4_UC, peerT[i], bgp.PathNLRI{NLRI: nlri_info.NLRI}, false, pathAttributes, time.Now(), false)
 	}
 	return pathT
 }

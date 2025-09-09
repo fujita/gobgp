@@ -175,7 +175,7 @@ func NewPathDestLocalKey(f bgp.Family, destPrefix string) *PathDestLocalKey {
 
 var localSource = &PeerInfo{}
 
-func NewPath(family bgp.Family, source *PeerInfo, nlri bgp.AddrPrefixInterface, isWithdraw bool, pattrs []bgp.PathAttributeInterface, timestamp time.Time, noImplicitWithdraw bool) *Path {
+func NewPath(family bgp.Family, source *PeerInfo, pathnlri bgp.PathNLRI, isWithdraw bool, pattrs []bgp.PathAttributeInterface, timestamp time.Time, noImplicitWithdraw bool) *Path {
 	if source == nil {
 		source = localSource
 	}
@@ -184,7 +184,7 @@ func NewPath(family bgp.Family, source *PeerInfo, nlri bgp.AddrPrefixInterface, 
 	}
 	return &Path{
 		info: &originInfo{
-			nlri:               nlri,
+			nlri:               pathnlri.NLRI,
 			source:             source,
 			timestamp:          timestamp.Unix(),
 			noImplicitWithdraw: noImplicitWithdraw,
@@ -192,6 +192,7 @@ func NewPath(family bgp.Family, source *PeerInfo, nlri bgp.AddrPrefixInterface, 
 		family:     family,
 		IsWithdraw: isWithdraw,
 		pathAttrs:  pattrs,
+		remoteID:   pathnlri.ID,
 	}
 }
 
@@ -1259,7 +1260,7 @@ func (p *Path) ToGlobal(vrf *Vrf) *Path {
 	default:
 		return p
 	}
-	path := NewPath(newFamily, p.OriginInfo().source, nlri, p.IsWithdraw, p.GetPathAttrs(), p.GetTimestamp(), false)
+	path := NewPath(newFamily, p.OriginInfo().source, bgp.PathNLRI{NLRI: nlri}, p.IsWithdraw, p.GetPathAttrs(), p.GetTimestamp(), false)
 	path.SetExtCommunities(vrf.ExportRt, false)
 	path.delPathAttr(bgp.BGP_ATTR_TYPE_NEXT_HOP)
 	attr, _ := bgp.NewPathAttributeMpReachNLRI(newFamily, []bgp.PathNLRI{{NLRI: nlri, ID: p.localID}}, nh)
@@ -1292,7 +1293,7 @@ func (p *Path) ToLocal() *Path {
 	default:
 		return p
 	}
-	path := NewPath(newFamily, p.OriginInfo().source, nlri, p.IsWithdraw, p.GetPathAttrs(), p.GetTimestamp(), false)
+	path := NewPath(newFamily, p.OriginInfo().source, bgp.PathNLRI{NLRI: nlri}, p.IsWithdraw, p.GetPathAttrs(), p.GetTimestamp(), false)
 	switch f {
 	case bgp.RF_IPv4_VPN, bgp.RF_IPv6_VPN:
 		path.delPathAttr(bgp.BGP_ATTR_TYPE_EXTENDED_COMMUNITIES)
@@ -1353,10 +1354,6 @@ func (p *Path) LocalID() uint32 {
 
 func (p *Path) RemoteID() uint32 {
 	return p.remoteID
-}
-
-func (p *Path) SetRemoteID(id uint32) {
-	p.remoteID = id
 }
 
 func nlriToIPNet(nlri bgp.AddrPrefixInterface) *net.IPNet {

@@ -570,7 +570,7 @@ func api2Path(resource api.TableType, path *api.Path, isWithdraw bool) (*table.P
 	}
 
 	doWithdraw := isWithdraw || path.IsWithdraw
-	newPath := table.NewPath(rf, pi, nlri, doWithdraw, pattrs, time.Now(), path.NoImplicitWithdraw)
+	newPath := table.NewPath(rf, pi, bgp.PathNLRI{NLRI: nlri, ID: path.Identifier}, doWithdraw, pattrs, time.Now(), path.NoImplicitWithdraw)
 	if !doWithdraw {
 		total := bytes.NewBuffer(make([]byte, 0))
 		for _, a := range newPath.GetPathAttrs() {
@@ -582,7 +582,6 @@ func api2Path(resource api.TableType, path *api.Path, isWithdraw bool) (*table.P
 		}
 		newPath.SetHash(farm.Hash64(total.Bytes()))
 	}
-	newPath.SetRemoteID(path.Identifier)
 	newPath.SetIsFromExternal(path.IsFromExternal)
 	return newPath, nil
 }

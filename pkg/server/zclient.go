@@ -307,7 +307,7 @@ func newPathFromIPRouteMessage(logger log.Logger, m *zebra.Message, version uint
 	med := bgp.NewPathAttributeMultiExitDisc(body.Metric)
 	pattr = append(pattr, med)
 
-	path := table.NewPath(family, nil, nlri, isWithdraw, pattr, time.Now(), false)
+	path := table.NewPath(family, nil, bgp.PathNLRI{NLRI: nlri}, isWithdraw, pattr, time.Now(), false)
 	path.SetIsFromExternal(true)
 	return path
 }

@@ -30,10 +30,10 @@ func TestAddPath(t *testing.T) {
 	attrs := []bgp.PathAttributeInterface{bgp.NewPathAttributeOrigin(0)}
 
 	nlri1, _ := bgp.NewIPAddrPrefix(netip.MustParsePrefix("20.20.20.0/24"))
-	p1 := NewPath(bgp.RF_IPv4_UC, pi, nlri1, false, attrs, time.Now(), false)
+	p1 := NewPath(bgp.RF_IPv4_UC, pi, bgp.PathNLRI{NLRI: nlri1}, false, attrs, time.Now(), false)
 	p1.remoteID = 1
 	nlri2, _ := bgp.NewIPAddrPrefix(netip.MustParsePrefix("20.20.20.0/24"))
-	p2 := NewPath(bgp.RF_IPv4_UC, pi, nlri2, false, attrs, time.Now(), false)
+	p2 := NewPath(bgp.RF_IPv4_UC, pi, bgp.PathNLRI{NLRI: nlri2}, false, attrs, time.Now(), false)
 	p2.remoteID = 2
 	family := p1.GetFamily()
 	families := []bgp.Family{family}
@@ -43,7 +43,7 @@ func TestAddPath(t *testing.T) {
 	assert.Equal(t, len(adj.table[family].GetDestinations()), 1)
 	assert.Equal(t, adj.Count([]bgp.Family{family}), 2)
 
-	p3 := NewPath(bgp.RF_IPv4_UC, pi, nlri2, false, attrs, time.Now(), false)
+	p3 := NewPath(bgp.RF_IPv4_UC, pi, bgp.PathNLRI{NLRI: nlri2}, false, attrs, time.Now(), false)
 	p3.remoteID = 2
 	adj.Update([]*Path{p3})
 
@@ -68,19 +68,19 @@ func TestAddPathAdjOut(t *testing.T) {
 	attrs := []bgp.PathAttributeInterface{bgp.NewPathAttributeOrigin(0)}
 
 	nlri1, _ := bgp.NewIPAddrPrefix(netip.MustParsePrefix("20.20.20.0/24"))
-	p1 := NewPath(bgp.RF_IPv4_UC, pi, nlri1, false, attrs, time.Now(), false)
+	p1 := NewPath(bgp.RF_IPv4_UC, pi, bgp.PathNLRI{NLRI: nlri1}, false, attrs, time.Now(), false)
 	p1.localID = 1
 	p1.remoteID = 1
 	nlri2, _ := bgp.NewIPAddrPrefix(netip.MustParsePrefix("20.20.20.0/24"))
-	p2 := NewPath(bgp.RF_IPv4_UC, pi, nlri2, false, attrs, time.Now(), false)
+	p2 := NewPath(bgp.RF_IPv4_UC, pi, bgp.PathNLRI{NLRI: nlri2}, false, attrs, time.Now(), false)
 	p2.localID = 2
 	p2.remoteID = 1
 	nlri3, _ := bgp.NewIPAddrPrefix(netip.MustParsePrefix("20.20.20.0/24"))
-	p3 := NewPath(bgp.RF_IPv4_UC, pi, nlri3, false, attrs, time.Now(), false)
+	p3 := NewPath(bgp.RF_IPv4_UC, pi, bgp.PathNLRI{NLRI: nlri3}, false, attrs, time.Now(), false)
 	p3.localID = 3
 	p3.remoteID = 2
 	nlri4, _ := bgp.NewIPAddrPrefix(netip.MustParsePrefix("20.20.20.0/24"))
-	p4 := NewPath(bgp.RF_IPv4_UC, pi, nlri4, false, attrs, time.Now(), false)
+	p4 := NewPath(bgp.RF_IPv4_UC, pi, bgp.PathNLRI{NLRI: nlri4}, false, attrs, time.Now(), false)
 	p4.localID = 4
 	p4.remoteID = 3
 	family := p1.GetFamily()
@@ -97,9 +97,9 @@ func TestStale(t *testing.T) {
 	attrs := []bgp.PathAttributeInterface{bgp.NewPathAttributeOrigin(0)}
 
 	nlri1, _ := bgp.NewIPAddrPrefix(netip.MustParsePrefix("20.20.10.0/24"))
-	p1 := NewPath(bgp.RF_IPv4_UC, pi, nlri1, false, attrs, time.Now(), false)
+	p1 := NewPath(bgp.RF_IPv4_UC, pi, bgp.PathNLRI{NLRI: nlri1}, false, attrs, time.Now(), false)
 	nlri2, _ := bgp.NewIPAddrPrefix(netip.MustParsePrefix("20.20.20.0/24"))
-	p2 := NewPath(bgp.RF_IPv4_UC, pi, nlri2, false, attrs, time.Now(), false)
+	p2 := NewPath(bgp.RF_IPv4_UC, pi, bgp.PathNLRI{NLRI: nlri2}, false, attrs, time.Now(), false)
 	p2.SetRejected(true)
 
 	family := p1.GetFamily()
@@ -119,7 +119,7 @@ func TestStale(t *testing.T) {
 	}
 
 	nlri3, _ := bgp.NewIPAddrPrefix(netip.MustParsePrefix("20.20.30.0/24"))
-	p3 := NewPath(bgp.RF_IPv4_UC, pi, nlri3, false, attrs, time.Now(), false)
+	p3 := NewPath(bgp.RF_IPv4_UC, pi, bgp.PathNLRI{NLRI: nlri3}, false, attrs, time.Now(), false)
 	adj.Update([]*Path{p1, p3})
 
 	droppedPathList := adj.DropStale(families)
@@ -133,20 +133,20 @@ func TestLLGRStale(t *testing.T) {
 	attrs := []bgp.PathAttributeInterface{bgp.NewPathAttributeOrigin(0)}
 
 	nlri1, _ := bgp.NewIPAddrPrefix(netip.MustParsePrefix("20.20.10.0/24"))
-	p1 := NewPath(bgp.RF_IPv4_UC, pi, nlri1, false, attrs, time.Now(), false)
+	p1 := NewPath(bgp.RF_IPv4_UC, pi, bgp.PathNLRI{NLRI: nlri1}, false, attrs, time.Now(), false)
 
 	nlri2, _ := bgp.NewIPAddrPrefix(netip.MustParsePrefix("20.20.20.0/24"))
-	p2 := NewPath(bgp.RF_IPv4_UC, pi, nlri2, false, attrs, time.Now(), false)
+	p2 := NewPath(bgp.RF_IPv4_UC, pi, bgp.PathNLRI{NLRI: nlri2}, false, attrs, time.Now(), false)
 	p2.SetRejected(true) // Not accepted
 
 	nlri3, _ := bgp.NewIPAddrPrefix(netip.MustParsePrefix("20.20.30.0/24"))
-	p3 := NewPath(bgp.RF_IPv4_UC, pi, nlri3, false, attrs, time.Now(), false)
+	p3 := NewPath(bgp.RF_IPv4_UC, pi, bgp.PathNLRI{NLRI: nlri3}, false, attrs, time.Now(), false)
 	p3.SetRejected(true)
 	// Not accepted and then dropped on MarkLLGRStaleOrDrop
 	p3.SetCommunities([]uint32{uint32(bgp.COMMUNITY_NO_LLGR)}, false)
 
 	nlri4, _ := bgp.NewIPAddrPrefix(netip.MustParsePrefix("20.20.40.0/24"))
-	p4 := NewPath(bgp.RF_IPv4_UC, pi, nlri4, false, attrs, time.Now(), false)
+	p4 := NewPath(bgp.RF_IPv4_UC, pi, bgp.PathNLRI{NLRI: nlri4}, false, attrs, time.Now(), false)
 	// dropped on MarkLLGRStaleOrDrop
 	p4.SetCommunities([]uint32{uint32(bgp.COMMUNITY_NO_LLGR)}, false)
 
