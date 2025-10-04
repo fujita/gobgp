@@ -149,7 +149,7 @@ const (
 	holdtimeIdle     = 5
 )
 
-type adminState int
+type adminState int32
 
 const (
 	adminStateUp adminState = iota
@@ -191,14 +191,29 @@ func (s *fsmState) Store(state bgp.FSMState) {
 	atomic.StoreInt32(&s.val, int32(state))
 }
 
+type adminStateRaw struct {
+	val int32
+}
+
+func (s *adminStateRaw) String() string {
+	return s.Load().String()
+}
+
+func (s *adminStateRaw) Load() adminState {
+	return adminState(atomic.LoadInt32(&s.val))
+}
+
+func (s *adminStateRaw) Store(state adminState) {
+	atomic.StoreInt32(&s.val, int32(state))
+}
+
 type fsm struct {
 	// protected by mutex
-	lock       sync.Mutex
-	gConf      *oc.Global
-	pConf      *oc.Neighbor
-	capMap     map[bgp.BGPCapabilityCode][]bgp.ParameterCapabilityInterface
-	recvOpen   *bgp.BGPMessage
-	adminState adminState
+	lock     sync.Mutex
+	gConf    *oc.Global
+	pConf    *oc.Neighbor
+	capMap   map[bgp.BGPCapabilityCode][]bgp.ParameterCapabilityInterface
+	recvOpen *bgp.BGPMessage
 
 	// safe for concurrent access
 	state                    fsmState
@@ -210,6 +225,7 @@ type fsm struct {
 	notification             chan *bgp.BGPMessage
 	deconfiguredNotification chan *bgp.BGPMessage
 	connCh                   chan net.Conn
+	adminState               adminStateRaw
 	adminStateCh             chan adminStateOperation
 
 	// only loop goroutine accesses; no lock required
@@ -303,7 +319,7 @@ func newFSM(gConf *oc.Global, pConf *oc.Neighbor, state bgp.FSMState, logger *sl
 		outgoingCh:               channels.NewInfiniteChannel(),
 		connCh:                   make(chan net.Conn, 1),
 		opensentHoldTime:         float64(holdtimeOpensent),
-		adminState:               adminState,
+		adminState:               adminStateRaw{val: int32(adminState)},
 		adminStateCh:             make(chan adminStateOperation, 1),
 		capMap:                   make(map[bgp.BGPCapabilityCode][]bgp.ParameterCapabilityInterface),
 		gracefulRestartTimer:     time.NewTimer(time.Hour),
@@ -447,11 +463,7 @@ func (h *fsmHandler) idle(ctx context.Context) (bgp.FSMState, *fsmStateReason) {
 			conn.Close()
 			fsm.logger.Warn("Closed an accepted connection", slog.String("State", fsm.state.String()))
 		case <-idleHoldTimer.C:
-			fsm.lock.Lock()
-			adminStateUp := fsm.adminState == adminStateUp
-			fsm.lock.Unlock()
-
-			if adminStateUp {
+			if fsm.adminState.Load() == adminStateUp {
 				fsm.logger.Debug("IdleHoldTimer expired", slog.String("State", fsm.state.String()), slog.Int("Duration", int(fsm.idleHoldTime)))
 				fsm.idleHoldTime = holdtimeIdle
 				return bgp.BGP_FSM_ACTIVE, newfsmStateReason(fsmIdleTimerExpired, nil, nil)
@@ -1808,17 +1820,18 @@ func (h *fsmHandler) loop(ctx context.Context, wg *sync.WaitGroup) {
 }
 
 func (h *fsmHandler) changeadminState(s adminState) error {
-	h.fsm.lock.Lock()
-	defer h.fsm.lock.Unlock()
-
 	fsm := h.fsm
-	if fsm.adminState != s {
+	// nobody can call changeadminState concurrently because fsm.lock is held so no swap() is needed.
+	if fsm.adminState.Load() != s {
 		fsm.logger.Debug("admin state changed",
 			slog.String("State", fsm.state.String()),
 			slog.String("adminState", s.String()))
 
-		fsm.adminState = s
+		fsm.adminState.Store(s)
+
+		h.fsm.lock.Lock()
 		fsm.pConf.State.AdminDown = !fsm.pConf.State.AdminDown
+		h.fsm.lock.Unlock()
 
 		switch s {
 		case adminStateUp:
