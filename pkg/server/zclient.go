@@ -250,6 +250,13 @@ func newNexthopUnregisterBody(family uint16, prefix netip.Addr) *zebra.NexthopRe
 	}
 }
 
+var zapiSource = &table.PeerInfo{
+	ID:           netip.IPv4Unspecified(),
+	LocalID:      netip.IPv4Unspecified(),
+	Address:      netip.IPv4Unspecified(),
+	LocalAddress: netip.IPv4Unspecified(),
+}
+
 func newPathFromIPRouteMessage(logger *slog.Logger, m *zebra.Message, version uint8, software zebra.Software) *table.Path {
 	header := m.Header
 	body := m.Body.(*zebra.IPRouteBody)
@@ -302,7 +309,7 @@ func newPathFromIPRouteMessage(logger *slog.Logger, m *zebra.Message, version ui
 	med := bgp.NewPathAttributeMultiExitDisc(body.Metric)
 	pattr = append(pattr, med)
 
-	path := table.NewPath(family, nil, bgp.PathNLRI{NLRI: nlri}, isWithdraw, pattr, time.Now(), false)
+	path := table.NewPath(family, zapiSource, bgp.PathNLRI{NLRI: nlri}, isWithdraw, pattr, time.Now(), false)
 	path.SetIsFromExternal(true)
 	return path
 }
