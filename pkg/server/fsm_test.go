@@ -18,6 +18,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -28,6 +29,7 @@ import (
 
 	"github.com/eapache/channels"
 	"github.com/osrg/gobgp/v4/api"
+	"github.com/osrg/gobgp/v4/internal/pkg/table"
 	"github.com/osrg/gobgp/v4/pkg/apiutil"
 	"github.com/osrg/gobgp/v4/pkg/config/oc"
 	"github.com/osrg/gobgp/v4/pkg/packet/bgp"
@@ -1393,4 +1395,154 @@ func TestBMPStatsUpdate(t *testing.T) {
 		"WithdrawUpdate should be 0 after reset")
 	assert.Equal(uint32(0), config.State.Messages.Received.WithdrawPrefix,
 		"WithdrawPrefix should be 0 after reset")
+}
+
+func makeTestPath(t *testing.T, prefix string) *table.Path {
+	t.Helper()
+	nlri, err := bgp.NewIPAddrPrefix(netip.MustParsePrefix(prefix))
+	if err != nil {
+		t.Fatal(err)
+	}
+	nh, err := bgp.NewPathAttributeNextHop(netip.MustParseAddr("192.0.2.1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return table.NewPath(bgp.RF_IPv4_UC, nil, bgp.PathNLRI{NLRI: nlri}, false, []bgp.PathAttributeInterface{
+		bgp.NewPathAttributeOrigin(0),
+		nh,
+	}, time.Now(), false)
+}
+
+func parseSentUpdates(t *testing.T, raw [][]byte) []*bgp.BGPMessage {
+	t.Helper()
+	var msgs []*bgp.BGPMessage
+	for _, buf := range raw {
+		for len(buf) > 0 {
+			msg, err := bgp.ParseBGPMessage(buf)
+			if err != nil {
+				t.Fatalf("ParseBGPMessage: %v", err)
+			}
+			msgs = append(msgs, msg)
+			buf = buf[msg.Header.Len:]
+		}
+	}
+	return msgs
+}
+
+// TestSendMessageloop_SingleMessage verifies that a single queued message
+// passes through without delay.
+func TestSendMessageloop_SingleMessage(t *testing.T) {
+	assert := assert.New(t)
+
+	m := NewMockConnection()
+	p, h := makePeerAndHandler(m)
+	t.Cleanup(func() { cleanPeerAndHandler(p, h) })
+
+	h.outgoing.In() <- &fsmOutgoingMsg{Paths: []*table.Path{makeTestPath(t, "10.0.0.0/24")}}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	stateReasonCh := make(chan fsmStateReason, 1)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() { _ = h.sendMessageloop(ctx, m.Conn, stateReasonCh, &wg) }()
+
+	select {
+	case <-m.bufReady.C:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for message")
+	}
+
+	cancel()
+	wg.Wait()
+
+	msgs := parseSentUpdates(t, m.GetSentMessages())
+	updates := 0
+	nlris := 0
+	for _, msg := range msgs {
+		if msg.Header.Type == bgp.BGP_MSG_UPDATE {
+			updates++
+			nlris += len(msg.Body.(*bgp.BGPUpdate).NLRI)
+		}
+	}
+	assert.Equal(1, updates, "single path should produce one UPDATE")
+	assert.Equal(1, nlris, "single path should carry one NLRI")
+}
+
+// TestSendMessageloop_Coalesce verifies that multiple queued messages
+// are coalesced — all NLRIs are delivered.
+func TestSendMessageloop_Coalesce(t *testing.T) {
+	assert := assert.New(t)
+
+	m := NewMockConnection()
+	p, h := makePeerAndHandler(m)
+	t.Cleanup(func() { cleanPeerAndHandler(p, h) })
+
+	const numPaths = 200
+	for i := range numPaths {
+		h.outgoing.In() <- &fsmOutgoingMsg{Paths: []*table.Path{
+			makeTestPath(t, fmt.Sprintf("10.%d.%d.0/24", i/256, i%256)),
+		}}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	stateReasonCh := make(chan fsmStateReason, 1)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() { _ = h.sendMessageloop(ctx, m.Conn, stateReasonCh, &wg) }()
+
+	assert.Eventually(func() bool {
+		total := 0
+		for _, msg := range parseSentUpdates(t, m.GetSentMessages()) {
+			if msg.Header.Type == bgp.BGP_MSG_UPDATE {
+				total += len(msg.Body.(*bgp.BGPUpdate).NLRI)
+			}
+		}
+		return total >= numPaths
+	}, 5*time.Second, 10*time.Millisecond, "timed out waiting for all NLRIs")
+
+	cancel()
+	wg.Wait()
+
+	msgs := parseSentUpdates(t, m.GetSentMessages())
+	nlris := 0
+	updates := 0
+	for _, msg := range msgs {
+		if msg.Header.Type == bgp.BGP_MSG_UPDATE {
+			updates++
+			nlris += len(msg.Body.(*bgp.BGPUpdate).NLRI)
+		}
+	}
+	assert.Equal(numPaths, nlris, "all NLRIs must be present")
+	t.Logf("coalesced %d paths into %d UPDATEs", numPaths, updates)
+}
+
+// TestSendMessageloop_KillSignal verifies that a non-path message
+// (kill signal) causes sendMessageloop to exit promptly.
+func TestSendMessageloop_KillSignal(t *testing.T) {
+	m := NewMockConnection()
+	p, h := makePeerAndHandler(m)
+	t.Cleanup(func() { cleanPeerAndHandler(p, h) })
+
+	h.outgoing.In() <- &fsmOutgoingMsg{Paths: []*table.Path{makeTestPath(t, "10.0.0.0/24")}}
+	h.outgoing.In() <- &fsmOutgoingMsg{Paths: []*table.Path{makeTestPath(t, "10.0.1.0/24")}}
+	h.outgoing.In() <- *newfsmStateReason(fsmAdminDown, nil, nil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	stateReasonCh := make(chan fsmStateReason, 1)
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	done := make(chan struct{})
+	go func() {
+		_ = h.sendMessageloop(ctx, m.Conn, stateReasonCh, &wg)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// success — loop exited
+	case <-time.After(2 * time.Second):
+		t.Fatal("sendMessageloop did not exit after kill signal")
+	}
 }
